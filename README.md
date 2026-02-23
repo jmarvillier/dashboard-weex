@@ -1,6 +1,7 @@
 # Dashboard Weex
 
 Welcome to the Dashboard Weex project!
+https://jmarvillier.github.io/dashboard-weex/
 
 ## Overview
 This is a dashboard application built with Weex framework.
