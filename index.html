@@ -19,14 +19,34 @@ body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;m
 .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:2.8rem;color:var(--gold);letter-spacing:-.03em;text-align:center;text-shadow:0 0 60px rgba(232,184,75,.2)}
 .logo span{font-size:.4rem;font-family:'Space Mono',monospace;background:var(--gold);color:var(--bg);padding:3px 8px;border-radius:3px;letter-spacing:.15em;vertical-align:middle;margin-left:10px}
 
-.choice-row{display:flex;gap:14px;width:100%;max-width:600px;flex-wrap:wrap}
-.choice-card{flex:1;min-width:220px;background:var(--bg2);border:2px solid var(--border);border-radius:16px;padding:30px 22px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.choice-row{display:flex;gap:14px;width:100%;max-width:700px;flex-wrap:wrap}
+.choice-card{flex:1;min-width:200px;background:var(--bg2);border:2px solid var(--border);border-radius:16px;padding:30px 22px;text-align:center;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
 .choice-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),transparent);opacity:0;transition:opacity .2s}
 .choice-card:hover{border-color:rgba(232,184,75,.5);transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,0,0,.5)}
 .choice-card:hover::before{opacity:1}
+
+/* ── Carte accès rapide ── */
+.choice-card.default-card{border-color:rgba(232,184,75,.4);background:linear-gradient(145deg,rgba(232,184,75,.09) 0%,var(--bg2) 60%)}
+.choice-card.default-card::before{opacity:1}
+.choice-card.default-card:hover{border-color:var(--gold);box-shadow:0 16px 48px rgba(232,184,75,.2)}
+.default-pill{display:inline-block;background:var(--gold);color:var(--bg);font-size:.48rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:2px 9px;border-radius:10px;margin-bottom:10px}
+
 .choice-icon{font-size:2.4rem;margin-bottom:12px;display:block}
 .choice-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;margin-bottom:7px}
 .choice-desc{font-size:.63rem;color:var(--text2);line-height:1.7}
+
+/* ── Loading overlay ── */
+#loadingOverlay{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(7,9,13,.92);backdrop-filter:blur(10px);
+  flex-direction:column;align-items:center;justify-content:center;gap:20px;
+}
+#loadingOverlay.show{display:flex}
+.ld-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:2.2rem;color:var(--gold)}
+.ld-bar{width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden}
+.ld-fill{height:100%;background:var(--gold);animation:ldp 1.6s ease-in-out infinite}
+@keyframes ldp{0%{width:0;margin-left:0}50%{width:70%}100%{width:0;margin-left:100%}}
+.ld-txt{font-size:.68rem;color:var(--text2)}
 
 .input-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:580px;position:relative;overflow:hidden;display:none;animation:fadeUp .3s ease}
 .input-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),transparent)}
@@ -173,11 +193,27 @@ tr:hover td{background:rgba(232,184,75,.025)}
 </head>
 <body>
 
+<!-- ══════════ LOADING OVERLAY ══════════ -->
+<div id="loadingOverlay">
+  <div class="ld-logo">WEEX</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+  <div class="ld-txt" id="ldTxt">Chargement…</div>
+</div>
+
 <!-- ══════════ LANDING ══════════ -->
 <div id="landing">
   <div class="logo">WEEX <span>DASHBOARD</span></div>
 
   <div class="choice-row" id="choiceRow">
+
+    <!-- ★ BOUTON ACCÈS RAPIDE PAR DÉFAUT ★ -->
+    <div class="choice-card default-card" onclick="loadDefault()">
+      <div class="default-pill">⚡ accès rapide</div>
+      <span class="choice-icon">🚀</span>
+      <div class="choice-title">Mon Journal WEEX</div>
+      <div class="choice-desc">Charge directement ton Google Sheet de trading par défaut</div>
+    </div>
+
     <div class="choice-card" onclick="showZone('local')">
       <span class="choice-icon">📱</span>
       <div class="choice-title">Depuis l'iPad</div>
@@ -239,6 +275,7 @@ tr:hover td{background:rgba(232,184,75,.025)}
       <div class="live-dot"></div>
       <span style="font-size:.58rem;color:var(--text2)" id="tsLabel"></span>
       <span class="excl-counter" id="exclCounter"></span>
+      <button class="btn-sm" onclick="reloadDefault()">⟳ Actualiser</button>
       <button class="btn-sm" onclick="backToLanding()">← Changer de fichier</button>
     </div>
   </div>
@@ -273,6 +310,92 @@ tr:hover td{background:rgba(232,184,75,.025)}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
+
+// ══════════════════════════════════
+// CONFIG — SHEET PAR DÉFAUT
+// ══════════════════════════════════
+const DEFAULT_SHEET_ID   = '1Cec11I3_NVlEedIQoBtomF2MzHBBaK0I';
+const DEFAULT_SHEET_URL  = 'https://docs.google.com/spreadsheets/d/1Cec11I3_NVlEedIQoBtomF2MzHBBaK0I/edit';
+const DEFAULT_SHEET_NAME = 'Mon Journal WEEX';
+
+// ══════════════════════════════════
+// LOADING OVERLAY
+// ══════════════════════════════════
+function showLoading(txt){
+  document.getElementById('ldTxt').textContent = txt||'Chargement…';
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading(){
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
+
+// ══════════════════════════════════
+// CHARGEMENT PAR DÉFAUT (NOUVEAU)
+// ══════════════════════════════════
+async function loadDefault(){
+  showLoading('Chargement de ton journal WEEX…');
+  const id = DEFAULT_SHEET_ID;
+  const urls=[
+    `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
+    `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`,
+  ];
+  let csv=null, lastErr='';
+  for(const url of urls){
+    try{
+      const res=await fetch(url,{mode:'cors'});
+      if(!res.ok){lastErr=`HTTP ${res.status}`;continue;}
+      const txt=await res.text();
+      if(txt.trim().startsWith('<')){lastErr='Accès refusé (HTML)';continue;}
+      if(txt.length<10){lastErr='Contenu vide';continue;}
+      csv=txt;break;
+    }catch(e){lastErr=e.message;}
+  }
+  hideLoading();
+  if(!csv){
+    // Sheet pas encore publié → bascule vers zone Drive avec URL pré-remplie
+    showZone('drive');
+    document.getElementById('driveUrl').value = DEFAULT_SHEET_URL;
+    checkUrl();
+    setMsg('msgDrive',
+      `⚠️ Le sheet n'est pas publié en accès public (${lastErr}).<br>Publie-le via <strong>Fichier → Publier sur le web → CSV</strong> puis clique <strong>Charger</strong>.`,
+      'warn');
+    return;
+  }
+  const rows=parseCSV(csv);
+  if(rows.length<2){
+    showZone('drive');
+    document.getElementById('driveUrl').value = DEFAULT_SHEET_URL;
+    checkUrl();
+    setMsg('msgDrive','❌ Données insuffisantes dans le fichier.','err');
+    return;
+  }
+  renderDashboard(rows, DEFAULT_SHEET_NAME);
+}
+
+async function reloadDefault(){
+  showLoading('Actualisation…');
+  const id = DEFAULT_SHEET_ID;
+  const urls=[
+    `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
+    `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`,
+  ];
+  let csv=null;
+  for(const url of urls){
+    try{
+      const res=await fetch(url,{mode:'cors'});
+      if(!res.ok) continue;
+      const txt=await res.text();
+      if(txt.trim().startsWith('<')) continue;
+      if(txt.length<10) continue;
+      csv=txt;break;
+    }catch(e){}
+  }
+  hideLoading();
+  if(!csv){ alert('Impossible de recharger. Vérifie que le sheet est publié sur le web.'); return; }
+  const rows=parseCSV(csv);
+  if(rows.length<2){ alert('Données insuffisantes.'); return; }
+  renderDashboard(rows, DEFAULT_SHEET_NAME);
+}
 
 // ══════════════════════════════════
 // STATE FLAGS
@@ -455,12 +578,7 @@ function parseCSV(text){
 // ══════════════════════════════════
 // PROCESSING — LOGIQUE CORRIGÉE
 // ══════════════════════════════════
-// Colonnes (0-indexed):
-// 0=Date, 1=PAIRE, 2=Sens, 3=Statut, 4=Prix_d/s, 5=USDT, 6=USDC, 7=EUR,
-// 8=USDT/EUR, 9=USDC/EUR, 10=Volume_d, 11=Prix_s
-
 function normPair(p){
-  // Normalise XAGUSDT -> XAG/USDT etc.
   p = String(p).trim();
   if(p==='XAGUSDT') return 'XAG/USDT';
   if(p==='BTCUSDT') return 'BTC/USDT';
@@ -500,11 +618,11 @@ function process(rows){
     if(!pair) return;
     if(!P[pair]) P[pair]={
       name:pair,
-      usdt_investi:0,   // USDT total dépensé en achats exécutés
-      vol_achete:0,     // Volume symbol acheté (exécutés)
-      vol_vendu:0,      // Volume symbol vendu (exécutés)
-      usdt_recu:0,      // USDT reçu des ventes exécutées
-      last_prix:0,      // Dernier prix connu
+      usdt_investi:0,
+      vol_achete:0,
+      vol_vendu:0,
+      usdt_recu:0,
+      last_prix:0,
       nb_total:0,
       nb_exec:0,
       nb_annule:0,
@@ -518,12 +636,11 @@ function process(rows){
 
     if(stat==='Annulé'||stat==='Annule'||stat.toLowerCase().includes('annul')){
       p.nb_annule++;
-      return; // pas d'impact financier
+      return;
     }
 
     p.nb_exec++;
 
-    // Montant en USDT (la colonne USDT contient toujours le montant en USDT équivalent)
     const montant = usdt || usdc || eur || 0;
 
     if(sens==='Achat'){
@@ -534,29 +651,19 @@ function process(rows){
       p.vol_vendu += vol;
     }
 
-    // Garde le dernier prix connu pour le PnL latent
     if(prixDs>0) p.last_prix=prixDs;
   });
 
-  // Calcul des dérivés
   Object.values(P).forEach(p=>{
-    // Position actuelle (peut être négative si ventes avant achats dans le journal)
     p.position = p.vol_achete - p.vol_vendu;
-
-    // Prix moyen d'achat (CUMP)
     p.prix_moy = p.vol_achete>0 ? p.usdt_investi/p.vol_achete : 0;
-
-    // PnL réalisé = USDT reçu - coût d'achat des volumes vendus
     const cout_vendu = p.prix_moy * p.vol_vendu;
     p.pnl_realise = p.vol_vendu>0 && p.prix_moy>0
       ? p.usdt_recu - cout_vendu
-      : p.usdt_recu; // si pas de prix moyen (vente pure), tout est gain brut
-
-    // PnL latent = position * (prix actuel - prix moyen)
+      : p.usdt_recu;
     p.pnl_latent = p.position>0 && p.prix_moy>0 && p.last_prix>0
       ? p.position * (p.last_prix - p.prix_moy)
       : 0;
-
     p.pnl_total = p.pnl_realise + p.pnl_latent;
   });
 
@@ -567,11 +674,10 @@ function process(rows){
 // RENDER
 // ══════════════════════════════════
 const fmt =(v,d=2)=>isNaN(+v)?'—':(+v).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
-const fmtV=(v,d=6)=>{ // format volume avec trim des zéros
+const fmtV=(v,d=6)=>{
   if(isNaN(+v)) return '—';
   const n=+v;
   if(n===0) return '0';
-  // choisit la précision selon la taille
   const dec = n>=1 ? 4 : n>=0.01 ? 6 : 8;
   return n.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:dec});
 };
@@ -585,15 +691,13 @@ function renderDashboard(rows, name){
   document.getElementById('tsLabel').textContent='Chargé à '+new Date().toLocaleTimeString('fr-FR');
 
   const P=process(rows);
-  // Filtre les paires sans activité (que des annulés)
   const list=Object.values(P)
     .filter(p=>p.nb_exec>0||p.vol_achete>0||p.vol_vendu>0)
     .sort((a,b)=>b.usdt_investi-a.usdt_investi);
 
   lastProcessedList=list;
-  excludedPairs.clear(); // reset flags au rechargement
+  excludedPairs.clear();
 
-  // ── KPIs globaux (via updateGlobalKPIs) ──
   document.getElementById('pairsGrid').innerHTML=list.map((p,i)=>{
     const bc=cc(p.pnl_total);
     const pid=p.name.replace(/\//g,'_');
@@ -611,7 +715,6 @@ function renderDashboard(rows, name){
       <div class="excluded-banner">🚩 Paire exclue des calculs globaux</div>
       <div class="pc-body">
 
-        <!-- Métriques principales -->
         <div class="metrics-main">
           <div class="m-cell">
             <div class="ml">Investi</div>
@@ -646,7 +749,6 @@ function renderDashboard(rows, name){
           </div>`:``}
         </div>
 
-        <!-- PnL -->
         <div class="pnl-row">
           <div class="pnl-box ${cc(p.pnl_realise)}">
             <div class="pnl-label">PnL Réalisé</div>
@@ -662,7 +764,6 @@ function renderDashboard(rows, name){
           </div>
         </div>
 
-        <!-- Barre trades -->
         <div class="tbar">
           <div class="tc tot"><span class="tn">${p.nb_total}</span><span class="tl">Total</span></div>
           <div class="tc exc"><span class="tn">${p.nb_exec}</span><span class="tl">Exec.</span></div>
@@ -675,7 +776,6 @@ function renderDashboard(rows, name){
     </div>`;
   }).join('');
 
-  // ── Tableau récap ──
   document.getElementById('tBody').innerHTML=list.map(p=>{
     const pid=p.name.replace(/\//g,'_');
     return `<tr id="tr-${pid}">
@@ -697,7 +797,7 @@ function renderDashboard(rows, name){
     <td class="c2">${p.nb_annule}</td>
   </tr>`;
   }).join('');
-  // Reset compteur
+
   document.getElementById('exclCounter').textContent='';
   document.getElementById('exclCounter').classList.remove('visible');
 
