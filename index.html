@@ -294,7 +294,7 @@ tr:hover td{background:rgba(232,184,75,.025)}
           <th>Vol. Vendu</th>
           <th>Position</th>
           <th>Prix Moy. Achat</th>
-          <th>Dernier Prix</th>
+          <th>Dernier Prix Achat</th>
           <th>PnL Réalisé</th>
           <th>PnL Latent</th>
           <th>PnL Total</th>
@@ -428,22 +428,27 @@ function toggleFlag(pair){
 
 function updateGlobalKPIs(){
   const active = lastProcessedList.filter(p=>!excludedPairs.has(p.name));
-  const sInv  = active.reduce((s,p)=>s+p.usdt_investi,0);
-  const sPnlR = active.reduce((s,p)=>s+p.pnl_realise, 0);
-  const sPnlL = active.reduce((s,p)=>s+p.pnl_latent,  0);
+  // Capital déposé = toutes les paires dépôt (même exclues, c'est un fait comptable)
+  const sDepose = lastProcessedList.reduce((s,p)=>s+p.capital_depose, 0);
+  const sInv  = active.filter(p=>!p.is_depot).reduce((s,p)=>s+p.usdt_investi,0);
+  const sPnlR = active.filter(p=>!p.is_depot).reduce((s,p)=>s+p.pnl_realise, 0);
+  const sPnlL = active.filter(p=>!p.is_depot).reduce((s,p)=>s+p.pnl_latent,  0);
   const sPnl  = sPnlR+sPnlL;
   const sTot  = active.reduce((s,p)=>s+p.nb_total,  0);
   const sExec = active.reduce((s,p)=>s+p.nb_exec,   0);
   const sCanc = active.reduce((s,p)=>s+p.nb_annule, 0);
   const ePct  = sTot>0?sExec/sTot*100:0;
+  const nActif = active.filter(p=>!p.is_depot).length;
+  const solde = sDepose - sInv; // capital déposé non encore investi
 
   const kpis=[
-    {l:'Capital Investi',  v:fmt(sInv)+' USDT',    c:'o',       s:`${active.length} paires actives`},
-    {l:'PnL Réalisé',      v:fmtS(sPnlR)+' USDT',  c:cc(sPnlR), s:'Gains/pertes clôturés'},
-    {l:'PnL Latent',       v:fmtS(sPnlL)+' USDT',  c:cc(sPnlL), s:'Positions ouvertes'},
-    {l:'PnL Total',        v:fmtS(sPnl)+' USDT',   c:cc(sPnl),  s:'Réalisé + Latent'},
-    {l:'Total Ordres',     v:sTot,                  c:'',         s:`${sExec} exec · ${sCanc} annulés`},
-    {l:'Taux Exécution',   v:fmt(ePct,1)+'%',       c:'',         s:'Ordres exécutés / total'},
+    {l:'Capital Déposé',   v:fmt(sDepose)+' USDT',  c:'o',       s:'Total des dépôts effectués'},
+    {l:'Capital Investi',  v:fmt(sInv)+' USDT',      c:'o',       s:`${nActif} paires actives`},
+    {l:'PnL Réalisé',      v:fmtS(sPnlR)+' USDT',   c:cc(sPnlR), s:'Gains/pertes clôturés'},
+    {l:'PnL Latent',       v:fmtS(sPnlL)+' USDT',   c:cc(sPnlL), s:'Positions ouvertes'},
+    {l:'PnL Total',        v:fmtS(sPnl)+' USDT',     c:cc(sPnl),  s:'Réalisé + Latent'},
+    {l:'Total Ordres',     v:sTot,                    c:'',         s:`${sExec} exec · ${sCanc} annulés`},
+    {l:'Taux Exécution',   v:fmt(ePct,1)+'%',         c:'',         s:'Ordres exécutés / total'},
   ];
   document.getElementById('kpiRow').innerHTML=kpis.map((k,i)=>`
     <div class="kpi" style="animation-delay:${i*.07}s">
@@ -595,6 +600,21 @@ function parseN(v){
   return parseFloat(s)||0;
 }
 
+// Détecte si un statut est "exécuté" (tolère espaces, accents manquants, casse)
+function isExec(stat){
+  const s = stat.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return s==='execute' || s==='exécuté' || s.startsWith('execut');
+}
+// Détecte si un statut est "annulé"
+function isAnnul(stat){
+  const s = stat.trim().toLowerCase();
+  return s.includes('annul');
+}
+// Détecte si une paire est de type USD* (dépôt/stablecoin)
+function isUsdPair(pair){
+  return /^usd/i.test(pair.trim());
+}
+
 function process(rows){
   // Trouve ligne header
   let start=1;
@@ -616,28 +636,54 @@ function process(rows){
     const vol   = parseN(r[10]);
 
     if(!pair) return;
+
+    // Colonne Dashboard (index 12) : si explicitement false → ligne exclue
+    const dash = r[12];
+    const dashStr = String(dash).trim().toLowerCase();
+    if(dash === false || dashStr === 'false' || dashStr === '0') return;
+
     if(!P[pair]) P[pair]={
       name:pair,
+      is_depot: false,      // paire de type dépôt (USD*)
+      capital_depose:0,     // cumul des dépôts sur cette paire
       usdt_investi:0,
       vol_achete:0,
       vol_vendu:0,
       usdt_recu:0,
-      last_prix:0,
+      last_prix_achat:0,
+      last_prix_vente:0,
       nb_total:0,
       nb_exec:0,
       nb_annule:0,
       nb_achat:0,
       nb_vente:0,
+      nb_depot:0,
     };
     const p=P[pair];
+
+    // ── Ligne DÉPÔT ──
+    if(sens==='Dépôt' || sens==='Depot' || sens.toLowerCase().includes('dép') || sens.toLowerCase().includes('dep')){
+      p.is_depot = true;
+      if(isExec(stat)){
+        const montant = usdt || usdc || eur || vol || 0;
+        p.capital_depose += montant;
+        p.nb_depot++;
+        p.nb_exec++;
+      }
+      p.nb_total++;
+      return;
+    }
+
     p.nb_total++;
     if(sens==='Achat') p.nb_achat++;
     if(sens==='Vente') p.nb_vente++;
 
-    if(stat==='Annulé'||stat==='Annule'||stat.toLowerCase().includes('annul')){
+    if(isAnnul(stat)){
       p.nb_annule++;
       return;
     }
+
+    if(!isExec(stat)) return; // statut inconnu → ignorer
 
     p.nb_exec++;
 
@@ -646,23 +692,26 @@ function process(rows){
     if(sens==='Achat'){
       p.usdt_investi += montant;
       p.vol_achete   += vol;
+      if(prixDs>0) p.last_prix_achat=prixDs;
     } else if(sens==='Vente'){
       p.usdt_recu += montant;
       p.vol_vendu += vol;
+      if(prixDs>0) p.last_prix_vente=prixDs;
     }
-
-    if(prixDs>0) p.last_prix=prixDs;
   });
 
   Object.values(P).forEach(p=>{
     p.position = p.vol_achete - p.vol_vendu;
     p.prix_moy = p.vol_achete>0 ? p.usdt_investi/p.vol_achete : 0;
+    p.prix_moy_vente = p.vol_vendu>0 ? p.usdt_recu/p.vol_vendu : 0;
+    // Investi en cours = total investi - coût des volumes déjà revendus
     const cout_vendu = p.prix_moy * p.vol_vendu;
+    p.investi_en_cours = Math.max(0, p.usdt_investi - cout_vendu);
     p.pnl_realise = p.vol_vendu>0 && p.prix_moy>0
       ? p.usdt_recu - cout_vendu
       : p.usdt_recu;
-    p.pnl_latent = p.position>0 && p.prix_moy>0 && p.last_prix>0
-      ? p.position * (p.last_prix - p.prix_moy)
+    p.pnl_latent = p.position>0 && p.prix_moy>0 && p.last_prix_achat>0
+      ? p.position * (p.last_prix_achat - p.prix_moy)
       : 0;
     p.pnl_total = p.pnl_realise + p.pnl_latent;
   });
@@ -697,29 +746,60 @@ function renderDashboard(rows, name){
 
   lastProcessedList=list;
   excludedPairs.clear();
+  // Auto-exclure les paires USD* (dépôts/stablecoins) par défaut
+  list.forEach(p=>{ if(isUsdPair(p.name)) excludedPairs.add(p.name); });
 
   document.getElementById('pairsGrid').innerHTML=list.map((p,i)=>{
-    const bc=cc(p.pnl_total);
+    const bc=p.is_depot ? 'n' : cc(p.pnl_total);
     const pid=p.name.replace(/\//g,'_');
-    return `<div class="pc" id="pc-${pid}" style="animation-delay:${i*.08}s">
+    const isExcluded = excludedPairs.has(p.name);
+    const badgeHtml = p.is_depot
+      ? `<div class="badge n">💰 ${fmt(p.capital_depose)} USDT déposés</div>`
+      : `<div class="badge ${bc}">${fmtS(p.pnl_total)} USDT</div>`;
+    const subHtml = p.is_depot
+      ? `${p.nb_depot} dépôt${p.nb_depot>1?'s':''} · ${fmt(p.capital_depose)} USDT`
+      : `${p.nb_exec} exécutés · ${p.nb_annule} annulés · ${p.nb_achat} achats · ${p.nb_vente} ventes`;
+    return `<div class="pc${isExcluded?' excluded':''}" id="pc-${pid}" style="animation-delay:${i*.08}s">
       <div class="pc-head">
         <div>
           <div class="pc-name">${p.name}</div>
-          <div class="pc-sub">${p.nb_exec} exécutés · ${p.nb_annule} annulés · ${p.nb_achat} achats · ${p.nb_vente} ventes</div>
+          <div class="pc-sub">${subHtml}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <div class="badge ${bc}">${fmtS(p.pnl_total)} USDT</div>
-          <button class="flag-btn" id="flag-${pid}" onclick="toggleFlag('${p.name}')">🏳 Exclure</button>
+          ${badgeHtml}
+          <button class="flag-btn${isExcluded?' flagged':''}" id="flag-${pid}" onclick="toggleFlag('${p.name}')">${isExcluded?'🚩 Exclue':'🏳 Exclure'}</button>
         </div>
       </div>
       <div class="excluded-banner">🚩 Paire exclue des calculs globaux</div>
       <div class="pc-body">
 
+        ${p.is_depot ? `
+        <div class="metrics-main">
+          <div class="m-cell">
+            <div class="ml">Total Déposé</div>
+            <div class="mv o">${fmt(p.capital_depose)}</div>
+            <div class="mv-sub">USDT</div>
+          </div>
+          <div class="m-cell">
+            <div class="ml">Nb Dépôts</div>
+            <div class="mv b">${p.nb_depot}</div>
+            <div class="mv-sub">opération${p.nb_depot>1?'s':''}</div>
+          </div>
+          <div class="m-cell">
+            <div class="ml">Devise</div>
+            <div class="mv">${p.name}</div>
+            <div class="mv-sub">stablecoin</div>
+          </div>
+        </div>
+        <div style="padding:8px 0;font-size:.6rem;color:var(--text2);text-align:center;letter-spacing:.06em">
+          Apport de capital — exclu des calculs PnL par défaut
+        </div>
+        ` : `
         <div class="metrics-main">
           <div class="m-cell">
             <div class="ml">Investi</div>
-            <div class="mv o">${fmt(p.usdt_investi)}</div>
-            <div class="mv-sub">USDT</div>
+            <div class="mv o">${fmt(p.investi_en_cours)} <span style="font-size:.65rem;color:var(--text2);font-weight:400">/ ${fmt(p.usdt_investi)}</span></div>
+            <div class="mv-sub">en cours / total USDT</div>
           </div>
           <div class="m-cell">
             <div class="ml">Vol. Acheté</div>
@@ -743,10 +823,21 @@ function renderDashboard(rows, name){
             <div class="mv-sub">USDT</div>
           </div>
           <div class="m-cell">
-            <div class="ml">Dernier Prix</div>
-            <div class="mv">${p.last_prix>0?fmt(p.last_prix):'—'}</div>
+            <div class="ml">Dernier Prix Achat</div>
+            <div class="mv">${p.last_prix_achat>0?fmt(p.last_prix_achat):'—'}</div>
             <div class="mv-sub">USDT</div>
-          </div>`:``}
+          </div>
+          ${p.vol_vendu>0?`
+          <div class="m-cell">
+            <div class="ml">Prix Moy. Vente</div>
+            <div class="mv ${p.prix_moy_vente>p.prix_moy?'g':p.prix_moy_vente<p.prix_moy&&p.prix_moy>0?'r':''}">${p.prix_moy_vente>0?fmt(p.prix_moy_vente):'—'}</div>
+            <div class="mv-sub">USDT</div>
+          </div>
+          <div class="m-cell">
+            <div class="ml">Dernier Prix Vente</div>
+            <div class="mv ${p.last_prix_vente>p.prix_moy?'g':p.last_prix_vente<p.prix_moy&&p.prix_moy>0?'r':''}">${p.last_prix_vente>0?fmt(p.last_prix_vente):'—'}</div>
+            <div class="mv-sub">USDT</div>
+          </div>`:``}`:``}
         </div>
 
         <div class="pnl-row">
@@ -771,6 +862,7 @@ function renderDashboard(rows, name){
           <div class="tc buy"><span class="tn">${p.nb_achat}</span><span class="tl">Achats</span></div>
           <div class="tc sel"><span class="tn">${p.nb_vente}</span><span class="tl">Ventes</span></div>
         </div>
+        `}
 
       </div>
     </div>`;
@@ -778,17 +870,19 @@ function renderDashboard(rows, name){
 
   document.getElementById('tBody').innerHTML=list.map(p=>{
     const pid=p.name.replace(/\//g,'_');
-    return `<tr id="tr-${pid}">
+    const isExcl = excludedPairs.has(p.name);
+    return `<tr id="tr-${pid}"${isExcl?' class="excluded-row"':''}>
     <td style="display:flex;align-items:center;gap:8px">
       ${p.name}
-      <span id="tr-flag-${pid}" style="font-size:.65rem;display:none">🚩</span>
+      ${isExcl?'<span style="font-size:.65rem">🚩</span>':''}
+      ${p.is_depot?'<span style="font-size:.55rem;background:rgba(232,184,75,.15);color:var(--gold);padding:1px 5px;border-radius:3px;letter-spacing:.06em">DÉPÔT</span>':''}
     </td>
     <td class="co bold">${fmt(p.usdt_investi)}</td>
     <td class="cb">${fmtV(p.vol_achete)}</td>
     <td class="c2">${fmtV(p.vol_vendu)}</td>
     <td class="${p.position>0?'cg':p.position<0?'cr':'c2'}">${fmtV(p.position)}</td>
     <td class="c2">${p.prix_moy>0?fmt(p.prix_moy):'—'}</td>
-    <td class="c2">${p.last_prix>0?fmt(p.last_prix):'—'}</td>
+    <td class="c2">${p.last_prix_achat>0?fmt(p.last_prix_achat):'—'}</td>
     <td class="${p.pnl_realise>0?'cg':p.pnl_realise<0?'cr':'c2'} bold">${fmtS(p.pnl_realise)}</td>
     <td class="${p.pnl_latent>0?'cg':p.pnl_latent<0?'cr':'c2'}">${fmtS(p.pnl_latent)}</td>
     <td class="${p.pnl_total>0?'cg':p.pnl_total<0?'cr':'c2'} bold">${fmtS(p.pnl_total)}</td>
