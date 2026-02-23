@@ -5,6 +5,8 @@ Welcome to the Dashboard Weex project!
 ## Overview
 This is a dashboard application built with Weex framework.
 
+[![Deploy to GitHub Pages](https://github.com/jmarvillier/dashboard-weex/actions/workflows/.deploy.yml/badge.svg)](https://github.com/jmarvillier/dashboard-weex/actions/workflows/.deploy.yml)
+
 ## Getting Started
 To get started with this project, follow these steps:
 
