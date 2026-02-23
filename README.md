@@ -1,0 +1,24 @@
+# Dashboard Weex
+
+Welcome to the Dashboard Weex project!
+
+## Overview
+This is a dashboard application built with Weex framework.
+
+## Getting Started
+To get started with this project, follow these steps:
+
+1. Clone the repository
+2. Install dependencies
+3. Run the development server
+
+## Project Structure
+- `/src` - Source code
+- `/docs` - Documentation
+- `/tests` - Test files
+
+## Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+This project is licensed under the MIT License.
