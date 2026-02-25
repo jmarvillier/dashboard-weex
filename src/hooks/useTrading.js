@@ -171,6 +171,13 @@ export function useTrading() {
     ingest(rows, 'Google Sheet')
   }, [])
 
+  // ── Rafraîchir l'état du repository (après ajout manuel d'une entrée) ──────
+
+  const refreshRepoAvailable = useCallback(async () => {
+    const available = await hasSnapshot()
+    setRepoAvailable(available)
+  }, [])
+
   // ── Effacer le repository ─────────────────────────────────────────────────
 
   const clearRepository = useCallback(async () => {
@@ -209,6 +216,7 @@ export function useTrading() {
     loadFromFile,
     loadFromDrive,
     clearRepository,
+    refreshRepoAvailable,
     toggleFlag,
     backToLanding,
   }
