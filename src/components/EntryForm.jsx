@@ -4,11 +4,11 @@
  * Formulaire de saisie d'une nouvelle ligne de trading.
  *
  * Structure des colonnes (identique au journal Excel) :
- *   [0]  Date
+ *   [0]  Date + heure
  *   [1]  Paire
- *   [2]  Sens         (Achat | Vente | Dépôt)
+ *   [2]  Sens         (Achat | Vente | Dépôt | Retrait)
  *   [3]  Statut       (Exécuté | Annulé | En attente)
- *   [4]  Prix de saisie
+ *   [4]  Cours
  *   [5]  Montant USDT
  *   [6]  Montant USDC
  *   [7]  Montant EUR
@@ -19,19 +19,28 @@
  *   [12] Dashboard    (true | false)
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { appendRow } from '../lib/repository.js'
 
-// ── Valeurs par défaut ────────────────────────────────────────────────────────
+// ── Helpers date ──────────────────────────────────────────────────────────────
 
-const today = () => new Date().toISOString().slice(0, 10)
+/** Retourne "YYYY-MM-DDTHH:MM" (format datetime-local) pour maintenant */
+function nowLocal() {
+  const d = new Date()
+  d.setSeconds(0, 0)
+  // Compense le décalage UTC → local
+  const offset = d.getTimezoneOffset() * 60000
+  return new Date(d - offset).toISOString().slice(0, 16)
+}
+
+// ── Données statiques ─────────────────────────────────────────────────────────
 
 const INITIAL = {
-  date      : today(),
+  datetime  : nowLocal(),
   paire     : '',
   sens      : 'Achat',
   statut    : 'Exécuté',
-  prix      : '',
+  cours     : '',
   usdt      : '',
   usdc      : '',
   eur       : '',
@@ -40,25 +49,113 @@ const INITIAL = {
   dashboard : true,
 }
 
-const SENS_OPTIONS   = ['Achat', 'Vente', 'Dépôt']
-const STATUT_OPTIONS = ['Exécuté', 'Annulé', 'En attente']
-
-// Paires courantes pour l'autocomplete
-const PAIRS_SUGGESTIONS = [
-  'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT',
-  'ADA/USDT', 'AVAX/USDT', 'DOT/USDT', 'MATIC/USDT', 'LINK/USDT',
-  'XAG/USDT', 'USDT/EUR', 'USDC/EUR',
+const SENS_OPTIONS = [
+  { label: 'Achat',   icon: '↑', key: 'achat'   },
+  { label: 'Vente',   icon: '↓', key: 'vente'   },
+  { label: 'Dépôt',  icon: '⊕', key: 'depot'   },
+  { label: 'Retrait', icon: '⊖', key: 'retrait' },
 ]
 
-// ── Composant ─────────────────────────────────────────────────────────────────
+const STATUT_OPTIONS = ['Exécuté', 'Annulé', 'En attente']
+
+// Paires connues — base de l'autocomplete
+const ALL_PAIRS = [
+  'BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT',
+  'ADA/USDT', 'AVAX/USDT', 'DOT/USDT', 'MATIC/USDT', 'LINK/USDT',
+  'DOGE/USDT', 'LTC/USDT', 'BCH/USDT', 'UNI/USDT', 'ATOM/USDT',
+  'FIL/USDT', 'APT/USDT', 'ARB/USDT', 'OP/USDT', 'SUI/USDT',
+  'XAG/USDT', 'USDT/EUR', 'USDC/EUR', 'BTC/EUR', 'ETH/EUR',
+]
+
+// ── Sous-composant : PaireInput (autocomplete custom) ─────────────────────────
+
+function PaireInput({ value, onChange }) {
+  const [open, setOpen]         = useState(false)
+  const [highlighted, setHl]    = useState(0)
+  const wrapRef                 = useRef()
+  const inputRef                = useRef()
+
+  // Suggestions filtrées selon la saisie
+  const suggestions = value.length === 0
+    ? ALL_PAIRS.slice(0, 8)
+    : ALL_PAIRS.filter(p =>
+        p.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 8)
+
+  // Ferme la liste si clic extérieur
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  function handleInput(e) {
+    onChange(e.target.value.toUpperCase())
+    setOpen(true)
+    setHl(0)
+  }
+
+  function handleSelect(pair) {
+    onChange(pair)
+    setOpen(false)
+    inputRef.current?.blur()
+  }
+
+  function handleKeyDown(e) {
+    if (!open) { if (e.key === 'ArrowDown') setOpen(true); return }
+    if (e.key === 'ArrowDown')  { e.preventDefault(); setHl(h => Math.min(h + 1, suggestions.length - 1)) }
+    if (e.key === 'ArrowUp')    { e.preventDefault(); setHl(h => Math.max(h - 1, 0)) }
+    if (e.key === 'Enter')      { e.preventDefault(); if (suggestions[highlighted]) handleSelect(suggestions[highlighted]) }
+    if (e.key === 'Escape')     { setOpen(false) }
+  }
+
+  return (
+    <div className="ac-wrap" ref={wrapRef}>
+      <input
+        ref={inputRef}
+        type="text"
+        className="ef-input"
+        placeholder="ex: BTC/USDT"
+        value={value}
+        onChange={handleInput}
+        onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
+        autoCapitalize="characters"
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {open && suggestions.length > 0 && (
+        <ul className="ac-list">
+          {suggestions.map((pair, i) => (
+            <li
+              key={pair}
+              className={`ac-item${i === highlighted ? ' ac-item-hl' : ''}`}
+              onMouseDown={() => handleSelect(pair)}
+              onMouseEnter={() => setHl(i)}
+            >
+              <span className="ac-pair">{pair}</span>
+              {value && pair.startsWith(value) && (
+                <span className="ac-badge">exact</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ── Composant principal ───────────────────────────────────────────────────────
 
 export default function EntryForm({ onClose, onSaved }) {
-  const [form, setForm]     = useState(INITIAL)
-  const [busy, setBusy]     = useState(false)
+  const [form, setForm]       = useState(INITIAL)
+  const [busy, setBusy]       = useState(false)
   const [success, setSuccess] = useState(false)
-  const [error, setError]   = useState(null)
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  const [error, setError]     = useState(null)
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -66,33 +163,30 @@ export default function EntryForm({ onClose, onSaved }) {
   }
 
   function validate() {
-    if (!form.date)  return 'La date est obligatoire.'
-    if (!form.paire.trim()) return 'La paire est obligatoire.'
-    if (!form.sens)  return 'Le sens est obligatoire.'
-    if (!form.statut) return 'Le statut est obligatoire.'
+    if (!form.datetime)       return 'La date et heure sont obligatoires.'
+    if (!form.paire.trim())   return 'La paire est obligatoire.'
+    if (!form.sens)           return 'Le sens est obligatoire.'
+    if (!form.statut)         return 'Le statut est obligatoire.'
     return null
   }
 
-  // Convertit le formulaire en tableau de colonnes (format journal)
   function toRow() {
     return [
-      form.date,           // [0]  Date
-      form.paire.trim(),   // [1]  Paire
-      form.sens,           // [2]  Sens
-      form.statut,         // [3]  Statut
-      form.prix    || '',  // [4]  Prix de saisie
-      form.usdt    || '',  // [5]  Montant USDT
-      form.usdc    || '',  // [6]  Montant USDC
-      form.eur     || '',  // [7]  Montant EUR
-      '',                  // [8]  réservé
-      '',                  // [9]  réservé
-      form.volume  || '',  // [10] Volume
-      form.notes   || '',  // [11] Notes
+      form.datetime,           // [0]  Date + heure
+      form.paire.trim(),       // [1]  Paire
+      form.sens,               // [2]  Sens
+      form.statut,             // [3]  Statut
+      form.cours   || '',      // [4]  Cours
+      form.usdt    || '',      // [5]  Montant USDT
+      form.usdc    || '',      // [6]  Montant USDC
+      form.eur     || '',      // [7]  Montant EUR
+      '',                      // [8]  réservé
+      '',                      // [9]  réservé
+      form.volume  || '',      // [10] Volume
+      form.notes   || '',      // [11] Notes
       form.dashboard ? 'true' : 'false', // [12] Dashboard
     ]
   }
-
-  // ── Submit ─────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
     const err = validate()
@@ -104,7 +198,7 @@ export default function EntryForm({ onClose, onSaved }) {
       setSuccess(true)
       setTimeout(() => {
         setSuccess(false)
-        setForm({ ...INITIAL, date: today() })
+        setForm({ ...INITIAL, datetime: nowLocal() })
         onSaved?.()
       }, 1400)
     } catch (e) {
@@ -113,8 +207,6 @@ export default function EntryForm({ onClose, onSaved }) {
       setBusy(false)
     }
   }
-
-  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="ef-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -126,72 +218,57 @@ export default function EntryForm({ onClose, onSaved }) {
           <button className="ef-close" onClick={onClose}>✕</button>
         </div>
 
-        {/* Succès */}
-        {success && (
-          <div className="ef-success">✅ Entrée sauvegardée dans le repository !</div>
-        )}
-
-        {/* Erreur */}
-        {error && (
-          <div className="ef-error">❌ {error}</div>
-        )}
+        {success && <div className="ef-success">✅ Entrée sauvegardée dans le repository !</div>}
+        {error   && <div className="ef-error">❌ {error}</div>}
 
         <div className="ef-body">
 
-          {/* Ligne 1 — Date + Paire */}
+          {/* ── Ligne 1 : Date + heure / Paire ── */}
           <div className="ef-row">
             <div className="ef-field">
-              <label className="ef-label">Date *</label>
+              <label className="ef-label">Date &amp; heure *</label>
               <input
-                type="date"
+                type="datetime-local"
                 className="ef-input"
-                value={form.date}
-                onChange={e => set('date', e.target.value)}
+                value={form.datetime}
+                onChange={e => set('datetime', e.target.value)}
               />
             </div>
             <div className="ef-field ef-field-wide">
               <label className="ef-label">Paire *</label>
-              <input
-                type="text"
-                className="ef-input"
-                placeholder="ex: BTC/USDT"
+              <PaireInput
                 value={form.paire}
-                onChange={e => set('paire', e.target.value.toUpperCase())}
-                list="pairs-list"
-                autoCapitalize="characters"
+                onChange={v => set('paire', v)}
               />
-              <datalist id="pairs-list">
-                {PAIRS_SUGGESTIONS.map(p => <option key={p} value={p} />)}
-              </datalist>
             </div>
           </div>
 
-          {/* Ligne 2 — Sens + Statut */}
+          {/* ── Ligne 2 : Sens + Statut ── */}
           <div className="ef-row">
             <div className="ef-field">
               <label className="ef-label">Sens *</label>
-              <div className="ef-seg">
-                {SENS_OPTIONS.map(opt => (
+              <div className="ef-seg ef-seg-wrap">
+                {SENS_OPTIONS.map(({ label, icon, key }) => (
                   <button
-                    key={opt}
-                    className={`ef-seg-btn${form.sens === opt ? ' active' : ''} sens-${opt.toLowerCase()}`}
-                    onClick={() => set('sens', opt)}
+                    key={label}
                     type="button"
+                    className={`ef-seg-btn${form.sens === label ? ' active' : ''} sens-${key}`}
+                    onClick={() => set('sens', label)}
                   >
-                    {opt === 'Achat' ? '↑' : opt === 'Vente' ? '↓' : '⊕'} {opt}
+                    {icon} {label}
                   </button>
                 ))}
               </div>
             </div>
             <div className="ef-field">
               <label className="ef-label">Statut *</label>
-              <div className="ef-seg">
+              <div className="ef-seg ef-seg-wrap">
                 {STATUT_OPTIONS.map(opt => (
                   <button
                     key={opt}
+                    type="button"
                     className={`ef-seg-btn${form.statut === opt ? ' active' : ''}`}
                     onClick={() => set('statut', opt)}
-                    type="button"
                   >
                     {opt}
                   </button>
@@ -200,10 +277,10 @@ export default function EntryForm({ onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Ligne 3 — Prix + Volume */}
+          {/* ── Ligne 3 : Cours + Volume ── */}
           <div className="ef-row">
             <div className="ef-field">
-              <label className="ef-label">Prix de saisie</label>
+              <label className="ef-label">Cours</label>
               <div className="ef-input-wrap">
                 <input
                   type="number"
@@ -211,8 +288,8 @@ export default function EntryForm({ onClose, onSaved }) {
                   placeholder="0.00"
                   min="0"
                   step="any"
-                  value={form.prix}
-                  onChange={e => set('prix', e.target.value)}
+                  value={form.cours}
+                  onChange={e => set('cours', e.target.value)}
                 />
                 <span className="ef-unit">USDT</span>
               </div>
@@ -231,19 +308,15 @@ export default function EntryForm({ onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Ligne 4 — Montants */}
-          <div className="ef-section-title">Montant investi</div>
+          {/* ── Ligne 4 : Montants ── */}
+          <div className="ef-section-title">Montant</div>
           <div className="ef-row ef-row-3">
             <div className="ef-field">
               <label className="ef-label">USDT</label>
               <div className="ef-input-wrap">
                 <input
-                  type="number"
-                  className="ef-input"
-                  placeholder="0.00"
-                  min="0"
-                  step="any"
-                  value={form.usdt}
+                  type="number" className="ef-input" placeholder="0.00"
+                  min="0" step="any" value={form.usdt}
                   onChange={e => set('usdt', e.target.value)}
                 />
                 <span className="ef-unit">$</span>
@@ -253,12 +326,8 @@ export default function EntryForm({ onClose, onSaved }) {
               <label className="ef-label">USDC</label>
               <div className="ef-input-wrap">
                 <input
-                  type="number"
-                  className="ef-input"
-                  placeholder="0.00"
-                  min="0"
-                  step="any"
-                  value={form.usdc}
+                  type="number" className="ef-input" placeholder="0.00"
+                  min="0" step="any" value={form.usdc}
                   onChange={e => set('usdc', e.target.value)}
                 />
                 <span className="ef-unit">$</span>
@@ -268,12 +337,8 @@ export default function EntryForm({ onClose, onSaved }) {
               <label className="ef-label">EUR</label>
               <div className="ef-input-wrap">
                 <input
-                  type="number"
-                  className="ef-input"
-                  placeholder="0.00"
-                  min="0"
-                  step="any"
-                  value={form.eur}
+                  type="number" className="ef-input" placeholder="0.00"
+                  min="0" step="any" value={form.eur}
                   onChange={e => set('eur', e.target.value)}
                 />
                 <span className="ef-unit">€</span>
@@ -281,7 +346,7 @@ export default function EntryForm({ onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Ligne 5 — Notes */}
+          {/* ── Ligne 5 : Notes ── */}
           <div className="ef-field">
             <label className="ef-label">Notes</label>
             <textarea
@@ -293,10 +358,11 @@ export default function EntryForm({ onClose, onSaved }) {
             />
           </div>
 
-          {/* Ligne 6 — Dashboard toggle */}
+          {/* ── Ligne 6 : Dashboard toggle ── */}
           <div className="ef-toggle-row">
             <label className="ef-toggle-label">
-              <div className={`ef-toggle${form.dashboard ? ' on' : ''}`}
+              <div
+                className={`ef-toggle${form.dashboard ? ' on' : ''}`}
                 onClick={() => set('dashboard', !form.dashboard)}
               >
                 <div className="ef-toggle-thumb" />
