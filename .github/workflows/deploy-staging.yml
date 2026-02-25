@@ -1,0 +1,57 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - staging
+      - 'feature/**'
+      - 'test/**'
+      - 'dev/**'
+      - 'jmarvillier-patch-3'   # ta branche actuelle
+  workflow_dispatch:
+
+# Seule permission nécessaire : écrire sur la branche gh-pages
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build (staging)
+        run: npm run build
+        env:
+          VITE_BASE: /dashboard-weex/staging/
+
+      # Pousse dans /staging/ sur gh-pages
+      # → ne touche PAS la prod (racine de gh-pages)
+      # → ne nécessite PAS les environment protection rules
+      - name: Deploy to gh-pages/staging
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: staging
+          publish_branch: gh-pages
+          commit_message: "[staging] ${{ github.ref_name }} @ ${{ github.sha }}"
+
+      - name: Print staging URL
+        run: |
+          echo "──────────────────────────────────────────────────────"
+          echo "✅  Staging déployé avec succès !"
+          echo "🔗  URL : https://${{ github.repository_owner }}.github.io/dashboard-weex/staging/"
+          echo "🌿  Branche  : ${{ github.ref_name }}"
+          echo "📦  Commit   : ${{ github.sha }}"
+          echo "──────────────────────────────────────────────────────"
