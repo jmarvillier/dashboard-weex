@@ -1,6 +1,7 @@
 {
   "name": "dashboard-weex",
   "version": "1.0.0",
+  "homepage": "https://jmarvillier.github.io/dashboard-weex",
   "type": "module",
   "scripts": {
     "dev": "vite",
