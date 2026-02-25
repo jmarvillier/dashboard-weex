@@ -1,36 +1,36 @@
 /**
  * src/sw.js — Service Worker WEEX Dashboard
  * ─────────────────────────────────────────────────────────────────────────────
- * Stratégie anti cache-post-déploiement :
+ * TEMPLATE — les placeholders sont remplacés par Vite au build :
  *
- *   index.html / sw.js   → Network-first TOUJOURS
- *                          Le navigateur récupère toujours la dernière version.
- *                          C'est index.html qui charge les bons JS/CSS hashés.
+ *   __APP_VERSION__  → "version" de package.json       ex: "1.1.0"
+ *   __GIT_SHA__      → SHA court du commit Git          ex: "a1b2c3d"
  *
- *   Assets hashés         → Cache-first (sûr car le hash change à chaque build)
- *   *.js, *.css, *.png    Les anciens ne sont jamais re-servis car leur URL change.
+ * Nom du cache résultant : "weex-1.1.0-a1b2c3d-assets"
+ *   → Unique par commit → purge automatique à chaque déploiement
+ *   → Traçable depuis les DevTools (Application → Cache Storage)
  *
- *   Google Sheets CSV     → Network-first (données toujours fraîches)
- *   Google Fonts          → Cache-first longue durée (immuables)
- *
- * Versioning automatique :
- *   __APP_VERSION__ et __BUILD_HASH__ sont injectés par Vite au build.
- *   Le nom du cache change à chaque build → purge automatique des anciens.
+ * Stratégies :
+ *   index.html / sw.js    → Network-first  (toujours la dernière version)
+ *   Assets hashés .js/.css → Cache-first   (URL unique par build, sûr)
+ *   Google Sheets          → Network-first  (données fraîches)
+ *   Google Fonts           → Cache-first    (immuables côté Google)
+ *   Reste                  → Network-first  avec fallback cache
  */
 
 const APP_VERSION  = '__APP_VERSION__'
-const BUILD_HASH   = '__BUILD_HASH__'
+const GIT_SHA      = '__GIT_SHA__'
 
-const ASSETS_CACHE = `weex-${APP_VERSION}-${BUILD_HASH}-assets`
-const DATA_CACHE   = `weex-${APP_VERSION}-${BUILD_HASH}-data`
+const CACHE_KEY    = `weex-${APP_VERSION}-${GIT_SHA}`
+const ASSETS_CACHE = `${CACHE_KEY}-assets`
+const DATA_CACHE   = `${CACHE_KEY}-data`
 
 const BASE = '/dashboard-weex/'
 
 // ── Install ───────────────────────────────────────────────────────────────────
 
 self.addEventListener('install', (event) => {
-  console.log(`[SW] Install — v${APP_VERSION} build:${BUILD_HASH}`)
-  // Précache uniquement index.html — les assets hashés se cachent à la demande
+  console.log(`[SW] Install — v${APP_VERSION} @ ${GIT_SHA}`)
   event.waitUntil(
     caches.open(ASSETS_CACHE)
       .then(cache => cache.add(`${BASE}index.html`))
@@ -38,17 +38,17 @@ self.addEventListener('install', (event) => {
   )
 })
 
-// ── Activate — purge les caches obsolètes ─────────────────────────────────────
+// ── Activate — purge les caches des commits précédents ───────────────────────
 
 self.addEventListener('activate', (event) => {
-  console.log(`[SW] Activate — purge caches obsolètes`)
+  console.log(`[SW] Activate — purge caches != ${CACHE_KEY}`)
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(k => k !== ASSETS_CACHE && k !== DATA_CACHE)
+          .filter(k => !k.startsWith(CACHE_KEY))
           .map(k => {
-            console.log(`[SW] Supprime : ${k}`)
+            console.log(`[SW] Supprime cache obsolète : ${k}`)
             return caches.delete(k)
           })
       ))
@@ -62,24 +62,22 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
 
-  // 1. Google Sheets CSV → Network-first (données toujours fraîches)
+  // Google Sheets → Network-first
   if (url.hostname === 'docs.google.com') {
     event.respondWith(networkFirst(request, DATA_CACHE))
     return
   }
 
-  // 2. Google Fonts → Cache-first longue durée (URLs immuables)
+  // Google Fonts → Cache-first (URLs immuables)
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(cacheFirst(request, ASSETS_CACHE))
     return
   }
 
-  // 3. index.html et sw.js → Network-first TOUJOURS
-  //    Garantit que le navigateur voit toujours la dernière version déployée.
-  //    Le fallback cache couvre le mode offline / raccourci iPad.
+  // index.html + sw.js → Network-first (toujours la version du dernier commit)
   if (
     request.mode === 'navigate' ||
-    url.pathname === `${BASE}` ||
+    url.pathname === BASE ||
     url.pathname === `${BASE}index.html` ||
     url.pathname === `${BASE}sw.js`
   ) {
@@ -87,22 +85,29 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // 4. Assets avec hash dans le nom (ex: index-Bx3kqA2f.js)
-  //    → Cache-first : leur URL est unique par build, jamais de conflit
-  if (url.pathname.match(/\.[a-f0-9]{8}\.(js|css|png|svg|woff2?)$/)) {
+  // Assets hashés (ex: index-Bx3kqA2f.js) → Cache-first
+  // Sûr car Vite change le hash à chaque modification du fichier
+  if (url.pathname.match(/\.[a-f0-9]{8,}\.(js|css|png|svg|woff2?)$/)) {
     event.respondWith(cacheFirst(request, ASSETS_CACHE))
     return
   }
 
-  // 5. Tout le reste → Network-first avec fallback cache
+  // Tout le reste → Network-first avec fallback cache
   event.respondWith(networkFirst(request, ASSETS_CACHE))
 })
 
 // ── Message ───────────────────────────────────────────────────────────────────
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting()
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+  // Permet d'interroger la version depuis l'app React
+  if (event.data?.type === 'GET_VERSION') {
+    event.source.postMessage({
+      type    : 'VERSION',
+      version : APP_VERSION,
+      sha     : GIT_SHA,
+      cache   : CACHE_KEY,
+    })
   }
 })
 
@@ -117,8 +122,7 @@ async function networkFirst(request, cacheName) {
     }
     return response
   } catch {
-    const cached = await caches.match(request)
-    return cached || Response.error()
+    return caches.match(request).then(c => c || Response.error())
   }
 }
 
