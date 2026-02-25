@@ -1,14 +1,18 @@
 /**
  * Landing.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Page d'accueil avec 3 cartes :
+ * Page d'accueil avec 5 cartes :
  *
- *   1. Mon Dashboard  → ouvre le dashboard depuis le repository (désactivée si vide)
- *   2. Depuis l'iPad  → importe un fichier .xlsx / .csv et sauvegarde dans le repo
- *   3. Google Sheets  → charge depuis un Google Sheet et sauvegarde dans le repo
+ *   1. Mon Dashboard     → ouvre le dashboard (désactivé si repo vide)
+ *   2. Nouvelle entrée   → formulaire de saisie → sauvegarde repo
+ *   3. Exporter .xlsx    → télécharge le repo en Excel (désactivé si repo vide)
+ *   4. Depuis l'iPad     → importe un fichier → sauvegarde repo
+ *   5. Google Sheets     → charge depuis GSheets → sauvegarde repo
  */
 
 import { useRef, useState } from 'react'
+import EntryForm  from './EntryForm.jsx'
+import ExportXlsx from './ExportXlsx.jsx'
 
 export default function Landing({
   zone,
@@ -19,11 +23,14 @@ export default function Landing({
   openFromRepository,
   loadFromDrive,
   loadFromFile,
+  onRepoUpdated,
 }) {
   const fileInputRef  = useRef()
-  const [driveUrl, setDriveUrl]   = useState('')
-  const [dragging, setDragging]   = useState(false)
-  const [driveBusy, setDriveBusy] = useState(false)
+  const [driveUrl, setDriveUrl]       = useState('')
+  const [dragging, setDragging]       = useState(false)
+  const [driveBusy, setDriveBusy]     = useState(false)
+  const [showEntry, setShowEntry]     = useState(false)
+  const [showExport, setShowExport]   = useState(false)
 
   function handleFile(file) {
     if (file) loadFromFile(file)
@@ -39,47 +46,91 @@ export default function Landing({
     <div id="landing">
       <div className="logo">WEEX <span>DASHBOARD</span></div>
 
-      {/* ── Choice row ── */}
+      {/* ── Modals ── */}
+      {showEntry && (
+        <EntryForm
+          onClose={() => setShowEntry(false)}
+          onSaved={() => { setShowEntry(false); onRepoUpdated?.() }}
+        />
+      )}
+      {showExport && (
+        <ExportXlsx onClose={() => setShowExport(false)} />
+      )}
+
+      {/* ── Choice grid ── */}
       {!zone && (
-        <div className="choice-row" id="choiceRow">
+        <div className="choice-grid">
 
-          {/* Carte 1 — Mon Dashboard (depuis le repository) */}
-          <div
-            className={`choice-card default-card${repoAvailable ? '' : ' disabled'}`}
-            onClick={repoAvailable ? openFromRepository : undefined}
-            title={repoAvailable ? undefined : "Aucune donnée en base. Importez d'abord un fichier."}
-          >
-            <div className="default-pill">⚡ accès rapide</div>
-            {!repoAvailable && <div className="locked-pill">🔒 aucune donnée</div>}
-            <span className="choice-icon">🚀</span>
-            <div className="choice-title">Mon Dashboard</div>
-            <div className="choice-desc">
-              {repoAvailable
-                ? 'Ouvre directement le dashboard avec les données sauvegardées'
-                : "Importe d'abord ton journal depuis l'iPad ou Google Sheets"}
+          {/* ── Ligne 1 : actions principales ── */}
+          <div className="choice-row choice-row-main">
+
+            {/* 1. Mon Dashboard */}
+            <div
+              className={`choice-card default-card${repoAvailable ? '' : ' disabled'}`}
+              onClick={repoAvailable ? openFromRepository : undefined}
+              title={repoAvailable ? undefined : "Importez d'abord un fichier."}
+            >
+              <div className="default-pill">⚡ accès rapide</div>
+              {!repoAvailable && <div className="locked-pill">🔒 vide</div>}
+              <span className="choice-icon">🚀</span>
+              <div className="choice-title">Mon Dashboard</div>
+              <div className="choice-desc">
+                {repoAvailable
+                  ? "Ouvre le dashboard avec les données sauvegardées"
+                  : "Importez d'abord ton journal"}
+              </div>
             </div>
+
+            {/* 2. Nouvelle entrée */}
+            <div className="choice-card action-card" onClick={() => setShowEntry(true)}>
+              <div className="action-pill">✏️ saisir</div>
+              <span className="choice-icon">➕</span>
+              <div className="choice-title">Nouvelle entrée</div>
+              <div className="choice-desc">
+                Ajoute une ligne manuellement au journal (trade, dépôt…)
+              </div>
+            </div>
+
+            {/* 3. Exporter .xlsx */}
+            <div
+              className={`choice-card action-card${repoAvailable ? '' : ' disabled'}`}
+              onClick={repoAvailable ? () => setShowExport(true) : undefined}
+              title={repoAvailable ? undefined : "Aucune donnée à exporter."}
+            >
+              <div className="action-pill">📥 exporter</div>
+              {!repoAvailable && <div className="locked-pill">🔒 vide</div>}
+              <span className="choice-icon">📊</span>
+              <div className="choice-title">Exporter .xlsx</div>
+              <div className="choice-desc">
+                Télécharge tout le repository en fichier Excel
+              </div>
+            </div>
+
           </div>
 
-          {/* Carte 2 — Depuis l'iPad */}
-          <div className="choice-card" onClick={() => setZone('local')}>
-            <div className="import-pill">📥 importer</div>
-            <span className="choice-icon">📱</span>
-            <div className="choice-title">Depuis l'iPad</div>
-            <div className="choice-desc">
-              Charge ton fichier .xlsx ou .csv depuis iCloud ou l'app Fichiers et
-              sauvegarde dans le repository
-            </div>
-          </div>
+          {/* ── Ligne 2 : sources d'import ── */}
+          <div className="choice-row choice-row-import">
 
-          {/* Carte 3 — Google Sheets */}
-          <div className="choice-card" onClick={() => setZone('drive')}>
-            <div className="import-pill">📥 importer</div>
-            <span className="choice-icon">☁️</span>
-            <div className="choice-title">Google Sheets</div>
-            <div className="choice-desc">
-              Colle le lien de ton Google Sheet (publication CSV requise) et
-              sauvegarde dans le repository
+            {/* 4. Depuis l'iPad */}
+            <div className="choice-card" onClick={() => setZone('local')}>
+              <div className="import-pill">📥 importer</div>
+              <span className="choice-icon">📱</span>
+              <div className="choice-title">Depuis l'iPad</div>
+              <div className="choice-desc">
+                .xlsx ou .csv depuis iCloud ou l'app Fichiers
+              </div>
             </div>
+
+            {/* 5. Google Sheets */}
+            <div className="choice-card" onClick={() => setZone('drive')}>
+              <div className="import-pill">📥 importer</div>
+              <span className="choice-icon">☁️</span>
+              <div className="choice-title">Google Sheets</div>
+              <div className="choice-desc">
+                Colle le lien de ton Google Sheet (publication CSV requise)
+              </div>
+            </div>
+
           </div>
 
         </div>
@@ -113,8 +164,7 @@ export default function Landing({
             onChange={(e) => handleFile(e.target.files[0])}
           />
           <div className="repo-notice">
-            💾 Le fichier sera sauvegardé dans le repository local. Tu pourras l'ouvrir
-            directement depuis "Mon Dashboard" la prochaine fois.
+            💾 Le fichier sera sauvegardé dans le repository local.
           </div>
           <button className="back-btn" onClick={() => setZone(null)}>← Retour</button>
         </div>
@@ -162,8 +212,7 @@ export default function Landing({
             />
           )}
           <div className="repo-notice">
-            💾 Les données seront sauvegardées dans le repository local. Tu pourras
-            rouvrir le dashboard sans connexion internet.
+            💾 Les données seront sauvegardées dans le repository local.
           </div>
           <button
             className="back-btn"
