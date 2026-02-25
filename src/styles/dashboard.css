@@ -85,3 +85,4 @@ tr:hover td { background:rgba(232,184,75,.025); }
 .bold { font-weight:700; }
 tr.excluded-row td { opacity:.35; text-decoration:line-through; text-decoration-color:rgba(245,71,106,.4); }
 tr.excluded-row td:first-child { text-decoration:none; }
+.btn-sm-danger:hover { border-color: var(--red, #f5476a) !important; color: var(--red, #f5476a) !important; }
