@@ -2,13 +2,41 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>WEEX — Dashboard</title>
+
+    <!-- ── PWA ── -->
+    <link rel="manifest" href="/dashboard-weex/manifest.json" />
+    <meta name="theme-color" content="#e8b84b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- ── Apple / iOS PWA ── -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WEEX" />
+    <link rel="apple-touch-icon" href="/dashboard-weex/icons/apple-touch-icon.png" />
+
+    <!-- ── Splash screens iOS (optionnel — améliore le démarrage) ── -->
+    <meta name="apple-touch-fullscreen" content="yes" />
+
+    <!-- ── Fonts & libs ── -->
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- ── Service Worker registration ── -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker
+            .register('/dashboard-weex/sw.js', { scope: '/dashboard-weex/' })
+            .then(reg => console.log('[SW] Registered:', reg.scope))
+            .catch(err => console.warn('[SW] Registration failed:', err))
+        })
+      }
+    </script>
   </body>
 </html>
