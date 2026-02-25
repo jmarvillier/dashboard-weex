@@ -1,21 +1,23 @@
 /**
  * sw.js — Service Worker WEEX Dashboard
  * ─────────────────────────────────────────────────────────────────────────────
- * Stratégie : Cache-first pour les assets statiques, Network-first pour les CSV
- * Google Sheets.
- *
- * Avantage PWA installée sur iPad :
- *   → Apple exempte les PWA installées (ajoutées à l'écran d'accueil) de la
- *     politique ITP de 7 jours. Les données IndexedDB persistent indéfiniment.
+ * Fix v3 :
+ *   - Numéro de version incrémenté → force la mise à jour sur Chrome/Safari
+ *   - Navigation fallback → renvoie index.html pour TOUTES les requêtes de
+ *     navigation (corrige la page blanche sur le shortcut iPad)
+ *   - Cache-first sécurisé avec fallback réseau
  */
 
-const CACHE_NAME    = 'weex-v2'
-const ASSETS_CACHE  = 'weex-assets-v2'
+const VERSION      = 'weex-v3'           // ← incrémenter à chaque déploiement
+const ASSETS_CACHE = `${VERSION}-assets`
+const DATA_CACHE   = `${VERSION}-data`
 
-// Assets à précacher au premier chargement
+const BASE = '/dashboard-weex/'
+
+// Shell minimal à précacher
 const PRECACHE_URLS = [
-  '/dashboard-weex/',
-  '/dashboard-weex/index.html',
+  BASE,
+  `${BASE}index.html`,
 ]
 
 // ── Install ───────────────────────────────────────────────────────────────────
@@ -24,71 +26,95 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(ASSETS_CACHE)
       .then(cache => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting())   // active immédiatement sans attendre
   )
 })
 
-// ── Activate ─────────────────────────────────────────────────────────────────
+// ── Activate — purge les anciens caches ───────────────────────────────────────
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
+    caches.keys()
+      .then(keys => Promise.all(
         keys
-          .filter(k => k !== CACHE_NAME && k !== ASSETS_CACHE)
-          .map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+          .filter(k => k !== ASSETS_CACHE && k !== DATA_CACHE)
+          .map(k  => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())  // prend le contrôle de tous les onglets
   )
 })
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
 self.addEventListener('fetch', (event) => {
-  const url = event.request.url
+  const { request } = event
+  const url = request.url
 
-  // Google Sheets CSV → Network-first (données fraîches si dispo, cache sinon)
+  // 1. Google Sheets CSV → Network-first (données toujours fraîches)
   if (url.includes('docs.google.com/spreadsheets')) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then(c => c.put(event.request, clone))
-          }
-          return response
-        })
-        .catch(() => caches.match(event.request))
-    )
+    event.respondWith(networkFirst(request, DATA_CACHE))
     return
   }
 
-  // Google Fonts → Network-first avec fallback cache
+  // 2. Google Fonts → Network-first avec mise en cache longue durée
   if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
+    event.respondWith(networkFirst(request, ASSETS_CACHE))
+    return
+  }
+
+  // 3. Requêtes de NAVIGATION (ouverture de l'app, raccourci iPad)
+  //    → Toujours renvoyer index.html depuis le cache
+  //    → C'est ce qui corrige la page blanche sur le shortcut
+  if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clone = response.clone()
-          caches.open(ASSETS_CACHE).then(c => c.put(event.request, clone))
-          return response
-        })
-        .catch(() => caches.match(event.request))
+      caches.match(`${BASE}index.html`)
+        .then(cached => cached || fetch(request))
+        .catch(() => caches.match(`${BASE}index.html`))
     )
     return
   }
 
-  // Tous les autres assets → Cache-first (app shell offline)
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type === 'opaque') {
-          return response
-        }
-        const clone = response.clone()
-        caches.open(ASSETS_CACHE).then(c => c.put(event.request, clone))
-        return response
-      })
-    })
-  )
+  // 4. Tous les autres assets (JS, CSS, images…) → Cache-first
+  event.respondWith(cacheFirst(request, ASSETS_CACHE))
+})
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function networkFirst(request, cacheName) {
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const cache = await caches.open(cacheName)
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch {
+    const cached = await caches.match(request)
+    return cached || Response.error()
+  }
+}
+
+async function cacheFirst(request, cacheName) {
+  const cached = await caches.match(request)
+  if (cached) return cached
+
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const cache = await caches.open(cacheName)
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch {
+    return Response.error()
+  }
+}
+
+// ── Message : force l'activation immédiate ────────────────────────────────────
+// Reçu depuis index.html quand un nouveau SW est en attente
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
