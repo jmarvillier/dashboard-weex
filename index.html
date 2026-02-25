@@ -15,8 +15,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="WEEX" />
     <link rel="apple-touch-icon" href="/dashboard-weex/icons/apple-touch-icon.png" />
-
-    <!-- ── Splash screens iOS (optionnel — améliore le démarrage) ── -->
     <meta name="apple-touch-fullscreen" content="yes" />
 
     <!-- ── Fonts & libs ── -->
@@ -27,14 +25,40 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- ── Service Worker registration ── -->
+    <!-- ── Service Worker ── -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('/dashboard-weex/sw.js', { scope: '/dashboard-weex/' })
-            .then(reg => console.log('[SW] Registered:', reg.scope))
-            .catch(err => console.warn('[SW] Registration failed:', err))
+        window.addEventListener('load', async () => {
+          try {
+            const reg = await navigator.serviceWorker.register(
+              '/dashboard-weex/sw.js',
+              { scope: '/dashboard-weex/' }
+            )
+
+            // Force la vérification d'une mise à jour à chaque chargement
+            reg.update()
+
+            // Dès qu'un nouveau SW est installé et attend → l'activer immédiatement
+            reg.addEventListener('updatefound', () => {
+              const newSW = reg.installing
+              newSW.addEventListener('statechange', () => {
+                if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Nouveau SW prêt → recharge la page pour l'appliquer
+                  navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' })
+                  window.location.reload()
+                }
+              })
+            })
+
+            console.log('[SW] Registered:', reg.scope)
+          } catch (err) {
+            console.warn('[SW] Registration failed:', err)
+          }
+        })
+
+        // Recharge quand le SW change de contrôleur (après activation)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload()
         })
       }
     </script>
