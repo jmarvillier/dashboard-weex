@@ -47,7 +47,7 @@ export default function Landing({
           <div
             className={`choice-card default-card${repoAvailable ? '' : ' disabled'}`}
             onClick={repoAvailable ? openFromRepository : undefined}
-            title={repoAvailable ? undefined : 'Aucune donnée en base. Importez d'abord un fichier.'}
+            title={repoAvailable ? undefined : "Aucune donnée en base. Importez d'abord un fichier."}
           >
             <div className="default-pill">⚡ accès rapide</div>
             {!repoAvailable && <div className="locked-pill">🔒 aucune donnée</div>}
@@ -56,7 +56,7 @@ export default function Landing({
             <div className="choice-desc">
               {repoAvailable
                 ? 'Ouvre directement le dashboard avec les données sauvegardées'
-                : 'Importe d'abord ton journal depuis l'iPad ou Google Sheets'}
+                : "Importe d'abord ton journal depuis l'iPad ou Google Sheets"}
             </div>
           </div>
 
