@@ -1,46 +1,56 @@
-import { useTrading }      from './hooks/useTrading.js'
-import LoadingOverlay      from './components/LoadingOverlay.jsx'
-import Landing             from './components/Landing.jsx'
-import Topbar              from './components/Topbar.jsx'
-import KpiRow              from './components/KpiRow.jsx'
-import PairCard            from './components/PairCard.jsx'
-import SummaryTable        from './components/SummaryTable.jsx'
+/**
+ * App.jsx
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Composant racine.
+ */
+
+import { useTrading }   from './hooks/useTrading.js'
+import LoadingOverlay   from './components/LoadingOverlay.jsx'
+import Landing          from './components/Landing.jsx'
+import Topbar           from './components/Topbar.jsx'
+import KpiRow           from './components/KpiRow.jsx'
+import PairCard         from './components/PairCard.jsx'
+import SummaryTable     from './components/SummaryTable.jsx'
+import InstallPrompt    from './components/InstallPrompt.jsx'
 
 export default function App() {
   const {
     view, zone, loading, loadingTxt,
     fileName, loadedAt, pairList, excluded, driveErr,
+    repoAvailable,
     setZone, setDriveErr,
-    loadDefault, reloadDefault, loadFromDrive, loadFromFile,
-    toggleFlag, backToLanding,
+    openFromRepository,
+    loadFromFile,
+    loadFromDrive,
+    clearRepository,
+    toggleFlag,
+    backToLanding,
   } = useTrading()
 
   return (
     <>
-      {/* ── Loading overlay ── */}
       <LoadingOverlay visible={loading} text={loadingTxt} />
 
-      {/* ── Landing ── */}
       {view === 'landing' && (
         <Landing
           zone={zone}
           setZone={setZone}
           driveErr={driveErr}
           setDriveErr={setDriveErr}
-          loadDefault={loadDefault}
+          repoAvailable={repoAvailable}
+          openFromRepository={openFromRepository}
           loadFromDrive={loadFromDrive}
           loadFromFile={loadFromFile}
         />
       )}
 
-      {/* ── Dashboard ── */}
       {view === 'dashboard' && (
         <div id="dashboard" style={{ display: 'block' }}>
           <Topbar
             fileName={fileName}
             loadedAt={loadedAt}
             excluded={excluded}
-            reloadDefault={reloadDefault}
+            clearRepository={clearRepository}
             backToLanding={backToLanding}
           />
           <div className="content">
@@ -65,6 +75,9 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Bannière d'invitation à installer la PWA (iOS Safari uniquement) */}
+      <InstallPrompt />
     </>
   )
 }
