@@ -214,3 +214,44 @@
   border-radius: 8px;
 }
 .install-why strong { color: var(--gold); }
+
+/* ── Nouvelle grille de cartes (5 cartes) ─────────────────────────────────── */
+
+.choice-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 860px;
+}
+
+.choice-row-main   { display: flex; gap: 14px; }
+.choice-row-import { display: flex; gap: 14px; }
+
+/* Cartes d'action (saisie / export) */
+.choice-card.action-card {
+  border-color: rgba(64, 150, 247, .25);
+}
+.choice-card.action-card:hover {
+  border-color: rgba(64, 150, 247, .6);
+  box-shadow: 0 16px 48px rgba(64, 150, 247, .12);
+}
+
+.action-pill {
+  display: inline-block;
+  background: rgba(64, 150, 247, .12);
+  border: 1px solid rgba(64, 150, 247, .3);
+  color: var(--blue);
+  font-size: .48rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 680px) {
+  .choice-row-main   { flex-direction: column; }
+  .choice-row-import { flex-direction: column; }
+}
