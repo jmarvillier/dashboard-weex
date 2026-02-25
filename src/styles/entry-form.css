@@ -405,3 +405,74 @@
   .ef-footer  { padding: 14px 16px 18px; }
   .ef-header  { padding: 16px 16px 14px; }
 }
+
+/* ── Autocomplete paire ───────────────────────────────────────────────────── */
+
+.ac-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.ac-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--bg2);
+  border: 1px solid rgba(232, 184, 75, .35);
+  border-radius: 10px;
+  list-style: none;
+  padding: 4px;
+  z-index: 9999;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .55);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.ac-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .1s;
+}
+.ac-item:hover,
+.ac-item-hl {
+  background: rgba(232, 184, 75, .1);
+}
+
+.ac-pair {
+  font-family: 'Space Mono', monospace;
+  font-size: .78rem;
+  color: var(--text);
+  letter-spacing: .04em;
+}
+
+.ac-badge {
+  font-size: .5rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  background: rgba(232, 184, 75, .15);
+  color: var(--gold);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ── Sens avec 4 boutons — wrap auto ─────────────────────────────────────── */
+
+.ef-seg-wrap {
+  flex-wrap: wrap;
+}
+
+/* Couleur Retrait */
+.ef-seg-btn.sens-retrait.active {
+  border-color: #f0a030;
+  background: rgba(240, 160, 48, .1);
+  color: #f0a030;
+}
+
+/* datetime-local styling */
+input[type="datetime-local"].ef-input {
+  color-scheme: dark;
+}
