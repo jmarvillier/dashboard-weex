@@ -89,6 +89,36 @@ export async function hasSnapshot() {
 }
 
 /**
+ * Ajoute une ligne au snapshot existant.
+ * Si aucun snapshot n'existe, crée un nouveau journal avec en-tête.
+ * @param {Array} row - Tableau de valeurs (13 colonnes, format journal)
+ * @returns {Promise<void>}
+ */
+export async function appendRow(row) {
+  const snapshot = await loadSnapshot()
+
+  let rows
+  let source
+
+  if (snapshot && Array.isArray(snapshot.rows) && snapshot.rows.length > 0) {
+    // Ajoute au snapshot existant
+    rows   = [...snapshot.rows, row]
+    source = snapshot.source
+  } else {
+    // Crée un nouveau journal avec en-tête
+    const header = [
+      'Date', 'Paire', 'Sens', 'Statut', 'Prix de saisie',
+      'Montant USDT', 'Montant USDC', 'Montant EUR', '', '',
+      'Volume', 'Notes', 'Dashboard',
+    ]
+    rows   = [header, row]
+    source = 'Saisie manuelle'
+  }
+
+  await saveSnapshot(rows, source)
+}
+
+/**
  * Supprime toutes les données sauvegardées.
  * @returns {Promise<void>}
  */
