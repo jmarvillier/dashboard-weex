@@ -23,6 +23,7 @@ export default function App() {
     loadFromFile,
     loadFromDrive,
     clearRepository,
+    refreshRepoAvailable,
     toggleFlag,
     backToLanding,
   } = useTrading()
@@ -41,6 +42,7 @@ export default function App() {
           openFromRepository={openFromRepository}
           loadFromDrive={loadFromDrive}
           loadFromFile={loadFromFile}
+          onRepoUpdated={refreshRepoAvailable}
         />
       )}
 
@@ -76,7 +78,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Bannière d'invitation à installer la PWA (iOS Safari uniquement) */}
       <InstallPrompt />
     </>
   )
