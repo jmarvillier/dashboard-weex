@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - jmarvillier-patch-3
+      - master
   workflow_dispatch:
 
 permissions:
