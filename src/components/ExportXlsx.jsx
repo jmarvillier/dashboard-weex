@@ -140,7 +140,7 @@ export default function ExportXlsx({ onClose }) {
   }
 
   return (
-    <div className="ef-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="ef-overlay">
       <div className="ef-modal ef-modal-sm">
 
         {/* Header */}

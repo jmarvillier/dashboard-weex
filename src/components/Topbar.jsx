@@ -1,3 +1,4 @@
+import Logo from './Logo.jsx'
 /**
  * Topbar.jsx
  * ─────────────────────────────────────────────────────────────────────────────
@@ -13,7 +14,7 @@ export default function Topbar({ fileName, loadedAt, excluded, clearRepository, 
   return (
     <div className="topbar">
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <div className="topbar-logo">WEEX</div>
+        <Logo small />
         <div className="topbar-file">📊 <strong>{fileName}</strong></div>
       </div>
       <div className="topbar-actions">
