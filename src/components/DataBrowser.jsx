@@ -228,7 +228,7 @@ export default function DataBrowser({ onClose, onDataChanged }) {
   }
 
   return (
-    <div className="db-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="db-overlay">
       <div className="db-modal">
 
         <div className="db-header">
