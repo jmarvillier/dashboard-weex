@@ -209,7 +209,7 @@ export default function EntryForm({ onClose, onSaved }) {
   }
 
   return (
-    <div className="ef-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="ef-overlay">
       <div className="ef-modal">
 
         {/* Header */}
