@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import DataMenu from './DataMenu.jsx'
+import Logo     from './Logo.jsx'
 
 export default function Landing({
   zone,
@@ -32,7 +33,7 @@ export default function Landing({
   if (showDataMenu) {
     return (
       <div id="landing">
-        <div className="logo">WEEX <span>DASHBOARD</span></div>
+        <Logo />
         <DataMenu
           repoAvailable={repoAvailable}
           loadFromFile={loadFromFile}
@@ -50,7 +51,7 @@ export default function Landing({
 
   return (
     <div id="landing">
-      <div className="logo">WEEX <span>DASHBOARD</span></div>
+      <Logo />
 
       <div className="choice-grid">
         <div className="choice-row choice-row-main">
