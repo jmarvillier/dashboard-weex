@@ -4,6 +4,7 @@ import './styles/variables.css'
 import './styles/landing.css'
 import './styles/dashboard.css'
 import './styles/entry-form.css'
+import './styles/data-menu.css'   // ← ligne ajoutée
 import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
