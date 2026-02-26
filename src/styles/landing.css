@@ -255,3 +255,28 @@
   .choice-row-main   { flex-direction: column; }
   .choice-row-import { flex-direction: column; }
 }
+
+/* ── Logo version ── */
+.logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-version {
+  font-family: 'Space Mono', monospace;
+  font-size: .55rem;
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 8px;
+  letter-spacing: .08em;
+  align-self: center;
+}
+
+.logo-version-small {
+  font-size: .5rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
