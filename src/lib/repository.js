@@ -119,6 +119,66 @@ export async function appendRow(row) {
 }
 
 /**
+ * Retourne toutes les lignes de données (sans l'en-tête).
+ * Chaque entrée inclut son index original dans snapshot.rows.
+ * @returns {Promise<{ header: Array, entries: Array<{ rowIndex: number, data: Array }> } | null>}
+ */
+export async function listEntries() {
+  const snapshot = await loadSnapshot()
+  if (!snapshot || !Array.isArray(snapshot.rows) || snapshot.rows.length < 1) {
+    return null
+  }
+
+  const rows = snapshot.rows
+  // Détecter la ligne d'en-tête
+  const hasHeader = rows[0]?.some(c => String(c).toUpperCase().includes('PAIRE'))
+  const headerIndex = hasHeader ? 0 : -1
+  const header = hasHeader ? rows[0] : []
+
+  const entries = rows
+    .map((data, rowIndex) => ({ rowIndex, data }))
+    .filter(({ rowIndex }) => rowIndex !== headerIndex)
+
+  return { header, entries, source: snapshot.source, loadedAt: snapshot.loadedAt }
+}
+
+/**
+ * Met à jour une ligne existante (par index dans snapshot.rows).
+ * @param {number} rowIndex - Index de la ligne dans snapshot.rows
+ * @param {Array}  newData  - Nouvelles valeurs pour cette ligne
+ * @returns {Promise<void>}
+ */
+export async function updateRow(rowIndex, newData) {
+  const snapshot = await loadSnapshot()
+  if (!snapshot || !Array.isArray(snapshot.rows)) {
+    throw new Error('Aucune donnée dans le repository.')
+  }
+
+  const rows = [...snapshot.rows]
+  if (rowIndex < 0 || rowIndex >= rows.length) {
+    throw new Error(`Index de ligne invalide : ${rowIndex}`)
+  }
+
+  rows[rowIndex] = newData
+  await saveSnapshot(rows, snapshot.source)
+}
+
+/**
+ * Supprime une ligne existante (par index dans snapshot.rows).
+ * @param {number} rowIndex - Index de la ligne dans snapshot.rows
+ * @returns {Promise<void>}
+ */
+export async function deleteRow(rowIndex) {
+  const snapshot = await loadSnapshot()
+  if (!snapshot || !Array.isArray(snapshot.rows)) {
+    throw new Error('Aucune donnée dans le repository.')
+  }
+
+  const rows = snapshot.rows.filter((_, i) => i !== rowIndex)
+  await saveSnapshot(rows, snapshot.source)
+}
+
+/**
  * Supprime toutes les données sauvegardées.
  * @returns {Promise<void>}
  */
