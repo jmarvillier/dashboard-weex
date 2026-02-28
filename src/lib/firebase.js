@@ -22,7 +22,6 @@ const firebaseConfig = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
 
 // Active le cache offline → l'app fonctionne sans connexion,
 // sync automatique au retour en ligne
