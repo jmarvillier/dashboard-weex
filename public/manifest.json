@@ -1,6 +1,6 @@
 {
-  "name": "WEEX Dashboard",
-  "short_name": "WEEX",
+  "name": "Ydash",
+  "short_name": "Ydash",
   "description": "Journal de trading — suivi de tes investissements crypto",
   "start_url": "/dashboard-weex/",
   "scope": "/dashboard-weex/",

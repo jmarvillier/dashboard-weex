@@ -111,7 +111,7 @@ export default function ExportXlsx({ onClose }) {
       })
 
       // 7. Téléchargement — méthode universelle Safari + Chrome + Firefox
-      const fileName = `journal-weex-${new Date().toISOString().slice(0, 10)}.xlsx`
+      const fileName = `journal-ydash-${new Date().toISOString().slice(0, 10)}.xlsx`
       const url      = URL.createObjectURL(blob)
       const a        = document.createElement('a')
       a.href         = url

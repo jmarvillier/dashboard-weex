@@ -1,14 +1,11 @@
 /**
  * DataMenu.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Sous-menu "Données" regroupant toutes les actions liées aux données :
- *   1. Nouvelle entrée   → formulaire de saisie
- *   2. Importer iPad     → fichier local
- *   3. Importer Sheets   → Google Sheets URL
- *   4. Parcourir         → DataBrowser (lecture / édition / suppression)
- *
- * Ce composant gère sa propre navigation interne (action sélectionnée).
- * Il reçoit les handlers d'action depuis Landing.
+ * Sous-menu "Données" — nouvel ordre :
+ *   1. Nouvelle entrée  → formulaire de saisie
+ *   2. Parcourir        → DataBrowser
+ *   3. Importer         → sous-menu Import (iPad + Google Sheets)
+ *   4. Exporter .xlsx   → ExportXlsx
  */
 
 import { useState, useRef } from 'react'
@@ -16,7 +13,7 @@ import EntryForm    from './EntryForm.jsx'
 import ExportXlsx  from './ExportXlsx.jsx'
 import DataBrowser from './DataBrowser.jsx'
 
-// ── Items du sous-menu ────────────────────────────────────────────────────────
+// ── Items du menu principal ───────────────────────────────────────────────────
 
 const MENU_ITEMS = [
   {
@@ -28,31 +25,6 @@ const MENU_ITEMS = [
     pillClass: 'action-pill',
   },
   {
-    id: 'export',
-    icon: '📊',
-    title: 'Exporter .xlsx',
-    desc: 'Télécharge tout le repository en fichier Excel',
-    pill: '📥 exporter',
-    pillClass: 'action-pill',
-    requiresData: true,
-  },
-  {
-    id: 'local',
-    icon: '📱',
-    title: 'Importer iPad',
-    desc: '.xlsx ou .csv depuis iCloud ou l\'app Fichiers',
-    pill: '📥 importer',
-    pillClass: 'import-pill',
-  },
-  {
-    id: 'drive',
-    icon: '☁️',
-    title: 'Google Sheets',
-    desc: 'Importer depuis un Google Sheet (publication CSV requise)',
-    pill: '📥 importer',
-    pillClass: 'import-pill',
-  },
-  {
     id: 'browse',
     icon: '📋',
     title: 'Parcourir',
@@ -60,6 +32,44 @@ const MENU_ITEMS = [
     pill: '🔍 gérer',
     pillClass: 'browse-pill',
     requiresData: true,
+  },
+  {
+    id: 'import',
+    icon: '📥',
+    title: 'Importer',
+    desc: 'Depuis iPad (xlsx/csv) ou Google Sheets',
+    pill: '📥 importer',
+    pillClass: 'import-pill',
+  },
+  {
+    id: 'export',
+    icon: '📊',
+    title: 'Exporter .xlsx',
+    desc: 'Télécharge tout le repository en fichier Excel',
+    pill: '📤 exporter',
+    pillClass: 'action-pill',
+    requiresData: true,
+  },
+]
+
+// ── Items du sous-menu Import ─────────────────────────────────────────────────
+
+const IMPORT_ITEMS = [
+  {
+    id: 'local',
+    icon: '📱',
+    title: 'Importer iPad',
+    desc: '.xlsx ou .csv depuis iCloud ou l\'app Fichiers',
+    pill: '📥 fichier',
+    pillClass: 'import-pill',
+  },
+  {
+    id: 'drive',
+    icon: '☁️',
+    title: 'Google Sheets',
+    desc: 'Importer depuis un Google Sheet (publication CSV requise)',
+    pill: '📥 sheets',
+    pillClass: 'import-pill',
   },
 ]
 
@@ -75,7 +85,7 @@ function LocalImportZone({ loadFromFile, onBack }) {
 
   return (
     <div className="input-card visible">
-      <button className="dm-back-btn" onClick={onBack}>← Données</button>
+      <button className="dm-back-btn" onClick={onBack}>← Importer</button>
       <label className="input-label">📱 Importer depuis l'iPad → Repository</label>
       <div
         className={`dropzone${dragging ? ' drag' : ''}`}
@@ -100,7 +110,7 @@ function LocalImportZone({ loadFromFile, onBack }) {
         style={{ display: 'none' }}
         onChange={e => handleFile(e.target.files[0])}
       />
-      <div className="repo-notice">💾 Le fichier sera sauvegardé dans le repository local.</div>
+      <div className="repo-notice">💾 Le fichier sera sauvegardé dans le repository.</div>
     </div>
   )
 }
@@ -119,7 +129,7 @@ function DriveImportZone({ loadFromDrive, driveErr, setDriveErr, onBack }) {
 
   return (
     <div className="input-card visible">
-      <button className="dm-back-btn" onClick={onBack}>← Données</button>
+      <button className="dm-back-btn" onClick={onBack}>← Importer</button>
       <label className="input-label">☁️ Importer depuis Google Sheets → Repository</label>
       <input
         type="text"
@@ -158,7 +168,61 @@ function DriveImportZone({ loadFromDrive, driveErr, setDriveErr, onBack }) {
           dangerouslySetInnerHTML={{ __html: driveErr.msg }}
         />
       )}
-      <div className="repo-notice">💾 Les données seront sauvegardées dans le repository local.</div>
+      <div className="repo-notice">💾 Les données seront sauvegardées dans le repository.</div>
+    </div>
+  )
+}
+
+// ── Sous-composant : sous-menu Import ─────────────────────────────────────────
+
+function ImportMenu({ loadFromFile, loadFromDrive, driveErr, setDriveErr, onBack }) {
+  const [activeImport, setActiveImport] = useState(null)
+
+  function handleBack() {
+    setActiveImport(null)
+    setDriveErr(null)
+  }
+
+  if (activeImport === 'local') {
+    return <LocalImportZone loadFromFile={loadFromFile} onBack={handleBack} />
+  }
+
+  if (activeImport === 'drive') {
+    return (
+      <DriveImportZone
+        loadFromDrive={loadFromDrive}
+        driveErr={driveErr}
+        setDriveErr={setDriveErr}
+        onBack={handleBack}
+      />
+    )
+  }
+
+  return (
+    <div className="dm-container">
+      <div className="dm-header">
+        <button className="dm-back-btn" onClick={onBack}>← Données</button>
+        <div className="dm-title">
+          <span className="dm-title-icon">📥</span>
+          Importer
+        </div>
+        <div className="dm-subtitle">Choisissez votre source de données</div>
+      </div>
+
+      <div className="dm-grid">
+        {IMPORT_ITEMS.map(item => (
+          <div
+            key={item.id}
+            className="choice-card dm-card"
+            onClick={() => setActiveImport(item.id)}
+          >
+            <div className={item.pillClass}>{item.pill}</div>
+            <span className="choice-icon">{item.icon}</span>
+            <div className="choice-title">{item.title}</div>
+            <div className="choice-desc">{item.desc}</div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -174,7 +238,6 @@ export default function DataMenu({
   onRepoUpdated,
   onBack,
 }) {
-  // activeAction : null | 'entry' | 'export' | 'local' | 'drive' | 'browse'
   const [activeAction, setActiveAction] = useState(null)
 
   function handleItemClick(item) {
@@ -187,32 +250,13 @@ export default function DataMenu({
     setDriveErr(null)
   }
 
-  // ── Rendu des sous-vues ───────────────────────────────────────────────────
+  // ── Sous-vues ─────────────────────────────────────────────────────────────
 
   if (activeAction === 'entry') {
     return (
       <EntryForm
         onClose={handleBack}
         onSaved={() => { handleBack(); onRepoUpdated?.() }}
-      />
-    )
-  }
-
-  if (activeAction === 'export') {
-    return <ExportXlsx onClose={handleBack} />
-  }
-
-  if (activeAction === 'local') {
-    return <LocalImportZone loadFromFile={loadFromFile} onBack={handleBack} />
-  }
-
-  if (activeAction === 'drive') {
-    return (
-      <DriveImportZone
-        loadFromDrive={loadFromDrive}
-        driveErr={driveErr}
-        setDriveErr={setDriveErr}
-        onBack={handleBack}
       />
     )
   }
@@ -226,12 +270,27 @@ export default function DataMenu({
     )
   }
 
-  // ── Vue : grille du sous-menu ─────────────────────────────────────────────
+  if (activeAction === 'import') {
+    return (
+      <ImportMenu
+        loadFromFile={loadFromFile}
+        loadFromDrive={loadFromDrive}
+        driveErr={driveErr}
+        setDriveErr={setDriveErr}
+        onBack={handleBack}
+      />
+    )
+  }
+
+  if (activeAction === 'export') {
+    return <ExportXlsx onClose={handleBack} />
+  }
+
+  // ── Vue principale ────────────────────────────────────────────────────────
 
   return (
     <div className="dm-container">
 
-      {/* Header du sous-menu */}
       <div className="dm-header">
         <button className="dm-back-btn" onClick={onBack}>← Accueil</button>
         <div className="dm-title">
@@ -241,7 +300,6 @@ export default function DataMenu({
         <div className="dm-subtitle">Gérez votre journal de trading</div>
       </div>
 
-      {/* Grille d'actions */}
       <div className="dm-grid">
         {MENU_ITEMS.map(item => {
           const locked = item.requiresData && !repoAvailable

@@ -2,10 +2,16 @@
  * DataBrowser.jsx
  * ─────────────────────────────────────────────────────────────────────────────
  * Parcourir, éditer et supprimer les entrées du repository.
+ *
+ * Améliorations :
+ *   - Tri anti-chronologique + par paire sur même date
+ *   - Boutons édition/suppression en début de ligne
+ *   - Bouton ➕ au-dessus de la grille → ouvre EntryForm en popin
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { listEntries, updateRow, deleteRow } from '../lib/repository.js'
+import EntryForm from './EntryForm.jsx'
 
 // ── Colonnes du journal ───────────────────────────────────────────────────────
 
@@ -39,16 +45,33 @@ function toDatetimeLocal(val) {
   return s
 }
 
-/**
- * Normalise chaque champ du draft à l'ouverture de l'édition,
- * garantissant que les selects ont toujours une option valide
- * et que les autres champs ont une valeur stable.
- */
+/** Convertit une valeur de date en timestamp pour le tri */
+function toTimestamp(val) {
+  if (!val) return 0
+  const s = String(val).trim()
+  // Format ISO ou datetime-local
+  if (s.includes('T')) return new Date(s).getTime() || 0
+  // Format JJ/MM/AAAA HH:MM
+  const m = s.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/)
+  if (m) return new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}`).getTime() || 0
+  return new Date(s).getTime() || 0
+}
+
+/** Tri anti-chronologique, puis par paire sur même date */
+function sortEntries(entries) {
+  return [...entries].sort((a, b) => {
+    const tA = toTimestamp(a.data[0])
+    const tB = toTimestamp(b.data[0])
+    if (tB !== tA) return tB - tA  // anti-chronologique
+    const pA = String(a.data[1] ?? '').toLowerCase()
+    const pB = String(b.data[1] ?? '').toLowerCase()
+    return pA.localeCompare(pB)    // alphabétique par paire
+  })
+}
+
 function initDraft(data) {
   const d = [...data]
-  // Étendre si le tableau est trop court
   while (d.length <= 12) d.push('')
-
   COLUMNS.forEach(col => {
     if (col.type === 'select') {
       const raw = String(d[col.key] ?? '').trim()
@@ -63,27 +86,6 @@ function initDraft(data) {
     }
   })
   return d
-}
-
-// ── Sous-composant : ligne en lecture ─────────────────────────────────────────
-
-function ReadRow({ entry, onEdit, onDelete }) {
-  const { rowIndex, data } = entry
-  const isExcluded = String(data[12]).trim().toLowerCase() === 'false'
-
-  return (
-    <tr className={`db-row${isExcluded ? ' db-row-excluded' : ''}`}>
-      {COLUMNS.map(col => (
-        <td key={col.key} className="db-cell">
-          {formatCell(col, data[col.key])}
-        </td>
-      ))}
-      <td className="db-cell db-cell-actions">
-        <button className="db-btn db-btn-edit" onClick={() => onEdit(rowIndex)} title="Modifier">✏️</button>
-        <button className="db-btn db-btn-delete" onClick={() => onDelete(rowIndex)} title="Supprimer">🗑️</button>
-      </td>
-    </tr>
-  )
 }
 
 function formatCell(col, value) {
@@ -103,52 +105,41 @@ function formatCell(col, value) {
   return <span className="db-text">{s}</span>
 }
 
-// ── Sous-composant : ligne en édition ─────────────────────────────────────────
+// ── Ligne en lecture — boutons en DÉBUT de ligne ──────────────────────────────
+
+function ReadRow({ entry, onEdit, onDelete }) {
+  const { rowIndex, data } = entry
+  const isExcluded = String(data[12]).trim().toLowerCase() === 'false'
+
+  return (
+    <tr className={`db-row${isExcluded ? ' db-row-excluded' : ''}`}>
+      {/* ── Actions en premier ── */}
+      <td className="db-cell db-cell-actions">
+        <button className="db-btn db-btn-edit"   onClick={() => onEdit(rowIndex)}   title="Modifier">✏️</button>
+        <button className="db-btn db-btn-delete" onClick={() => onDelete(rowIndex)} title="Supprimer">🗑️</button>
+      </td>
+      {COLUMNS.map(col => (
+        <td key={col.key} className="db-cell">
+          {formatCell(col, data[col.key])}
+        </td>
+      ))}
+    </tr>
+  )
+}
+
+// ── Ligne en édition — boutons en DÉBUT de ligne ──────────────────────────────
 
 function EditRow({ entry, onSave, onCancel, saving }) {
   const { rowIndex } = entry
-
-  // Normalisation à l'init pour que chaque champ ait une valeur stable
   const [draft, setDraft] = useState(() => initDraft(entry.data))
 
   function set(colKey, value) {
-    setDraft(prev => {
-      const next = [...prev]
-      next[colKey] = value
-      return next
-    })
+    setDraft(prev => { const next = [...prev]; next[colKey] = value; return next })
   }
 
   return (
     <tr className="db-row db-row-editing">
-      {COLUMNS.map(col => (
-        <td key={col.key} className="db-cell db-cell-input">
-          {col.type === 'select' ? (
-            <select
-              className="db-input"
-              value={draft[col.key]}
-              onChange={e => set(col.key, e.target.value)}
-            >
-              {col.options.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          ) : col.type === 'datetime-local' ? (
-            <input
-              className="db-input"
-              type="datetime-local"
-              value={draft[col.key]}
-              onChange={e => set(col.key, e.target.value)}
-            />
-          ) : (
-            <input
-              className="db-input"
-              type={col.type}
-              step="any"
-              value={draft[col.key]}
-              onChange={e => set(col.key, e.target.value)}
-            />
-          )}
-        </td>
-      ))}
+      {/* ── Actions en premier ── */}
       <td className="db-cell db-cell-actions">
         <button
           className="db-btn db-btn-save"
@@ -163,6 +154,19 @@ function EditRow({ entry, onSave, onCancel, saving }) {
           title="Annuler"
         >✕</button>
       </td>
+      {COLUMNS.map(col => (
+        <td key={col.key} className="db-cell db-cell-input">
+          {col.type === 'select' ? (
+            <select className="db-input" value={draft[col.key]} onChange={e => set(col.key, e.target.value)}>
+              {col.options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : col.type === 'datetime-local' ? (
+            <input className="db-input" type="datetime-local" value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
+          ) : (
+            <input className="db-input" type={col.type} step="any" value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
+          )}
+        </td>
+      ))}
     </tr>
   )
 }
@@ -170,14 +174,15 @@ function EditRow({ entry, onSave, onCancel, saving }) {
 // ── Composant principal ───────────────────────────────────────────────────────
 
 export default function DataBrowser({ onClose, onDataChanged }) {
-  const [state, setState]          = useState('loading')
-  const [allEntries, setAll]       = useState([])
-  const [filter, setFilter]        = useState('')
-  const [page, setPage]            = useState(0)
-  const [editingIndex, setEditing]  = useState(null)
-  const [saving, setSaving]        = useState(false)
-  const [error, setError]          = useState(null)
+  const [state, setState]         = useState('loading')
+  const [allEntries, setAll]      = useState([])
+  const [filter, setFilter]       = useState('')
+  const [page, setPage]           = useState(0)
+  const [editingIndex, setEditing] = useState(null)
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [showEntryForm, setShowEntryForm] = useState(false)
 
   const reload = useCallback(async () => {
     setState('loading')
@@ -185,7 +190,8 @@ export default function DataBrowser({ onClose, onDataChanged }) {
     try {
       const result = await listEntries()
       if (!result) { setState('error'); setError('Aucune donnée dans le repository.'); return }
-      setAll(result.entries)
+      // Tri anti-chronologique + par paire
+      setAll(sortEntries(result.entries))
       setState('ready')
     } catch (e) {
       setState('error'); setError(e.message)
@@ -231,6 +237,7 @@ export default function DataBrowser({ onClose, onDataChanged }) {
     <div className="db-overlay">
       <div className="db-modal">
 
+        {/* ── Header ── */}
         <div className="db-header">
           <div className="db-title">
             <span className="db-title-icon">📋</span>
@@ -245,6 +252,7 @@ export default function DataBrowser({ onClose, onDataChanged }) {
           </div>
         </div>
 
+        {/* ── Toolbar : recherche + bouton ➕ ── */}
         {state === 'ready' && (
           <div className="db-toolbar">
             <div className="db-search-wrap">
@@ -261,11 +269,21 @@ export default function DataBrowser({ onClose, onDataChanged }) {
             <div className="db-filter-count">
               {filter ? `${filtered.length} résultat${filtered.length > 1 ? 's' : ''}` : ''}
             </div>
+
+            {/* ── Bouton Nouvelle entrée ── */}
+            <button
+              className="db-btn-add"
+              onClick={() => setShowEntryForm(true)}
+              title="Nouvelle entrée"
+            >
+              ➕ Nouvelle entrée
+            </button>
           </div>
         )}
 
         {error && <div className="db-error">⚠️ {error}</div>}
 
+        {/* ── Corps / tableau ── */}
         <div className="db-body">
           {state === 'loading' && (
             <div className="db-empty-state"><div className="db-spinner" />Chargement…</div>
@@ -281,10 +299,11 @@ export default function DataBrowser({ onClose, onDataChanged }) {
               <table className="db-table">
                 <thead>
                   <tr>
+                    {/* Colonne actions en premier */}
+                    <th className="db-th db-th-actions">Actions</th>
                     {COLUMNS.map(col => (
                       <th key={col.key} className="db-th" style={{ minWidth: col.width }}>{col.label}</th>
                     ))}
-                    <th className="db-th db-th-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -312,6 +331,7 @@ export default function DataBrowser({ onClose, onDataChanged }) {
           )}
         </div>
 
+        {/* ── Pagination ── */}
         {pageCount > 1 && (
           <div className="db-pagination">
             <button className="db-page-btn" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Préc.</button>
@@ -326,6 +346,7 @@ export default function DataBrowser({ onClose, onDataChanged }) {
 
       </div>
 
+      {/* ── Confirmation suppression ── */}
       {deleteConfirm !== null && (
         <div className="db-confirm-overlay">
           <div className="db-confirm">
@@ -343,6 +364,19 @@ export default function DataBrowser({ onClose, onDataChanged }) {
           </div>
         </div>
       )}
+
+      {/* ── Popin EntryForm ── */}
+      {showEntryForm && (
+        <EntryForm
+          onClose={() => setShowEntryForm(false)}
+          onSaved={() => {
+            setShowEntryForm(false)
+            reload()
+            onDataChanged?.()
+          }}
+        />
+      )}
+
     </div>
   )
 }
