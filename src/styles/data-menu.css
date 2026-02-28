@@ -56,6 +56,12 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  margin: 0 auto;
+}
+
+/* Centre le dm-container dans la page landing */
+#landing .dm-container {
+  align-self: center;
 }
 
 .dm-header {
@@ -106,9 +112,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
+  justify-items: center;
 }
 
-.dm-card { min-width: 0 !important; }
+.dm-card { min-width: 0 !important; width: 100%; }
 
 /* Pill spécifique pour browse */
 .browse-pill {
