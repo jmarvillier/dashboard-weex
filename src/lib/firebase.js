@@ -26,10 +26,6 @@ export const db = getFirestore(app)
 
 // Active le cache offline → l'app fonctionne sans connexion,
 // sync automatique au retour en ligne
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Firebase persistence : plusieurs onglets ouverts — désactivé.')
-  } else if (err.code === 'unimplemented') {
-    console.warn('Firebase persistence : navigateur non supporté.')
-  }
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache()
 })
