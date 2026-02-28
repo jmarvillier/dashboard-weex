@@ -1,84 +1,34 @@
 /**
  * repository.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Couche de persistance basée sur IndexedDB.
- * Stocke les données du journal de trading localement dans le navigateur.
- * Totalement gratuit, sans backend, sans configuration.
+ * Couche de persistance basée sur Firebase Firestore.
+ * API publique identique à l'ancienne version IndexedDB.
  *
- * Structure :
- *   DB : "weex-trading-db"
- *   Store : "snapshots"
- *     → clé : "latest"  (un seul enregistrement actif)
- *     → valeur : { rows, source, loadedAt, version }
+ * Structure Firestore :
+ *   collection "snapshots"
+ *     └── document "latest"
+ *           { rows: Array, source: string, loadedAt: string, version: number }
  */
 
-const DB_NAME    = 'weex-trading-db'
-const DB_VERSION = 1
-const STORE_NAME = 'snapshots'
-const RECORD_KEY = 'latest'
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
+import { db } from './firebase.js'
 
-// ── Initialisation ───────────────────────────────────────────────────────────
+const SNAPSHOT_REF = doc(db, 'snapshots', 'latest')
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION)
-
-    req.onupgradeneeded = (event) => {
-      const db = event.target.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-    }
-
-    req.onsuccess  = (event) => resolve(event.target.result)
-    req.onerror    = (event) => reject(event.target.error)
-  })
-}
-
-// ── Public API ───────────────────────────────────────────────────────────────
-
-/**
- * Sauvegarde un snapshot des données dans IndexedDB.
- * @param {Array}  rows      - Lignes brutes parsées (tableau de tableaux)
- * @param {string} source    - Label de la source ("Mon Journal WEEX", "Google Sheet", nom de fichier…)
- * @returns {Promise<void>}
- */
 export async function saveSnapshot(rows, source) {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx    = db.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    const payload = {
-      rows,
-      source,
-      loadedAt : new Date().toISOString(),
-      version  : 1,
-    }
-    const req = store.put(payload, RECORD_KEY)
-    req.onsuccess = () => resolve()
-    req.onerror   = (e) => reject(e.target.error)
+  await setDoc(SNAPSHOT_REF, {
+    rows,
+    source,
+    loadedAt : new Date().toISOString(),
+    version  : 1,
   })
 }
 
-/**
- * Charge le dernier snapshot sauvegardé.
- * @returns {Promise<{ rows: Array, source: string, loadedAt: string } | null>}
- */
 export async function loadSnapshot() {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx    = db.transaction(STORE_NAME, 'readonly')
-    const store = tx.objectStore(STORE_NAME)
-    const req   = store.get(RECORD_KEY)
-    req.onsuccess = (e) => resolve(e.target.result ?? null)
-    req.onerror   = (e) => reject(e.target.error)
-  })
+  const snap = await getDoc(SNAPSHOT_REF)
+  if (!snap.exists()) return null
+  return snap.data()
 }
 
-/**
- * Vérifie s'il existe des données sauvegardées.
- * @returns {Promise<boolean>}
- */
 export async function hasSnapshot() {
   try {
     const snapshot = await loadSnapshot()
@@ -88,24 +38,14 @@ export async function hasSnapshot() {
   }
 }
 
-/**
- * Ajoute une ligne au snapshot existant.
- * Si aucun snapshot n'existe, crée un nouveau journal avec en-tête.
- * @param {Array} row - Tableau de valeurs (13 colonnes, format journal)
- * @returns {Promise<void>}
- */
 export async function appendRow(row) {
   const snapshot = await loadSnapshot()
-
-  let rows
-  let source
+  let rows, source
 
   if (snapshot && Array.isArray(snapshot.rows) && snapshot.rows.length > 0) {
-    // Ajoute au snapshot existant
     rows   = [...snapshot.rows, row]
     source = snapshot.source
   } else {
-    // Crée un nouveau journal avec en-tête
     const header = [
       'Date', 'Paire', 'Sens', 'Statut', 'Prix de saisie',
       'Montant USDT', 'Montant USDC', 'Montant EUR', '', '',
@@ -118,77 +58,38 @@ export async function appendRow(row) {
   await saveSnapshot(rows, source)
 }
 
-/**
- * Retourne toutes les lignes de données (sans l'en-tête).
- * Chaque entrée inclut son index original dans snapshot.rows.
- * @returns {Promise<{ header: Array, entries: Array<{ rowIndex: number, data: Array }> } | null>}
- */
 export async function listEntries() {
   const snapshot = await loadSnapshot()
-  if (!snapshot || !Array.isArray(snapshot.rows) || snapshot.rows.length < 1) {
-    return null
-  }
+  if (!snapshot || !Array.isArray(snapshot.rows) || snapshot.rows.length < 1) return null
 
-  const rows = snapshot.rows
-  // Détecter la ligne d'en-tête
+  const rows      = snapshot.rows
   const hasHeader = rows[0]?.some(c => String(c).toUpperCase().includes('PAIRE'))
-  const headerIndex = hasHeader ? 0 : -1
-  const header = hasHeader ? rows[0] : []
-
-  const entries = rows
+  const header    = hasHeader ? rows[0] : []
+  const entries   = rows
     .map((data, rowIndex) => ({ rowIndex, data }))
-    .filter(({ rowIndex }) => rowIndex !== headerIndex)
+    .filter(({ rowIndex }) => hasHeader ? rowIndex !== 0 : true)
 
   return { header, entries, source: snapshot.source, loadedAt: snapshot.loadedAt }
 }
 
-/**
- * Met à jour une ligne existante (par index dans snapshot.rows).
- * @param {number} rowIndex - Index de la ligne dans snapshot.rows
- * @param {Array}  newData  - Nouvelles valeurs pour cette ligne
- * @returns {Promise<void>}
- */
 export async function updateRow(rowIndex, newData) {
   const snapshot = await loadSnapshot()
-  if (!snapshot || !Array.isArray(snapshot.rows)) {
-    throw new Error('Aucune donnée dans le repository.')
-  }
+  if (!snapshot || !Array.isArray(snapshot.rows)) throw new Error('Aucune donnée dans le repository.')
 
   const rows = [...snapshot.rows]
-  if (rowIndex < 0 || rowIndex >= rows.length) {
-    throw new Error(`Index de ligne invalide : ${rowIndex}`)
-  }
+  if (rowIndex < 0 || rowIndex >= rows.length) throw new Error(`Index invalide : ${rowIndex}`)
 
   rows[rowIndex] = newData
   await saveSnapshot(rows, snapshot.source)
 }
 
-/**
- * Supprime une ligne existante (par index dans snapshot.rows).
- * @param {number} rowIndex - Index de la ligne dans snapshot.rows
- * @returns {Promise<void>}
- */
 export async function deleteRow(rowIndex) {
   const snapshot = await loadSnapshot()
-  if (!snapshot || !Array.isArray(snapshot.rows)) {
-    throw new Error('Aucune donnée dans le repository.')
-  }
+  if (!snapshot || !Array.isArray(snapshot.rows)) throw new Error('Aucune donnée dans le repository.')
 
-  const rows = snapshot.rows.filter((_, i) => i !== rowIndex)
-  await saveSnapshot(rows, snapshot.source)
+  await saveSnapshot(snapshot.rows.filter((_, i) => i !== rowIndex), snapshot.source)
 }
 
-/**
- * Supprime toutes les données sauvegardées.
- * @returns {Promise<void>}
- */
 export async function clearSnapshot() {
-  const db = await openDB()
-  return new Promise((resolve, reject) => {
-    const tx    = db.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    const req   = store.delete(RECORD_KEY)
-    req.onsuccess = () => resolve()
-    req.onerror   = (e) => reject(e.target.error)
-  })
+  await deleteDoc(SNAPSHOT_REF)
 }
