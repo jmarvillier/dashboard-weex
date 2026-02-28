@@ -32,8 +32,7 @@ export default function Landing({
 
   if (showDataMenu) {
     return (
-      <div id="landing">
-        <Logo />
+      <div id="landing" style={{ justifyContent: 'center', alignItems: 'center' }}>
         <DataMenu
           repoAvailable={repoAvailable}
           loadFromFile={loadFromFile}
