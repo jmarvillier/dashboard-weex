@@ -12,12 +12,12 @@ import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
 
 // ── 🔧 À REMPLACER ────────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey            : 'REMPLACE_PAR_TON_API_KEY',
-  authDomain        : 'REMPLACE_PAR_TON_AUTH_DOMAIN',
-  projectId         : 'REMPLACE_PAR_TON_PROJECT_ID',
-  storageBucket     : 'REMPLACE_PAR_TON_STORAGE_BUCKET',
-  messagingSenderId : 'REMPLACE_PAR_TON_MESSAGING_SENDER_ID',
-  appId             : 'REMPLACE_PAR_TON_APP_ID',
+  apiKey: "AIzaSyBdJgv9gZamPkQbohhSyR_byr__wnE-CjY",
+  authDomain: "dashboard-weex.firebaseapp.com",
+  projectId: "dashboard-weex",
+  storageBucket: "dashboard-weex.firebasestorage.app",
+  messagingSenderId: "167218478733",
+  appId: "1:167218478733:web:9c25811d2b7f87724facc4"
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
