@@ -15,12 +15,24 @@ import { db } from './firebase.js'
 const SNAPSHOT_REF = doc(db, 'snapshots', 'latest')
 
 export async function saveSnapshot(rows, source) {
-  await setDoc(SNAPSHOT_REF, {
-    rows,
-    source,
-    loadedAt : new Date().toISOString(),
-    version  : 1,
-  })
+  try {
+    const payload = {
+      rows,
+      source,
+      loadedAt : new Date().toISOString(),
+      version  : 1,
+    }
+    await setDoc(SNAPSHOT_REF, payload)
+  } catch (err) {
+    // Affiche l'erreur sur la page
+    document.body.innerHTML += `
+      <div style="position:fixed;top:0;left:0;right:0;background:red;color:white;
+                  padding:20px;font-family:monospace;font-size:13px;z-index:9999">
+        <b>Erreur saveSnapshot :</b><br>${err.message}<br><br>
+        Code : ${err.code}
+      </div>`
+    throw err
+  }
 }
 
 export async function loadSnapshot() {
