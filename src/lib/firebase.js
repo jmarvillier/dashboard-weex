@@ -1,30 +1,29 @@
-/**
- * firebase.js
- * Initialisation Firebase + export de l'instance Firestore.
- *
- * 🔧 Remplace les valeurs ci-dessous par celles de ta Firebase Console :
- *   https://console.firebase.google.com → Ton projet → ⚙️ → Paramètres du projet
- *   → Tes applications → Ajouter une appli Web → SDK Config
- */
+import { initializeApp }        from 'firebase/app'
+import { initializeFirestore, persistentLocalCache } from 'firebase/firestore'
 
-import { initializeApp }                            from 'firebase/app'
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
-
-// ── 🔧 À REMPLACER ────────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "AIzaSyBdJgv9gZamPkQbohhSyR_byr__wnE-CjY",
-  authDomain: "dashboard-weex.firebaseapp.com",
-  projectId: "dashboard-weex",
-  storageBucket: "dashboard-weex.firebasestorage.app",
-  messagingSenderId: "167218478733",
-  appId: "1:167218478733:web:9c25811d2b7f87724facc4"
+  apiKey            : 'TON_API_KEY',        // ← garde tes vraies valeurs
+  authDomain        : 'dashboard-weex.firebaseapp.com',
+  projectId         : 'dashboard-weex',
+  storageBucket     : 'dashboard-weex.firebasestorage.app',
+  messagingSenderId : '167218478733',
+  appId             : '1:167218478733:web:9c25811d2b7f87724facc4',
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
-const app = initializeApp(firebaseConfig)
+let app, db
 
-// Active le cache offline → l'app fonctionne sans connexion,
-// sync automatique au retour en ligne
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache()
-})
+try {
+  app = initializeApp(firebaseConfig)
+  db  = initializeFirestore(app, {
+    localCache: persistentLocalCache()
+  })
+} catch (err) {
+  // Affiche l'erreur sur la page
+  document.body.innerHTML = `
+    <div style="color:red;padding:20px;font-family:monospace;font-size:14px">
+      <b>Erreur Firebase :</b><br>${err.message}
+    </div>`
+  throw err
+}
+
+export { db }
