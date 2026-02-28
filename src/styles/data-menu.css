@@ -56,8 +56,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  margin: auto;
-  padding: 30px 20px;
+  margin: 0 auto;
 }
 
 /* Centre le dm-container dans la page landing */
