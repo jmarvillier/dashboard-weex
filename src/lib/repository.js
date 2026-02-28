@@ -1,44 +1,35 @@
-/**
- * repository.js
- * Couche de persistance basée sur Firebase Firestore.
- * API publique identique à l'ancienne version IndexedDB.
- *
- * Structure Firestore :
- *   collection "snapshots"
- *     └── document "latest"
- *           { rows: Array, source: string, loadedAt: string, version: number }
- */
-
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
 import { db } from './firebase.js'
 
 const SNAPSHOT_REF = doc(db, 'snapshots', 'latest')
 
+function serialize(rows) {
+  return rows.map((row, i) => ({ i, r: JSON.stringify(row) }))
+}
+
+function deserialize(rowObjects) {
+  return rowObjects
+    .slice()
+    .sort((a, b) => a.i - b.i)
+    .map(obj => {
+      try { return JSON.parse(obj.r) } catch { return [] }
+    })
+}
+
 export async function saveSnapshot(rows, source) {
-  try {
-    const payload = {
-      rows,
-      source,
-      loadedAt : new Date().toISOString(),
-      version  : 1,
-    }
-    await setDoc(SNAPSHOT_REF, payload)
-  } catch (err) {
-    // Affiche l'erreur sur la page
-    document.body.innerHTML += `
-      <div style="position:fixed;top:0;left:0;right:0;background:red;color:white;
-                  padding:20px;font-family:monospace;font-size:13px;z-index:9999">
-        <b>Erreur saveSnapshot :</b><br>${err.message}<br><br>
-        Code : ${err.code}
-      </div>`
-    throw err
-  }
+  await setDoc(SNAPSHOT_REF, {
+    rows     : serialize(rows),
+    source,
+    loadedAt : new Date().toISOString(),
+    version  : 3,
+  })
 }
 
 export async function loadSnapshot() {
   const snap = await getDoc(SNAPSHOT_REF)
   if (!snap.exists()) return null
-  return snap.data()
+  const data = snap.data()
+  return { ...data, rows: deserialize(data.rows) }
 }
 
 export async function hasSnapshot() {
