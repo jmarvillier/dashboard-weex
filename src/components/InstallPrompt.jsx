@@ -11,7 +11,7 @@
 
 import { useState, useEffect } from 'react'
 
-const STORAGE_KEY = 'weex-install-dismissed'
+const STORAGE_KEY = 'ydash-install-dismissed'
 
 function isIosSafari() {
   const ua = navigator.userAgent
@@ -47,7 +47,7 @@ export default function InstallPrompt() {
       <div className="install-header">
         <span className="install-icon">📲</span>
         <div>
-          <div className="install-title">Installe WEEX sur ton iPad</div>
+          <div className="install-title">Installe Ydash sur ton iPad</div>
           <div className="install-sub">Données permanentes · Accès hors-ligne</div>
         </div>
       </div>
