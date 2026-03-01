@@ -9,7 +9,7 @@
  *   - small          : topbar du dashboard
  */
 
-const VERSION = '1.9.1'
+const VERSION = '1.0.9'
 
 export default function Logo({ small = false }) {
   if (small) {
