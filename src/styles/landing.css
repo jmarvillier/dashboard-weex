@@ -16,17 +16,22 @@
   align-items:center; justify-content:center; padding:30px 20px; gap:28px;
 }
 
-/* Quand un sous-menu est affiché, le contenu sous le logo
-   doit être centré horizontalement */
 #landing > .dm-container {
   width: 100%;
   max-width: 760px;
 }
+
 .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:2.8rem; color:var(--gold); letter-spacing:-.03em; text-align:center; text-shadow:0 0 60px rgba(232,184,75,.2); }
 .logo span { font-size:.4rem; font-family:'Space Mono',monospace; background:var(--gold); color:var(--bg); padding:3px 8px; border-radius:3px; letter-spacing:.15em; vertical-align:middle; margin-left:10px; }
 
 /* ── Choice cards ── */
-.choice-row { display:flex; gap:14px; width:100%; max-width:700px; flex-wrap:wrap; }
+.choice-row {
+  display: flex;
+  gap: 14px;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .choice-card {
   flex:1; min-width:200px; background:var(--bg2); border:2px solid var(--border);
   border-radius:16px; padding:30px 22px; text-align:center; cursor:pointer;
@@ -81,9 +86,8 @@
 .msg.err  { background:rgba(245,71,106,.08); border:1px solid rgba(245,71,106,.28); color:var(--red); }
 .msg.warn { background:rgba(232,184,75,.08);  border:1px solid rgba(232,184,75,.25);  color:var(--gold); }
 
-/* ── Repository / nouvelles classes ────────────────────────────────────────── */
+/* ── Repository ─────────────────────────────────────────────────────────────── */
 
-/* Carte désactivée (dashboard sans données) */
 .choice-card.disabled {
   opacity: .45;
   cursor: not-allowed;
@@ -96,7 +100,6 @@
 }
 .choice-card.disabled::before { opacity: 1; }
 
-/* Pills */
 .import-pill {
   display: inline-block;
   background: rgba(232,184,75,.12);
@@ -126,7 +129,6 @@
   margin-left: 6px;
 }
 
-/* Notice repository */
 .repo-notice {
   margin-top: 12px;
   padding: 10px 14px;
@@ -222,20 +224,25 @@
 }
 .install-why strong { color: var(--gold); }
 
-/* ── Nouvelle grille de cartes (5 cartes) ─────────────────────────────────── */
+/* ── Grille principale (3 cartes) ─────────────────────────────────────────── */
 
 .choice-grid {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 14px;
   width: 100%;
-  max-width: 860px;
+  max-width: 1050px;
 }
 
-.choice-row-main   { display: flex; gap: 14px; }
-.choice-row-import { display: flex; gap: 14px; }
+.choice-row-main {
+  display: flex;
+  gap: 14px;
+  width: 100%;
+  justify-content: center;
+}
+.choice-row-import { display: flex; gap: 14px; width: 100%; justify-content: center; }
 
-/* Cartes d'action (saisie / export) */
 .choice-card.action-card {
   border-color: rgba(64, 150, 247, .25);
 }
@@ -286,4 +293,112 @@
   font-size: .5rem;
   padding: 2px 6px;
   border-radius: 6px;
+}
+
+/* ── Carte Paires (Landing) ────────────────────────────────────────────────── */
+
+.choice-card.paires-card {
+  border-color: rgba(0, 214, 143, .25);
+  background: linear-gradient(145deg, rgba(0, 214, 143, .07) 0%, var(--bg2) 60%);
+}
+.choice-card.paires-card::before {
+  background: linear-gradient(90deg, var(--green), transparent);
+  opacity: 1;
+}
+.choice-card.paires-card:hover {
+  border-color: rgba(0, 214, 143, .6);
+  box-shadow: 0 16px 48px rgba(0, 214, 143, .15);
+}
+
+.paires-pill {
+  display: inline-block;
+  background: rgba(0, 214, 143, .15);
+  border: 1px solid rgba(0, 214, 143, .35);
+  color: var(--green);
+  font-size: .48rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+/* ── Page PairesView ───────────────────────────────────────────────────────── */
+
+.paires-page-header {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.paires-page-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--green), transparent);
+}
+
+.paires-page-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--text);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.paires-page-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.paires-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: .62rem;
+}
+.paires-badge.g { border-color: rgba(0,214,143,.3);  background: rgba(0,214,143,.06); }
+.paires-badge.r { border-color: rgba(245,71,106,.3); background: rgba(245,71,106,.06); }
+.paires-badge.o { border-color: rgba(232,184,75,.3);  background: rgba(232,184,75,.06); }
+
+.paires-badge-val {
+  font-weight: 700;
+  font-size: .75rem;
+  color: var(--text);
+}
+.paires-badge.g .paires-badge-val { color: var(--green); }
+.paires-badge.r .paires-badge-val { color: var(--red); }
+.paires-badge.o .paires-badge-val { color: var(--gold); }
+
+.paires-badge-lbl {
+  color: var(--text2);
+  font-size: .58rem;
+}
+
+.paires-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text2);
+  font-size: .78rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+#landing .pairs-grid {
+  max-width: 100%;
 }

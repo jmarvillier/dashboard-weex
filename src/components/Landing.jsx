@@ -1,13 +1,11 @@
 /**
  * Landing.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Page d'accueil avec 2 cartes principales :
+ * Page d'accueil avec 3 cartes principales :
  *
  *   1. Mon Dashboard  → ouvre le dashboard (désactivé si repo vide)
- *   2. Données        → sous-menu DataMenu (ajout, import, export, parcourir)
- *
- * Les actions liées aux données ont été regroupées dans la carte "Données"
- * pour une meilleure organisation et maintenabilité.
+ *   2. Paires         → ouvre la vue dédiée aux paires (désactivé si repo vide)
+ *   3. Données        → sous-menu DataMenu (ajout, import, export, parcourir)
  */
 
 import { useState } from 'react'
@@ -24,12 +22,11 @@ export default function Landing({
   loadFromDrive,
   loadFromFile,
   onRepoUpdated,
+  onOpenPaires,
 }) {
-  // Contrôle si le sous-menu Données est actif
   const [showDataMenu, setShowDataMenu] = useState(false)
 
   // ── Vue : sous-menu Données ───────────────────────────────────────────────
-
   if (showDataMenu) {
     return (
       <div id="landing">
@@ -48,7 +45,6 @@ export default function Landing({
   }
 
   // ── Vue : grille d'accueil ────────────────────────────────────────────────
-
   return (
     <div id="landing">
       <Logo />
@@ -73,7 +69,24 @@ export default function Landing({
             </div>
           </div>
 
-          {/* 2. Données */}
+          {/* 2. Paires ← NOUVEAU */}
+          <div
+            className={`choice-card paires-card${repoAvailable ? '' : ' disabled'}`}
+            onClick={repoAvailable ? onOpenPaires : undefined}
+            title={repoAvailable ? undefined : "Importez d'abord un fichier."}
+          >
+            <div className="paires-pill">📈 paires</div>
+            {!repoAvailable && <div className="locked-pill">🔒 vide</div>}
+            <span className="choice-icon">📊</span>
+            <div className="choice-title">Paires</div>
+            <div className="choice-desc">
+              {repoAvailable
+                ? 'Consulter le détail de chaque paire de trading'
+                : "Importez d'abord ton journal"}
+            </div>
+          </div>
+
+          {/* 3. Données */}
           <div
             className="choice-card data-card"
             onClick={() => setShowDataMenu(true)}
