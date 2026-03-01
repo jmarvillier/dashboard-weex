@@ -2,8 +2,6 @@
  * KpiRow.jsx — Bande de KPIs globaux en haut du dashboard
  */
 
-import BalanceDonut from './BalanceDonut.jsx'
-
 const fmt  = (v, d = 2) => isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const fmtS = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + fmt(Math.abs(n)) }
 const cc   = v => v > 0 ? 'g' : v < 0 ? 'r' : ''
@@ -101,9 +99,6 @@ export default function KpiRow({ pairList, excluded }) {
         <div className="kpi-v g">{fmt(ePct, 1)}<span className="kpi-unit">%</span></div>
         <div className="kpi-s">Exécutés / total</div>
       </div>
-
-      {/* Balance Cash / Crypto — Donut */}
-      <BalanceDonut pairList={pairList} excluded={excluded} />
 
     </div>
   )
