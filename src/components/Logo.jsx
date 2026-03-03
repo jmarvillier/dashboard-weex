@@ -16,7 +16,7 @@ export default function Logo({ small = false }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div className="topbar-logo">Ydash</div>
-        <span className="logo-version logo-version-small">v.{VERSION}</span>
+        <span className="logo-version logo-version-small">v{VERSION}</span>
       </div>
     )
   }
