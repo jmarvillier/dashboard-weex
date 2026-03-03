@@ -60,12 +60,27 @@ function swPlugin() {
   }
 }
 
+// ── Plugin : génère version.json dans dist/ ────────────────────────────────
+
+function versionJsonPlugin() {
+  return {
+    name: 'version-json',
+    generateBundle() {
+      this.emitFile({
+        type    : 'asset',
+        fileName: 'version.json',
+        source  : JSON.stringify({ version, sha: gitSha, builtAt: new Date().toISOString() }),
+      })
+    },
+  }
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const base = process.env.VITE_BASE ?? '/dashboard-weex/'
 
 export default defineConfig({
-  plugins  : [react(), swPlugin()],
+  plugins  : [react(), swPlugin(), versionJsonPlugin()],
   base,
   publicDir: 'public',
 
