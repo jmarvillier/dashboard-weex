@@ -9,14 +9,14 @@
  *   - small          : topbar du dashboard
  */
 
-const VERSION = '1.0.9'
+const VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
 
 export default function Logo({ small = false }) {
   if (small) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div className="topbar-logo">Ydash</div>
-        <span className="logo-version logo-version-small">v{VERSION}</span>
+        <span className="logo-version logo-version-small">v.{VERSION}</span>
       </div>
     )
   }
