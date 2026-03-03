@@ -1,49 +1,48 @@
 /**
  * InstallPrompt.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Bannière d'invitation à installer / mettre à jour la PWA.
+ * Gère deux cas distincts :
  *
- * Cas couverts :
- *  1. iOS/iPadOS Safari  → guide manuel (Partager → Écran d'accueil)
- *  2. Android / Chrome   → prompt natif beforeinstallprompt
- *  3. Version obsolète   → ré-affichage même si déjà dismissée autrefois,
- *                          que ce soit dans le navigateur ou dans l'app installée
+ *  1. INSTALLATION INITIALE
+ *     - iOS/iPadOS Safari  → détection UA corrigée (iPad 13+ = "Macintosh")
+ *     - Android / Chrome   → prompt natif beforeinstallprompt
+ *     - Dismissable définitivement (localStorage)
  *
- * La version courante est injectée par Vite (VITE_APP_VERSION) et comparée
- * à la version "latest" lue dans /dashboard-weex/version.json (généré au build).
- * En l'absence de ce fichier, seule la détection install est active.
+ *  2. MISE À JOUR DISPONIBLE
+ *     - Détectée via l'événement SW "updatefound" (nouveau SW en attente)
+ *     - Un bouton "Mettre à jour" envoie SKIP_WAITING au SW → reload propre
+ *     - PAS de désinstallation/réinstallation nécessaire
+ *     - Ré-affiché à chaque nouvelle version même si dismissé avant
  */
 
 import { useState, useEffect, useRef } from 'react'
 
 /* ─── Clés localStorage ──────────────────────────────────────────────────── */
-const KEY_DISMISSED = 'ydash-install-dismissed'
-const KEY_DISMISSED_VERSION = 'ydash-install-dismissed-version'
+const KEY_DISMISSED         = 'ydash-install-dismissed'
+const KEY_UPDATE_DISMISSED  = 'ydash-update-dismissed-sha'
 
 /* ─── Version courante (injectée par Vite) ───────────────────────────────── */
-const CURRENT_VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
+export const CURRENT_VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
 
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
+/* ─── Helpers détection plateforme ──────────────────────────────────────── */
 
-/** Compare semver : retourne true si b > a */
-function isNewerVersion(a, b) {
-  const parse = v => (v ?? '0.0.0').split('.').map(Number)
-  const [aMaj, aMin, aPat] = parse(a)
-  const [bMaj, bMin, bPat] = parse(b)
-  if (bMaj !== aMaj) return bMaj > aMaj
-  if (bMin !== aMin) return bMin > aMin
-  return bPat > aPat
-}
-
-function isIos() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+/**
+ * iOS 13+ sur iPad : le UA contient "Macintosh" et non "iPad".
+ * On doit aussi vérifier maxTouchPoints pour distinguer iPad de Mac.
+ */
+function isIosDevice() {
+  const ua = navigator.userAgent
+  const classicIos = /iphone|ipad|ipod/i.test(ua)
+  // iPad 13+ se présente comme "Macintosh" mais avec touch
+  const modernIpad = /macintosh/i.test(ua) && navigator.maxTouchPoints > 1
+  return classicIos || modernIpad
 }
 
 function isIosSafari() {
-  const ua = navigator.userAgent
+  const ua         = navigator.userAgent
   const standalone = window.navigator.standalone === true
-  const safari = /safari/i.test(ua) && !/chrome|crios|fxios/i.test(ua)
-  return isIos() && safari && !standalone
+  const safari     = /safari/i.test(ua) && !/chrome|crios|fxios|android/i.test(ua)
+  return isIosDevice() && safari && !standalone
 }
 
 function isStandalone() {
@@ -56,146 +55,145 @@ function isStandalone() {
 /* ─── Composant ──────────────────────────────────────────────────────────── */
 
 export default function InstallPrompt() {
-  const [mode, setMode] = useState(null)          // null | 'ios' | 'android' | 'update'
-  const [latestVersion, setLatestVersion] = useState(null)
-  const deferredPrompt = useRef(null)
+  // 'install-ios' | 'install-android' | 'update' | null
+  const [mode, setMode]               = useState(null)
+  const [pendingSW, setPendingSW]     = useState(null)   // registration du SW en attente
+  const [newSWsha, setNewSWsha]       = useState(null)   // SHA du nouveau SW (pour dédoublonner dismiss)
+  const deferredPrompt                = useRef(null)
+  const swReg                         = useRef(null)
 
-  /* Capture le prompt natif Android/Chrome */
+  /* ── Capture le prompt natif Android ── */
   useEffect(() => {
-    const handler = (e) => {
+    const handler = e => {
       e.preventDefault()
       deferredPrompt.current = e
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  /* Récupère la version "latest" depuis version.json (généré au build) */
-  useEffect(() => {
-    fetch('/dashboard-weex/version.json?t=' + Date.now())
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.version) setLatestVersion(data.version) })
-      .catch(() => {})
-  }, [])
-
-  /* Décide si on affiche et dans quel mode */
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // ── Cas 1 : version obsolète (prioritaire) ──────────────────────────
-      if (latestVersion && isNewerVersion(CURRENT_VERSION, latestVersion)) {
-        const dismissedAt = localStorage.getItem(KEY_DISMISSED_VERSION)
-        if (dismissedAt !== latestVersion) {
-          setMode('update')
-          return
-        }
-      }
-
-      // ── Cas 2 : pas encore installée ────────────────────────────────────
-      if (!isStandalone()) {
-        const dismissed = localStorage.getItem(KEY_DISMISSED)
-        if (dismissed) return                 // déjà refusé, on n'insiste pas
-
-        if (isIosSafari()) {
-          setMode('ios')
-          return
-        }
-
-        // Android / Chrome : on attend que le prompt natif soit capturé
-        if (deferredPrompt.current) {
-          setMode('android')
-          return
-        }
-      }
-    }, 1800)
-
-    return () => clearTimeout(timer)
-  }, [latestVersion])
-
-  /* Attente du prompt natif (peut arriver après le premier rendu) */
-  useEffect(() => {
-    if (mode !== null) return
-    const handler = () => {
       if (!isStandalone() && !localStorage.getItem(KEY_DISMISSED)) {
-        setMode('android')
+        setMode('install-android')
       }
     }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [mode])
+  }, [])
 
-  /* ── Dismiss ──────────────────────────────────────────────────────────── */
+  /* ── Détection initiale install iOS ── */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (isIosSafari() && !localStorage.getItem(KEY_DISMISSED)) {
+        setMode('install-ios')
+      }
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [])
+
+  /* ── Écoute les mises à jour SW ── */
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+
+    navigator.serviceWorker.ready.then(reg => {
+      swReg.current = reg
+
+      const checkWaiting = (waiting) => {
+        if (!waiting) return
+        // Récupère le SHA du nouveau SW via un message (ou fallback Date.now)
+        const sha = waiting._sha ?? String(Date.now())
+        const dismissedSha = localStorage.getItem(KEY_UPDATE_DISMISSED)
+        if (sha !== dismissedSha) {
+          setPendingSW(waiting)
+          setNewSWsha(sha)
+          setMode('update')
+        }
+      }
+
+      // SW déjà en attente au chargement
+      if (reg.waiting) checkWaiting(reg.waiting)
+
+      // Nouveau SW qui s'installe après le chargement
+      reg.addEventListener('updatefound', () => {
+        const installing = reg.installing
+        if (!installing) return
+        installing.addEventListener('statechange', () => {
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            checkWaiting(installing)
+          }
+        })
+      })
+    })
+
+    // Quand le SW s'active (après skipWaiting), recharge la page
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload()
+    })
+
+    // Écoute SW_ACTIVATED pour confirmation
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type === 'SW_ACTIVATED') {
+        console.log('[App] SW activé :', event.data.version)
+      }
+    })
+  }, [])
+
+  /* ── Appliquer la mise à jour ── */
+  function applyUpdate() {
+    const sw = pendingSW || swReg.current?.waiting
+    if (sw) {
+      sw.postMessage({ type: 'SKIP_WAITING' })
+    } else {
+      window.location.reload()
+    }
+  }
+
+  /* ── Dismiss ── */
   function dismiss() {
     if (mode === 'update') {
-      localStorage.setItem(KEY_DISMISSED_VERSION, latestVersion)
+      if (newSWsha) localStorage.setItem(KEY_UPDATE_DISMISSED, newSWsha)
     } else {
       localStorage.setItem(KEY_DISMISSED, '1')
     }
     setMode(null)
   }
 
-  /* ── Trigger install Android ─────────────────────────────────────────── */
+  /* ── Trigger Android install ── */
   async function triggerAndroidInstall() {
     if (!deferredPrompt.current) return
     deferredPrompt.current.prompt()
     const { outcome } = await deferredPrompt.current.userChoice
     deferredPrompt.current = null
-    if (outcome === 'accepted') setMode(null)
-    else dismiss()
+    if (outcome === 'accepted') {
+      setMode(null)
+      localStorage.setItem(KEY_DISMISSED, '1')
+    } else {
+      dismiss()
+    }
   }
 
   if (!mode) return null
 
-  /* ── Rendu ───────────────────────────────────────────────────────────── */
-
-  const isUpdate = mode === 'update'
-
   return (
-    <div className={`install-prompt ${isUpdate ? 'install-prompt--update' : ''}`}>
+    <div className={`install-prompt${mode === 'update' ? ' install-prompt--update' : ''}`}>
       <button className="install-close" onClick={dismiss} aria-label="Fermer">✕</button>
 
-      {/* ── Bannière MISE À JOUR ── */}
-      {isUpdate && (
+      {/* ── Mise à jour disponible ── */}
+      {mode === 'update' && (
         <>
           <div className="install-header">
             <span className="install-icon">🔄</span>
             <div>
-              <div className="install-title">Nouvelle version disponible</div>
-              <div className="install-sub">
-                v{CURRENT_VERSION} → <strong style={{ color: 'var(--gold)' }}>v{latestVersion}</strong>
-              </div>
+              <div className="install-title">Mise à jour disponible</div>
+              <div className="install-sub">Une nouvelle version est prête à être installée</div>
             </div>
           </div>
-          <div className="install-why">
-            Une mise à jour est disponible. Réinstalle l'application pour bénéficier
-            des dernières améliorations et corrections.
+          <div className="install-why" style={{ marginBottom: 12 }}>
+            Applique la mise à jour maintenant sans perdre tes données.<br />
+            L'app se rechargera automatiquement.
           </div>
-          {isIosSafari() && (
-            <div className="install-steps">
-              <div className="install-step">
-                <span className="install-num">1</span>
-                <span>Supprime l'icône Ydash de ton écran d'accueil</span>
-              </div>
-              <div className="install-step">
-                <span className="install-num">2</span>
-                <span>Ouvre ce lien dans Safari puis <strong>⎋ Partager → Écran d'accueil</strong></span>
-              </div>
-            </div>
-          )}
-          {mode === 'android' && (
-            <button className="install-cta" onClick={triggerAndroidInstall}>
-              📲 Installer la mise à jour
-            </button>
-          )}
-          {!isIosSafari() && mode !== 'android' && (
-            <div className="install-why">
-              Ferme puis réouvre l'application pour charger la nouvelle version.
-            </div>
-          )}
+          <button className="install-cta install-cta--update" onClick={applyUpdate}>
+            🔄 Mettre à jour maintenant
+          </button>
         </>
       )}
 
-      {/* ── Bannière iOS INSTALL ── */}
-      {mode === 'ios' && (
+      {/* ── Installation iOS/iPadOS ── */}
+      {mode === 'install-ios' && (
         <>
           <div className="install-header">
             <span className="install-icon">📲</span>
@@ -207,7 +205,7 @@ export default function InstallPrompt() {
           <div className="install-steps">
             <div className="install-step">
               <span className="install-num">1</span>
-              <span>Appuie sur <strong>⎋ Partager</strong> en bas de Safari</span>
+              <span>Appuie sur <strong>⎋ Partager</strong> dans Safari</span>
             </div>
             <div className="install-step">
               <span className="install-num">2</span>
@@ -215,18 +213,17 @@ export default function InstallPrompt() {
             </div>
             <div className="install-step">
               <span className="install-num">3</span>
-              <span>Appuie sur <strong>Ajouter</strong> — c'est tout !</span>
+              <span>Appuie sur <strong>Ajouter</strong></span>
             </div>
           </div>
           <div className="install-why">
-            💡 Une fois installée, tes données sont <strong>permanentes</strong> —
-            Apple n'efface pas le stockage des apps ajoutées à l'écran d'accueil.
+            💡 Données permanentes une fois installée — Apple ne les efface pas.
           </div>
         </>
       )}
 
-      {/* ── Bannière Android INSTALL ── */}
-      {mode === 'android' && !isUpdate && (
+      {/* ── Installation Android ── */}
+      {mode === 'install-android' && (
         <>
           <div className="install-header">
             <span className="install-icon">📲</span>
@@ -236,7 +233,7 @@ export default function InstallPrompt() {
             </div>
           </div>
           <div className="install-why" style={{ marginBottom: 12 }}>
-            Installe l'application sur ton téléphone pour y accéder sans passer par le navigateur.
+            Installe l'app pour y accéder sans navigateur.
           </div>
           <button className="install-cta" onClick={triggerAndroidInstall}>
             📲 Installer la version mobile
@@ -246,6 +243,3 @@ export default function InstallPrompt() {
     </div>
   )
 }
-
-/* ─── Export du helper version (utilisé par Topbar) ─────────────────────── */
-export { CURRENT_VERSION, isNewerVersion }
