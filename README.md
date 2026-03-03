@@ -16,9 +16,7 @@ This is a dashboard application for crypto.
 
 Créer et compléter un fichier .env.local
 
-Terminé
-
-# Fichier de dev local — NE PAS COMMITER (déjà dans .gitignore par défaut avec Vite)
+Fichier de dev local — NE PAS COMMITER (déjà dans .gitignore par défaut avec Vite)
 
 VITE_FIREBASE_API_KEY=...
 
