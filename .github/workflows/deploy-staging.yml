@@ -10,7 +10,6 @@ on:
       - 'develop'
   workflow_dispatch:
 
-# Seule permission nécessaire : écrire sur la branche gh-pages
 permissions:
   contents: write
 
@@ -19,8 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
@@ -35,23 +36,28 @@ jobs:
         env:
           VITE_BASE: /dashboard-weex/staging/
 
-      # Pousse dans /staging/ sur gh-pages
-      # → ne touche PAS la prod (racine de gh-pages)
-      # → ne nécessite PAS les environment protection rules
-      - name: Deploy to gh-pages/staging
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          destination_dir: staging
-          publish_branch: gh-pages
-          commit_message: "[staging] ${{ github.ref_name }} @ ${{ github.sha }}"
+      - name: Prepare gh-pages with staging
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin gh-pages 2>/dev/null && \
+            git worktree add /tmp/gh-pages origin/gh-pages || \
+            mkdir -p /tmp/gh-pages
+
+          rm -rf /tmp/gh-pages/staging
+          cp -r dist /tmp/gh-pages/staging
+          touch /tmp/gh-pages/.nojekyll
+
+          cd /tmp/gh-pages
+          git add -A
+          git commit -m "[staging] ${{ github.ref_name }} @ $(echo ${{ github.sha }} | cut -c1-7)" || echo "Nothing to commit"
+          git push origin HEAD:gh-pages
 
       - name: Print staging URL
         run: |
           echo "──────────────────────────────────────────────────────"
-          echo "✅  Staging déployé avec succès !"
-          echo "🔗  URL : https://${{ github.repository_owner }}.github.io/dashboard-weex/staging/"
-          echo "🌿  Branche  : ${{ github.ref_name }}"
-          echo "📦  Commit   : ${{ github.sha }}"
+          echo "✅  Staging déployé !"
+          echo "🔗  https://${{ github.repository_owner }}.github.io/dashboard-weex/staging/"
+          echo "🌿  Branche : ${{ github.ref_name }}"
           echo "──────────────────────────────────────────────────────"
