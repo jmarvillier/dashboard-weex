@@ -7,7 +7,7 @@ on:
       - 'feature/**'
       - 'test/**'
       - 'dev/**'
-      - 'developp'
+      - 'develop'
   workflow_dispatch:
 
 permissions:
