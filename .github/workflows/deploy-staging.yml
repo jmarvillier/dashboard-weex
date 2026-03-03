@@ -36,34 +36,44 @@ jobs:
         env:
           VITE_BASE: /dashboard-weex/staging/
 
-      - name: Deploy staging into gh-pages
+      - name: Save staging build to staging-build branch
         run: |
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          if git ls-remote --exit-code origin gh-pages; then
-            git clone --branch gh-pages --single-branch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" /tmp/ghp
+          if git ls-remote --exit-code origin staging-build; then
+            git clone --branch staging-build --single-branch \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+              /tmp/staging-build
           else
-            mkdir /tmp/ghp && cd /tmp/ghp
+            mkdir /tmp/staging-build && cd /tmp/staging-build
             git init
-            git checkout -b gh-pages
-            touch .nojekyll
-            git add .nojekyll
-            git commit -m "init gh-pages"
-            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+            git checkout -b staging-build
+            git remote add origin \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           fi
 
-          rm -rf /tmp/ghp/staging
-          cp -r dist /tmp/ghp/staging
-          touch /tmp/ghp/.nojekyll
+          rm -rf /tmp/staging-build/*
+          cp -r dist/. /tmp/staging-build/
+          touch /tmp/staging-build/.nojekyll
 
-          cd /tmp/ghp
+          cd /tmp/staging-build
           git add -A
           git diff --cached --quiet && echo "Nothing to commit" && exit 0
-          git commit -m "[staging] ${{ github.ref_name }} @ $(echo '${{ github.sha }}' | cut -c1-7)"
-          git push origin gh-pages
+          git commit -m "[staging-build] ${{ github.ref_name }} @ $(echo '${{ github.sha }}' | cut -c1-7)"
+          git push origin staging-build --force
+
+      - name: Trigger prod deploy to pick up staging
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/.deploy.yml/dispatches" \
+            -d '{"ref":"main"}'
+        continue-on-error: true
 
       - name: Print staging URL
         run: |
-          echo "✅  Staging déployé !"
+          echo "✅  Build staging sauvegardé !"
           echo "🔗  https://${{ github.repository_owner }}.github.io/dashboard-weex/staging/"
+          echo "⏳  Disponible après le redéploiement de la prod (1-2 min)"
