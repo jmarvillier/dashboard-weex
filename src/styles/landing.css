@@ -491,3 +491,8 @@
   0%,100% { box-shadow: 0 0 0 0 rgba(64,150,247,0); }
   50%      { box-shadow: 0 0 0 4px rgba(64,150,247,.15); }
 }
+
+/* Variante "Mettre à jour" du CTA (bleu au lieu de gold) */
+.install-cta--update {
+  background: linear-gradient(135deg, var(--blue) 0%, #2a6fc9 100%);
+}
