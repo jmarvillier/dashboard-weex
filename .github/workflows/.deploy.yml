@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - main
   workflow_dispatch:
 
 permissions:
@@ -22,8 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # fetch-depth: 0 est nécessaire pour que git rev-parse --short HEAD
-          # retourne le vrai SHA du commit (pas juste "HEAD détaché")
           fetch-depth: 1
 
       - name: Setup Node 20
@@ -34,15 +33,28 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build
+      - name: Build prod
         run: npm run build
-        # Le SHA Git est lu automatiquement par vite.config.js via git rev-parse
 
       - name: Print build info
         run: |
           echo "Version : $(node -p "require('./package.json').version")"
           echo "SHA Git  : $(git rev-parse --short=7 HEAD)"
-          echo "Cache key: weex-$(node -p "require('./package.json').version")-$(git rev-parse --short=7 HEAD)"
+
+      - name: Inject staging build into dist
+        run: |
+          if git ls-remote --exit-code origin staging-build; then
+            echo "✅ staging-build trouvé → clone dans dist/staging/"
+            git clone --branch staging-build --single-branch \
+              "https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git" \
+              dist/staging
+            rm -rf dist/staging/.git
+            echo "Staging injecté dans dist/staging/"
+            ls dist/staging/ | head -5
+          else
+            echo "ℹ️ Pas de staging-build, on déploie sans"
+          fi
+        continue-on-error: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
