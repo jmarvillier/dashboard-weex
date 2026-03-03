@@ -41,6 +41,9 @@ jobs:
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Mémorise le chemin absolu du build AVANT tout cd
+          BUILD_DIR="$GITHUB_WORKSPACE/dist"
+
           if git ls-remote --exit-code origin staging-build; then
             git clone --branch staging-build --single-branch \
               "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
@@ -51,10 +54,12 @@ jobs:
             git checkout -b staging-build
             git remote add origin \
               "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+            cd "$GITHUB_WORKSPACE"
           fi
 
+          # Copie avec chemin absolu
           rm -rf /tmp/staging-build/*
-          cp -r dist/. /tmp/staging-build/
+          cp -r "$BUILD_DIR/." /tmp/staging-build/
           touch /tmp/staging-build/.nojekyll
 
           cd /tmp/staging-build
