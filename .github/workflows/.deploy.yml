@@ -41,17 +41,16 @@ jobs:
           echo "Version : $(node -p "require('./package.json').version")"
           echo "SHA Git  : $(git rev-parse --short=7 HEAD)"
 
-      - name: Restore staging from gh-pages
+      - name: Inject staging build into dist
         run: |
-          git fetch origin gh-pages 2>/dev/null || true
-          if git show origin/gh-pages:staging/index.html > /dev/null 2>&1; then
-            echo "Staging trouvé → copie dans dist/staging/"
-            git --work-tree=dist/staging checkout origin/gh-pages -- staging/
-            mv dist/staging/staging/* dist/staging/ 2>/dev/null || true
-            rm -rf dist/staging/staging
-            echo "✅ Staging restauré"
+          git fetch origin staging-build 2>/dev/null || true
+          if git ls-remote --exit-code origin staging-build; then
+            echo "✅ staging-build trouvé → injection dans dist/staging/"
+            mkdir -p dist/staging
+            git --work-tree=dist/staging checkout origin/staging-build -- .
+            echo "Staging injecté"
           else
-            echo "ℹ️ Pas de staging existant, on continue sans"
+            echo "ℹ️ Pas de staging-build, on déploie sans"
           fi
         continue-on-error: true
 
