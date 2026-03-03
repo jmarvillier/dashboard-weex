@@ -38,15 +38,13 @@ jobs:
 
       - name: Deploy staging into gh-pages
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Clone gh-pages dans /tmp/ghp (ou crée un repo vide si elle n'existe pas)
           if git ls-remote --exit-code origin gh-pages; then
             git clone --branch gh-pages --single-branch "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" /tmp/ghp
           else
-            mkdir /tmp/ghp
-            cd /tmp/ghp
+            mkdir /tmp/ghp && cd /tmp/ghp
             git init
             git checkout -b gh-pages
             touch .nojekyll
@@ -55,7 +53,6 @@ jobs:
             git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           fi
 
-          # Injecte le build dans /staging/ sans toucher le reste
           rm -rf /tmp/ghp/staging
           cp -r dist /tmp/ghp/staging
           touch /tmp/ghp/.nojekyll
