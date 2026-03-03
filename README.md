@@ -5,6 +5,7 @@ Welcome to the Ydash project!
 master : https://jmarvillier.github.io/dashboard-weex/
 
 develop : https://jmarvillier.github.io/dashboard-weex/staging/
+[![Deploy Staging](https://github.com/jmarvillier/dashboard-weex/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/jmarvillier/dashboard-weex/actions/workflows/deploy-staging.yml)
 
 ## Overview
 
