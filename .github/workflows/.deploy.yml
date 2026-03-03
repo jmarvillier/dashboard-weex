@@ -43,12 +43,14 @@ jobs:
 
       - name: Inject staging build into dist
         run: |
-          git fetch origin staging-build 2>/dev/null || true
           if git ls-remote --exit-code origin staging-build; then
-            echo "✅ staging-build trouvé → injection dans dist/staging/"
-            mkdir -p dist/staging
-            git --work-tree=dist/staging checkout origin/staging-build -- .
-            echo "Staging injecté"
+            echo "✅ staging-build trouvé → clone dans dist/staging/"
+            git clone --branch staging-build --single-branch \
+              "https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git" \
+              dist/staging
+            rm -rf dist/staging/.git
+            echo "Staging injecté dans dist/staging/"
+            ls dist/staging/ | head -5
           else
             echo "ℹ️ Pas de staging-build, on déploie sans"
           fi
