@@ -7,7 +7,7 @@ on:
       - 'feature/**'
       - 'test/**'
       - 'dev/**'
-      - 'jmarvillier-patch-3'   # ta branche actuelle
+      - 'develop'
   workflow_dispatch:
 
 # Seule permission nécessaire : écrire sur la branche gh-pages
