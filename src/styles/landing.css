@@ -402,3 +402,97 @@
 #landing .pairs-grid {
   max-width: 100%;
 }
+
+/* ── InstallPrompt : variante mise à jour ──────────────────────────────────── */
+.install-prompt--update {
+  border-color: rgba(64,150,247,.4);
+  box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(64,150,247,.15);
+}
+.install-prompt--update .install-title { color: var(--blue); }
+
+/* Bouton CTA Android */
+.install-cta {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--gold) 0%, #c9992a 100%);
+  color: var(--bg);
+  font-family: 'Space Mono', monospace;
+  font-size: .72rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  letter-spacing: .04em;
+  transition: opacity .2s, transform .15s;
+}
+.install-cta:hover { opacity: .9; transform: translateY(-1px); }
+
+/* ── Topbar : bouton installer ─────────────────────────────────────────────── */
+.btn-install-topbar {
+  border-color: rgba(232,184,75,.45) !important;
+  color: var(--gold) !important;
+  background: rgba(232,184,75,.08) !important;
+  animation: pulse-gold 2.5s ease-in-out infinite;
+}
+.btn-install-topbar:hover {
+  background: rgba(232,184,75,.18) !important;
+}
+.btn-install-update {
+  border-color: rgba(64,150,247,.45) !important;
+  color: var(--blue) !important;
+  background: rgba(64,150,247,.08) !important;
+  animation: pulse-blue 2.5s ease-in-out infinite;
+}
+.btn-install-update:hover {
+  background: rgba(64,150,247,.18) !important;
+}
+.btn-install-dismiss {
+  background: none; border: none;
+  color: var(--muted); font-size: .65rem;
+  cursor: pointer; padding: 2px 5px;
+  border-radius: 4px; transition: color .15s;
+  line-height: 1;
+}
+.btn-install-dismiss:hover { color: var(--text); }
+
+/* ── Guide iOS inline sous la topbar ──────────────────────────────────────── */
+.ios-guide-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+  background: rgba(232,184,75,.07);
+  border-bottom: 1px solid rgba(232,184,75,.2);
+  font-size: .62rem;
+  color: var(--text2);
+  animation: fadeUp .3s ease;
+  position: relative;
+}
+.ios-guide-bar strong { color: var(--text); }
+.ios-guide-sep { color: var(--muted); font-size: .55rem; }
+.ios-guide-close {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: none; border: none;
+  color: var(--muted); font-size: .65rem;
+  cursor: pointer; padding: 4px 6px;
+  border-radius: 4px; transition: color .15s;
+}
+.ios-guide-close:hover { color: var(--text); }
+
+@keyframes pulse-gold {
+  0%,100% { box-shadow: 0 0 0 0 rgba(232,184,75,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(232,184,75,.15); }
+}
+@keyframes pulse-blue {
+  0%,100% { box-shadow: 0 0 0 0 rgba(64,150,247,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(64,150,247,.15); }
+}
+
+/* Variante "Mettre à jour" du CTA (bleu au lieu de gold) */
+.install-cta--update {
+  background: linear-gradient(135deg, var(--blue) 0%, #2a6fc9 100%);
+}

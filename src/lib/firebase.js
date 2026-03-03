@@ -1,14 +1,15 @@
 import { initializeApp }                             from 'firebase/app'
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore'
 
-// 🔧 Remplace avec ta vraie config Firebase
+// Les valeurs sont injectées au build depuis les secrets GitHub Actions
+// via les variables d'environnement Vite (VITE_*)
 const firebaseConfig = {
-  apiKey: "AIzaSyBdJgv9gZamPkQbohhSyR_byr__wnE-CjY",
-  authDomain: "dashboard-weex.firebaseapp.com",
-  projectId: "dashboard-weex",
-  storageBucket: "dashboard-weex.firebasestorage.app",
-  messagingSenderId: "167218478733",
-  appId: "1:167218478733:web:9c25811d2b7f87724facc4"
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
 const app = initializeApp(firebaseConfig)

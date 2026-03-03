@@ -9,7 +9,7 @@
  *   - small          : topbar du dashboard
  */
 
-const VERSION = '1.0.9'
+const VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
 
 export default function Logo({ small = false }) {
   if (small) {

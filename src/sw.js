@@ -1,62 +1,85 @@
-name: Deploy to GitHub Pages
+/**
+ * sw.js — Service Worker Ydash
+ * ─────────────────────────────────────────────────────────────────────────────
+ * __APP_VERSION__ et __GIT_SHA__ sont remplacés par vite.config.js au build.
+ *
+ * Stratégie :
+ *  - Cache nommé par version+sha → purge automatique à chaque déploiement
+ *  - Install  : mise en cache des assets de base
+ *  - Activate : purge anciens caches + claim + notifie les clients (SW_ACTIVATED)
+ *  - Fetch    : version.json → réseau direct | reste → Cache First
+ *  - Message  : SKIP_WAITING → activation immédiate sur demande de l'app
+ */
 
-on:
-  push:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
+const VERSION    = '__APP_VERSION__'
+const GIT_SHA    = '__GIT_SHA__'
+const CACHE_NAME = `weex-${VERSION}-${GIT_SHA}-assets`
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+const PRECACHE_URLS = ['./', './index.html', './manifest.json', './version.json']
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
+/* ── Install ──────────────────────────────────────────────────────────────── */
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(() => console.log(`[SW] Installed v${VERSION}@${GIT_SHA}`))
+    // Pas de skipWaiting ici : on laisse l'app décider via message
+  )
+})
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          # fetch-depth: 0 est nécessaire pour que git rev-parse --short HEAD
-          # retourne le vrai SHA du commit (pas juste "HEAD détaché")
-          fetch-depth: 1
+/* ── Activate ─────────────────────────────────────────────────────────────── */
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => {
+          console.log(`[SW] Purge cache obsolète : ${k}`)
+          return caches.delete(k)
+        })
+      ))
+      .then(() => self.clients.claim())
+      .then(() => {
+        // Notifie tous les clients que le nouveau SW est actif → l'app affiche le toast
+        return self.clients.matchAll({ includeUncontrolled: true }).then(clients =>
+          clients.forEach(c => c.postMessage({ type: 'SW_ACTIVATED', version: VERSION, sha: GIT_SHA }))
+        )
+      })
+      .then(() => console.log(`[SW] Activé v${VERSION}@${GIT_SHA}`))
+  )
+})
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+/* ── Message ──────────────────────────────────────────────────────────────── */
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    console.log('[SW] skipWaiting demandé par l\'app')
+    self.skipWaiting()
+  }
+})
 
-      - name: Install dependencies
-        run: npm install
+/* ── Fetch ────────────────────────────────────────────────────────────────── */
+self.addEventListener('fetch', event => {
+  const { request } = event
+  const url = new URL(request.url)
 
-      - name: Build
-        run: npm run build
-        # Le SHA Git est lu automatiquement par vite.config.js via git rev-parse
+  if (request.method !== 'GET') return
+  if (url.origin !== location.origin) return
 
-      - name: Print build info
-        run: |
-          echo "Version : $(node -p "require('./package.json').version")"
-          echo "SHA Git  : $(git rev-parse --short=7 HEAD)"
-          echo "Cache key: weex-$(node -p "require('./package.json').version")-$(git rev-parse --short=7 HEAD)"
+  // version.json → toujours réseau (ne jamais servir une version périmée)
+  if (url.pathname.endsWith('version.json')) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)))
+    return
+  }
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  // Cache First pour tout le reste
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached
+      return fetch(request).then(response => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()))
+        }
+        return response
+      })
+    })
+  )
+})
