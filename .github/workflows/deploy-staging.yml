@@ -7,10 +7,9 @@ on:
       - 'feature/**'
       - 'test/**'
       - 'dev/**'
-      - 'jmarvillier-patch-3'   # ta branche actuelle
+      - 'develop'
   workflow_dispatch:
 
-# Seule permission nécessaire : écrire sur la branche gh-pages
 permissions:
   contents: write
 
@@ -19,8 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
@@ -35,23 +36,47 @@ jobs:
         env:
           VITE_BASE: /dashboard-weex/staging/
 
-      # Pousse dans /staging/ sur gh-pages
-      # → ne touche PAS la prod (racine de gh-pages)
-      # → ne nécessite PAS les environment protection rules
-      - name: Deploy to gh-pages/staging
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          destination_dir: staging
-          publish_branch: gh-pages
-          commit_message: "[staging] ${{ github.ref_name }} @ ${{ github.sha }}"
+      - name: Save staging build to staging-build branch
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          BUILD_DIR="$GITHUB_WORKSPACE/dist"
+
+          if git ls-remote --exit-code origin staging-build; then
+            git clone --branch staging-build --single-branch \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+              /tmp/staging-build
+          else
+            mkdir /tmp/staging-build && cd /tmp/staging-build
+            git init
+            git checkout -b staging-build
+            git remote add origin \
+              "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+            cd "$GITHUB_WORKSPACE"
+          fi
+
+          rm -rf /tmp/staging-build/*
+          cp -r "$BUILD_DIR/." /tmp/staging-build/
+          touch /tmp/staging-build/.nojekyll
+
+          cd /tmp/staging-build
+          git add -A
+          git diff --cached --quiet && echo "Nothing to commit" && exit 0
+          git commit -m "[staging-build] ${{ github.ref_name }} @ $(echo '${{ github.sha }}' | cut -c1-7)"
+          git push origin staging-build --force
+
+      - name: Trigger prod deploy to pick up staging
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/.deploy.yml/dispatches" \
+            -d '{"ref":"master"}'
+        continue-on-error: true
 
       - name: Print staging URL
         run: |
-          echo "──────────────────────────────────────────────────────"
-          echo "✅  Staging déployé avec succès !"
-          echo "🔗  URL : https://${{ github.repository_owner }}.github.io/dashboard-weex/staging/"
-          echo "🌿  Branche  : ${{ github.ref_name }}"
-          echo "📦  Commit   : ${{ github.sha }}"
-          echo "──────────────────────────────────────────────────────"
+          echo "✅  Build staging sauvegardé !"
+          echo "🔗  https://${{ github.repository_owner }}.github.io/dashboard-weex/staging/"
+          echo "⏳  Disponible après le redéploiement de la prod (1-2 min)"
