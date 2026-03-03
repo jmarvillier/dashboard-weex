@@ -13,7 +13,6 @@ develop : https://jmarvillier.github.io/dashboard-weex/staging/
 
 This is a dashboard application for crypto.
 
-[![Deploy to GitHub Pages](https://github.com/jmarvillier/dashboard-weex/actions/workflows/.deploy.yml/badge.svg)](https://github.com/jmarvillier/dashboard-weex/actions/workflows/.deploy.yml)
 
 ## Configuration Firebase en local
 
