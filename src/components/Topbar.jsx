@@ -1,9 +1,33 @@
+/**
+ * Topbar.jsx
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Barre de navigation principale.
+ * Affiche un bouton contextuel :
+ *  - "📲 Installer"     → si l'app n'est pas encore installée (iOS ou Android)
+ *  - "🔄 Mettre à jour" → si un nouveau Service Worker attend (sans réinstaller)
+ *
+ * iOS 13+ fix : maxTouchPoints > 1 pour détecter l'iPad qui se présente en Macintosh
+ */
+
 import { useState, useEffect, useRef } from 'react'
 import Logo from './Logo.jsx'
-import { CURRENT_VERSION, isNewerVersion } from './InstallPrompt.jsx'
 
-const KEY_DISMISSED = 'ydash-install-dismissed'
-const KEY_DISMISSED_VERSION = 'ydash-install-dismissed-version'
+const KEY_DISMISSED        = 'ydash-install-dismissed'
+const KEY_UPDATE_DISMISSED = 'ydash-update-dismissed-sha'
+
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+function isIosDevice() {
+  const ua = navigator.userAgent
+  return /iphone|ipad|ipod/i.test(ua) ||
+    (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
+}
+
+function isIosSafari() {
+  const ua         = navigator.userAgent
+  const standalone = window.navigator.standalone === true
+  const safari     = /safari/i.test(ua) && !/chrome|crios|fxios|android/i.test(ua)
+  return isIosDevice() && safari && !standalone
+}
 
 function isStandalone() {
   return (
@@ -12,112 +36,99 @@ function isStandalone() {
   )
 }
 
-function isIosSafari() {
-  const ua = navigator.userAgent
-  const standalone = window.navigator.standalone === true
-  const safari = /safari/i.test(ua) && !/chrome|crios|fxios/i.test(ua)
-  return /iphone|ipad|ipod/i.test(ua) && safari && !standalone
-}
-
+/* ─── Composant ──────────────────────────────────────────────────────────── */
 export default function Topbar({ loadedAt, excluded, backToLanding }) {
   const n = excluded.size
-  const [showInstallBtn, setShowInstallBtn] = useState(false)
-  const [installMode, setInstallMode] = useState(null)   // 'ios' | 'android' | 'update'
-  const [latestVersion, setLatestVersion] = useState(null)
-  const [showIosGuide, setShowIosGuide] = useState(false)
-  const deferredPrompt = useRef(null)
 
-  /* Capture le prompt natif Android */
+  const [btnMode, setBtnMode]       = useState(null)  // null | 'ios' | 'android' | 'update'
+  const [showIosGuide, setShowIos]  = useState(false)
+  const deferredPrompt              = useRef(null)
+  const pendingSW                   = useRef(null)
+  const newSWsha                    = useRef(null)
+
+  /* ── Prompt Android ── */
   useEffect(() => {
-    const handler = (e) => {
+    const handler = e => {
       e.preventDefault()
       deferredPrompt.current = e
-      evaluateInstall(latestVersion)
+      if (!isStandalone() && !localStorage.getItem(KEY_DISMISSED)) {
+        setBtnMode('android')
+      }
     }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [latestVersion])
-
-  /* Récupère la version latest */
-  useEffect(() => {
-    fetch('/dashboard-weex/version.json?t=' + Date.now())
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.version) {
-          setLatestVersion(data.version)
-          evaluateInstall(data.version)
-        }
-      })
-      .catch(() => {})
-
-    // Évalue aussi sans version.json
-    evaluateInstall(null)
   }, [])
 
-  function evaluateInstall(latest) {
-    // Cas update (prioritaire)
-    if (latest && isNewerVersion(CURRENT_VERSION, latest)) {
-      const dismissedAt = localStorage.getItem(KEY_DISMISSED_VERSION)
-      if (dismissedAt !== latest) {
-        setInstallMode('update')
-        setShowInstallBtn(true)
-        return
-      }
+  /* ── Détection iOS + SW updates ── */
+  useEffect(() => {
+    // iOS install
+    if (isIosSafari() && !localStorage.getItem(KEY_DISMISSED)) {
+      setBtnMode('ios')
     }
-    // Cas non installée
-    if (!isStandalone()) {
-      const dismissed = localStorage.getItem(KEY_DISMISSED)
-      if (!dismissed) {
-        if (isIosSafari()) {
-          setInstallMode('ios')
-          setShowInstallBtn(true)
-          return
-        }
-        if (deferredPrompt.current) {
-          setInstallMode('android')
-          setShowInstallBtn(true)
-          return
-        }
-      }
-    }
-    setShowInstallBtn(false)
-  }
 
-  async function handleInstallClick() {
-    if (installMode === 'ios') {
-      setShowIosGuide(v => !v)
+    // Surveillance SW
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.ready.then(reg => {
+      const onWaiting = (sw) => {
+        const sha = String(Date.now())
+        newSWsha.current = sha
+        const dismissed = localStorage.getItem(KEY_UPDATE_DISMISSED)
+        if (dismissed !== sha) {
+          pendingSW.current = sw
+          setBtnMode('update')
+        }
+      }
+      if (reg.waiting) onWaiting(reg.waiting)
+      reg.addEventListener('updatefound', () => {
+        const inst = reg.installing
+        if (!inst) return
+        inst.addEventListener('statechange', () => {
+          if (inst.state === 'installed' && navigator.serviceWorker.controller) {
+            onWaiting(inst)
+          }
+        })
+      })
+    })
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload()
+    })
+  }, [])
+
+  /* ── Actions ── */
+  async function handleBtn() {
+    if (btnMode === 'ios') {
+      setShowIos(v => !v)
       return
     }
-    if (installMode === 'android' && deferredPrompt.current) {
+    if (btnMode === 'android' && deferredPrompt.current) {
       deferredPrompt.current.prompt()
       const { outcome } = await deferredPrompt.current.userChoice
       deferredPrompt.current = null
       if (outcome === 'accepted') {
-        setShowInstallBtn(false)
+        setBtnMode(null)
         localStorage.setItem(KEY_DISMISSED, '1')
       }
       return
     }
-    if (installMode === 'update') {
-      // Rafraîchit l'app pour récupérer la nouvelle version
-      window.location.reload(true)
+    if (btnMode === 'update') {
+      const sw = pendingSW.current
+      if (sw) sw.postMessage({ type: 'SKIP_WAITING' })
+      else window.location.reload()
     }
   }
 
-  function dismissInstall() {
-    if (installMode === 'update') {
-      localStorage.setItem(KEY_DISMISSED_VERSION, latestVersion)
+  function dismissBtn() {
+    if (btnMode === 'update') {
+      localStorage.setItem(KEY_UPDATE_DISMISSED, newSWsha.current ?? '')
     } else {
       localStorage.setItem(KEY_DISMISSED, '1')
     }
-    setShowInstallBtn(false)
-    setShowIosGuide(false)
+    setBtnMode(null)
+    setShowIos(false)
   }
 
-  const btnLabel =
-    installMode === 'update'
-      ? `🔄 v${latestVersion} dispo`
-      : '📲 Installer'
+  const btnLabel = btnMode === 'update' ? '🔄 Mettre à jour' : '📲 Installer'
 
   return (
     <>
@@ -136,18 +147,17 @@ export default function Topbar({ loadedAt, excluded, backToLanding }) {
             </span>
           )}
 
-          {/* Bouton install / mise à jour */}
-          {showInstallBtn && (
+          {btnMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button
-                className={`btn-sm btn-install-topbar ${installMode === 'update' ? 'btn-install-update' : ''}`}
-                onClick={handleInstallClick}
+                className={`btn-sm btn-install-topbar${btnMode === 'update' ? ' btn-install-update' : ''}`}
+                onClick={handleBtn}
               >
                 {btnLabel}
               </button>
               <button
                 className="btn-install-dismiss"
-                onClick={dismissInstall}
+                onClick={dismissBtn}
                 aria-label="Ignorer"
                 title="Ne plus afficher"
               >✕</button>
@@ -158,15 +168,15 @@ export default function Topbar({ loadedAt, excluded, backToLanding }) {
         </div>
       </div>
 
-      {/* Guide iOS inline sous la topbar */}
-      {showIosGuide && installMode === 'ios' && (
+      {/* Guide iOS inline */}
+      {showIosGuide && btnMode === 'ios' && (
         <div className="ios-guide-bar">
-          <span>1. Appuie sur <strong>⎋ Partager</strong></span>
+          <span>1. <strong>⎋ Partager</strong></span>
           <span className="ios-guide-sep">›</span>
           <span>2. <strong>"Sur l'écran d'accueil"</strong></span>
           <span className="ios-guide-sep">›</span>
           <span>3. <strong>Ajouter</strong></span>
-          <button className="ios-guide-close" onClick={() => setShowIosGuide(false)}>✕</button>
+          <button className="ios-guide-close" onClick={() => setShowIos(false)}>✕</button>
         </div>
       )}
     </>
