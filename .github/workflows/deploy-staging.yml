@@ -41,7 +41,6 @@ jobs:
           git config --global user.name  "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Mémorise le chemin absolu du build AVANT tout cd
           BUILD_DIR="$GITHUB_WORKSPACE/dist"
 
           if git ls-remote --exit-code origin staging-build; then
@@ -57,7 +56,6 @@ jobs:
             cd "$GITHUB_WORKSPACE"
           fi
 
-          # Copie avec chemin absolu
           rm -rf /tmp/staging-build/*
           cp -r "$BUILD_DIR/." /tmp/staging-build/
           touch /tmp/staging-build/.nojekyll
@@ -74,7 +72,7 @@ jobs:
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/workflows/.deploy.yml/dispatches" \
-            -d '{"ref":"main"}'
+            -d '{"ref":"master"}'
         continue-on-error: true
 
       - name: Print staging URL
