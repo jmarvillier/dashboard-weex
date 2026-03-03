@@ -34,33 +34,16 @@
               '/dashboard-weex/sw.js',
               { scope: '/dashboard-weex/' }
             )
-
-            // Force la vérification d'une mise à jour à chaque chargement
+            // Force la vérification d'une MAJ à chaque chargement.
+            // La gestion du bouton MAJ et du reload est déléguée
+            // à InstallPrompt.jsx / Topbar.jsx via les événements SW.
             reg.update()
-
-            // Dès qu'un nouveau SW est installé et attend → l'activer immédiatement
-            reg.addEventListener('updatefound', () => {
-              const newSW = reg.installing
-              newSW.addEventListener('statechange', () => {
-                if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-                  // Nouveau SW prêt → recharge la page pour l'appliquer
-                  navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' })
-                  window.location.reload()
-                }
-              })
-            })
-
             console.log('[SW] Registered:', reg.scope)
           } catch (err) {
             console.warn('[SW] Registration failed:', err)
           }
         })
-
-        // Recharge quand le SW change de contrôleur (après activation)
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload()
-        })
       }
     </script>
-  </body>
+</body>
 </html>
