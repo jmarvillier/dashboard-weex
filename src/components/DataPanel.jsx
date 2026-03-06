@@ -2,8 +2,6 @@
  * DataPanel.jsx
  * ─────────────────────────────────────────────────────────────────────────────
  * Page "Données" intégrée dans le shell principal.
- * Remplace DataMenu (qui était dans une page séparée / overlay).
- *
  * Sous-vues : menu | entry | browse | import | export
  */
 
@@ -62,7 +60,7 @@ const IMPORT_SOURCES = [
     id: 'drive',
     icon: '☁️',
     label: 'Google Sheets',
-    desc: 'Via l\'URL de publication CSV',
+    desc: "Via l'URL de publication CSV",
     color: 'green',
   },
 ]
@@ -77,9 +75,7 @@ function LocalImportZone({ loadFromFile, onBack }) {
 
   return (
     <div className="dp-sub-view">
-      <button className="dp-back-btn" onClick={onBack}>
-        <span>←</span> Importer
-      </button>
+      <button className="dp-back-btn" onClick={onBack}>← Importer</button>
       <div className="dp-sub-header">
         <div className="dp-sub-icon">📱</div>
         <div className="dp-sub-title">Importer depuis l'appareil</div>
@@ -124,9 +120,7 @@ function DriveImportZone({ loadFromDrive, driveErr, setDriveErr, onBack }) {
 
   return (
     <div className="dp-sub-view">
-      <button className="dp-back-btn" onClick={onBack}>
-        <span>←</span> Importer
-      </button>
+      <button className="dp-back-btn" onClick={onBack}>← Importer</button>
       <div className="dp-sub-header">
         <div className="dp-sub-icon">☁️</div>
         <div className="dp-sub-title">Importer depuis Google Sheets</div>
@@ -153,9 +147,7 @@ function DriveImportZone({ loadFromDrive, driveErr, setDriveErr, onBack }) {
         disabled={driveUrl.length < 15 || driveBusy}
         onClick={handleLoad}
       >
-        {driveBusy
-          ? <><span className="spin" />Chargement…</>
-          : '▶ Charger et sauvegarder'}
+        {driveBusy ? <><span className="spin" />Chargement…</> : '▶ Charger et sauvegarder'}
       </button>
 
       {driveErr && (
@@ -178,9 +170,7 @@ function ImportMenu({ loadFromFile, loadFromDrive, driveErr, setDriveErr, onBack
 
   return (
     <div className="dp-sub-view">
-      <button className="dp-back-btn" onClick={onBack}>
-        <span>←</span> Données
-      </button>
+      <button className="dp-back-btn" onClick={onBack}>← Données</button>
       <div className="dp-sub-header">
         <div className="dp-sub-icon">📥</div>
         <div className="dp-sub-title">Importer des données</div>
@@ -211,7 +201,6 @@ export default function DataPanel({
   driveErr,
   setDriveErr,
   onRepoUpdated,
-  clearRepository,
 }) {
   const [activeAction, setActiveAction] = useState(null)
 
@@ -221,7 +210,6 @@ export default function DataPanel({
     setActiveAction(item.id)
   }
 
-  /* Sous-vues en mode modal (EntryForm, DataBrowser, ExportXlsx gardent leurs propres overlays) */
   if (activeAction === 'entry') {
     return (
       <div className="page-content">
@@ -274,7 +262,7 @@ export default function DataPanel({
                 key={item.id}
                 className={`dp-action-card dp-action-card--${item.color}${locked ? ' dp-action-card--locked' : ''}`}
                 onClick={() => handleItemClick(item)}
-                title={locked ? 'Importez d\'abord des données.' : undefined}
+                title={locked ? "Importez d'abord des données." : undefined}
                 disabled={locked}
               >
                 <span className="dp-action-pill">{item.pill}</span>
@@ -286,18 +274,6 @@ export default function DataPanel({
             )
           })}
         </div>
-
-        {repoAvailable && (
-          <div className="dp-danger-zone">
-            <div className="dp-danger-label">⚠️ Zone de danger</div>
-            <button
-              className="dp-btn-danger"
-              onClick={() => { if (window.confirm('Vider le repository ? Cette action est irréversible.')) clearRepository() }}
-            >
-              🗑️ Vider le repository
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )
