@@ -1,22 +1,19 @@
 /**
  * App.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Composant racine.
- * Vues : 'landing' | 'dashboard' | 'paires'
+ * Composant racine unifié.
+ * Architecture : Shell fixe (Sidebar + Topbar) + zone de contenu dynamique.
  *
- * view      → géré par useTrading ('landing' | 'dashboard')
- * subView   → surcharge locale pour afficher 'paires' sur les données chargées
+ * Pages : 'landing' | 'dashboard' | 'paires' | 'donnees'
+ * La sidebar est visible dès que des données sont chargées.
  */
 
-import { useState, useEffect } from 'react'
-import { useTrading }   from './hooks/useTrading.js'
-import LoadingOverlay   from './components/LoadingOverlay.jsx'
-import Landing          from './components/Landing.jsx'
-import Topbar           from './components/Topbar.jsx'
-import KpiRow           from './components/KpiRow.jsx'
-import SummaryTable     from './components/SummaryTable.jsx'
-import InstallPrompt    from './components/InstallPrompt.jsx'
-import PairesView       from './components/PairesView.jsx'
+import { useState, useEffect }  from 'react'
+import { useTrading }            from './hooks/useTrading.js'
+import LoadingOverlay            from './components/LoadingOverlay.jsx'
+import Landing                   from './components/Landing.jsx'
+import AppShell                  from './components/AppShell.jsx'
+import InstallPrompt             from './components/InstallPrompt.jsx'
 
 export default function App() {
   const {
@@ -33,84 +30,59 @@ export default function App() {
     backToLanding,
   } = useTrading()
 
-  const [subView, setSubView] = useState(null)
-  const [pendingPaires, setPendingPaires] = useState(false)
+  // Page active dans le shell : 'dashboard' | 'paires' | 'donnees'
+  const [activePage, setActivePage] = useState('dashboard')
 
+  // Quand on revient sur la landing, on reset la page active
   useEffect(() => {
-    if (view === 'dashboard' && pendingPaires) {
-      setSubView('paires')
-      setPendingPaires(false)
-    }
-  }, [view, pendingPaires])
-
-  useEffect(() => {
-    if (view === 'landing') setSubView(null)
+    if (view === 'landing') setActivePage('dashboard')
   }, [view])
 
-  const handleOpenDashboard = () => {
-    setSubView(null)
-    openFromRepository()
-  }
-
-  const handleOpenPaires = () => {
-    setPendingPaires(true)
+  const handleEnterApp = (page = 'dashboard') => {
+    setActivePage(page)
     openFromRepository()
   }
 
   const handleBackToLanding = () => {
-    setSubView(null)
+    setActivePage('dashboard')
     backToLanding()
   }
-
-  const effective =
-    view === 'landing'     ? 'landing'
-    : subView === 'paires' ? 'paires'
-    : 'dashboard'
 
   return (
     <>
       <LoadingOverlay visible={loading} text={loadingTxt} />
 
-      {effective === 'landing' && (
+      {view === 'landing' ? (
         <Landing
           zone={zone}
           setZone={setZone}
           driveErr={driveErr}
           setDriveErr={setDriveErr}
           repoAvailable={repoAvailable}
-          openFromRepository={handleOpenDashboard}
-          onOpenPaires={handleOpenPaires}
+          openFromRepository={() => handleEnterApp('dashboard')}
+          onOpenPaires={() => handleEnterApp('paires')}
+          onOpenDonnees={() => handleEnterApp('donnees')}
           loadFromDrive={loadFromDrive}
           loadFromFile={loadFromFile}
           onRepoUpdated={refreshRepoAvailable}
         />
-      )}
-
-      {effective === 'dashboard' && (
-        <div id="dashboard" style={{ display: 'block' }}>
-          <Topbar
-            fileName={fileName}
-            loadedAt={loadedAt}
-            excluded={excluded}
-            clearRepository={clearRepository}
-            backToLanding={handleBackToLanding}
-          />
-          <div className="content">
-            <div className="sec">Vue Globale</div>
-            <KpiRow pairList={pairList} excluded={excluded} />
-
-            <div className="sec">Tableau Récapitulatif</div>
-            <SummaryTable pairList={pairList} excluded={excluded} />
-          </div>
-        </div>
-      )}
-
-      {effective === 'paires' && (
-        <PairesView
-          pairList={pairList}
+      ) : (
+        <AppShell
+          activePage={activePage}
+          setActivePage={setActivePage}
+          fileName={fileName}
+          loadedAt={loadedAt}
           excluded={excluded}
+          pairList={pairList}
+          repoAvailable={repoAvailable}
+          clearRepository={clearRepository}
+          backToLanding={handleBackToLanding}
           toggleFlag={toggleFlag}
-          onBack={handleBackToLanding}
+          loadFromFile={loadFromFile}
+          loadFromDrive={loadFromDrive}
+          driveErr={driveErr}
+          setDriveErr={setDriveErr}
+          onRepoUpdated={refreshRepoAvailable}
         />
       )}
 
