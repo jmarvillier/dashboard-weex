@@ -1,16 +1,13 @@
 /**
  * Landing.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Page d'accueil avec 3 cartes principales :
- *
- *   1. Mon Dashboard  → ouvre le dashboard (désactivé si repo vide)
- *   2. Paires         → ouvre la vue dédiée aux paires (désactivé si repo vide)
- *   3. Données        → sous-menu DataMenu (ajout, import, export, parcourir)
+ * Page d'accueil simplifiée.
+ * 3 cartes d'accès rapide → App Shell avec la page correspondante.
+ * Import direct possible depuis la landing.
  */
 
-import { useState } from 'react'
-import DataMenu from './DataMenu.jsx'
-import Logo     from './Logo.jsx'
+import { useState, useRef } from 'react'
+import Logo from './Logo.jsx'
 
 export default function Landing({
   zone,
@@ -23,90 +20,139 @@ export default function Landing({
   loadFromFile,
   onRepoUpdated,
   onOpenPaires,
+  onOpenDonnees,
 }) {
-  const [showDataMenu, setShowDataMenu] = useState(false)
+  const [driveUrl, setDriveUrl]   = useState('')
+  const [driveBusy, setDriveBusy] = useState(false)
+  const [showQuickImport, setShowQuickImport] = useState(false)
+  const fileInputRef = useRef()
 
-  // ── Vue : sous-menu Données ───────────────────────────────────────────────
-  if (showDataMenu) {
-    return (
-      <div id="landing">
-        <Logo />
-        <DataMenu
-          repoAvailable={repoAvailable}
-          loadFromFile={loadFromFile}
-          loadFromDrive={loadFromDrive}
-          driveErr={driveErr}
-          setDriveErr={setDriveErr}
-          onRepoUpdated={onRepoUpdated}
-          onBack={() => { setShowDataMenu(false); setZone(null); setDriveErr(null) }}
-        />
-      </div>
-    )
+  async function handleDriveLoad() {
+    setDriveBusy(true)
+    await loadFromDrive(driveUrl)
+    setDriveBusy(false)
   }
 
-  // ── Vue : grille d'accueil ────────────────────────────────────────────────
+  function handleFile(file) {
+    if (file) { loadFromFile(file); setShowQuickImport(false) }
+  }
+
   return (
     <div id="landing">
       <Logo />
 
-      <div className="choice-grid">
-        <div className="choice-row choice-row-main">
+      {/* Grille principale */}
+      <div className="landing-grid">
 
-          {/* 1. Mon Dashboard */}
-          <div
-            className={`choice-card default-card${repoAvailable ? '' : ' disabled'}`}
-            onClick={repoAvailable ? openFromRepository : undefined}
-            title={repoAvailable ? undefined : "Importez d'abord un fichier."}
-          >
-            <div className="default-pill">⚡ accès rapide</div>
-            {!repoAvailable && <div className="locked-pill">🔒 vide</div>}
-            <span className="choice-icon">🚀</span>
-            <div className="choice-title">Mon Dashboard</div>
-            <div className="choice-desc">
-              {repoAvailable
-                ? 'Ouvre le dashboard avec les données sauvegardées'
-                : "Importez d'abord ton journal"}
-            </div>
+        {/* ── Dashboard ── */}
+        <div
+          className={`landing-card landing-card--gold${repoAvailable ? '' : ' landing-card--disabled'}`}
+          onClick={repoAvailable ? openFromRepository : undefined}
+          title={repoAvailable ? undefined : "Importez d'abord un fichier."}
+        >
+          <div className="landing-card-pill landing-card-pill--gold">⚡ accès rapide</div>
+          {!repoAvailable && <div className="landing-card-pill landing-card-pill--locked">🔒 vide</div>}
+          <span className="landing-card-icon">🚀</span>
+          <div className="landing-card-title">Dashboard</div>
+          <div className="landing-card-desc">
+            {repoAvailable
+              ? 'Vue globale de vos investissements'
+              : "Importez d'abord votre journal"}
           </div>
-
-          {/* 2. Paires ← NOUVEAU */}
-          <div
-            className={`choice-card paires-card${repoAvailable ? '' : ' disabled'}`}
-            onClick={repoAvailable ? onOpenPaires : undefined}
-            title={repoAvailable ? undefined : "Importez d'abord un fichier."}
-          >
-            <div className="paires-pill">📈 paires</div>
-            {!repoAvailable && <div className="locked-pill">🔒 vide</div>}
-            <span className="choice-icon">📊</span>
-            <div className="choice-title">Paires</div>
-            <div className="choice-desc">
-              {repoAvailable
-                ? 'Consulter le détail de chaque paire de trading'
-                : "Importez d'abord ton journal"}
-            </div>
-          </div>
-
-          {/* 3. Données */}
-          <div
-            className="choice-card data-card"
-            onClick={() => setShowDataMenu(true)}
-          >
-            <div className="data-pill">🗄️ gérer</div>
-            <span className="choice-icon">🗃️</span>
-            <div className="choice-title">Données</div>
-            <div className="choice-desc">
-              Importer, exporter, saisir et parcourir votre journal de trading
-            </div>
-            <div className="dm-preview-badges">
-              <span className="dm-preview-badge">➕ Entrée</span>
-              <span className="dm-preview-badge">📊 Export</span>
-              <span className="dm-preview-badge">📥 Import</span>
-              <span className="dm-preview-badge">📋 Parcourir</span>
-            </div>
-          </div>
-
         </div>
+
+        {/* ── Paires ── */}
+        <div
+          className={`landing-card landing-card--green${repoAvailable ? '' : ' landing-card--disabled'}`}
+          onClick={repoAvailable ? onOpenPaires : undefined}
+          title={repoAvailable ? undefined : "Importez d'abord un fichier."}
+        >
+          <div className="landing-card-pill landing-card-pill--green">📈 paires</div>
+          {!repoAvailable && <div className="landing-card-pill landing-card-pill--locked">🔒 vide</div>}
+          <span className="landing-card-icon">📊</span>
+          <div className="landing-card-title">Paires</div>
+          <div className="landing-card-desc">
+            {repoAvailable
+              ? 'Détail de chaque paire de trading'
+              : "Importez d'abord votre journal"}
+          </div>
+        </div>
+
+        {/* ── Données ── */}
+        <div
+          className="landing-card landing-card--blue"
+          onClick={onOpenDonnees}
+        >
+          <div className="landing-card-pill landing-card-pill--blue">🗄️ gérer</div>
+          <span className="landing-card-icon">🗃️</span>
+          <div className="landing-card-title">Données</div>
+          <div className="landing-card-desc">
+            Importer, exporter, saisir et parcourir votre journal
+          </div>
+          <div className="landing-card-badges">
+            <span>➕ Entrée</span>
+            <span>📊 Export</span>
+            <span>📥 Import</span>
+            <span>📋 Parcourir</span>
+          </div>
+        </div>
+
       </div>
+
+      {/* Import rapide */}
+      {!repoAvailable && (
+        <div className="landing-quick-import">
+          {!showQuickImport ? (
+            <button className="landing-quick-import-btn" onClick={() => setShowQuickImport(true)}>
+              📥 Importer rapidement un fichier
+            </button>
+          ) : (
+            <div className="landing-import-zone">
+              <div className="landing-import-header">
+                <span>📥 Import rapide</span>
+                <button onClick={() => setShowQuickImport(false)}>✕</button>
+              </div>
+
+              {/* Google Sheets */}
+              <div className="landing-import-row">
+                <input
+                  type="text"
+                  className="dp-url-input"
+                  placeholder="URL Google Sheets…"
+                  value={driveUrl}
+                  onChange={e => { setDriveUrl(e.target.value); setDriveErr(null) }}
+                />
+                <button
+                  className="dp-btn-primary"
+                  disabled={driveUrl.length < 15 || driveBusy}
+                  onClick={handleDriveLoad}
+                >
+                  {driveBusy ? <><span className="spin" />…</> : '▶ Sheets'}
+                </button>
+              </div>
+
+              {driveErr && (
+                <div className={`dp-msg ${driveErr.type}`} dangerouslySetInnerHTML={{ __html: driveErr.msg }} />
+              )}
+
+              {/* Fichier local */}
+              <button
+                className="landing-file-btn"
+                onClick={() => fileInputRef.current.click()}
+              >
+                📂 Choisir un fichier (.xlsx / .csv)
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                style={{ display: 'none' }}
+                onChange={e => handleFile(e.target.files[0])}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
