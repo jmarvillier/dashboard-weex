@@ -3,45 +3,24 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Shell principal de l'application.
  * Structure : Sidebar fixe | Topbar fixe | Zone de contenu scrollable
- *
- * La sidebar gère la navigation entre :
- *   - Dashboard (vue globale)
- *   - Paires    (cartes par paire)
- *   - Données   (gestion : saisie, import, export, parcourir)
  */
 
 import { useState, useRef, useEffect } from 'react'
-import Logo        from './Logo.jsx'
-import KpiRow      from './KpiRow.jsx'
+import Logo         from './Logo.jsx'
+import KpiRow       from './KpiRow.jsx'
 import SummaryTable from './SummaryTable.jsx'
-import PairesView  from './PairesView.jsx'
-import DataPanel   from './DataPanel.jsx'
+import PairesView   from './PairesView.jsx'
+import DataPanel    from './DataPanel.jsx'
 
 /* ─── Items de navigation ───────────────────────────────────────────────── */
 const NAV_ITEMS = [
-  {
-    id: 'dashboard',
-    icon: '🚀',
-    label: 'Dashboard',
-    sublabel: 'Vue globale',
-  },
-  {
-    id: 'paires',
-    icon: '📊',
-    label: 'Paires',
-    sublabel: 'Détail par paire',
-  },
-  {
-    id: 'donnees',
-    icon: '🗃️',
-    label: 'Données',
-    sublabel: 'Gérer le journal',
-  },
+  { id: 'dashboard', icon: '🚀', label: 'Dashboard',  sublabel: 'Vue globale'      },
+  { id: 'paires',    icon: '📊', label: 'Paires',     sublabel: 'Détail par paire' },
+  { id: 'donnees',   icon: '🗃️', label: 'Données',    sublabel: 'Gérer le journal' },
 ]
 
 /* ─── Topbar ─────────────────────────────────────────────────────────────── */
-function Topbar({ activePage, loadedAt, excluded, clearRepository, backToLanding, sidebarOpen, setSidebarOpen }) {
-  const n = excluded.size
+function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   const pageItem = NAV_ITEMS.find(i => i.id === activePage)
 
   const [btnMode, setBtnMode]      = useState(null)
@@ -128,31 +107,20 @@ function Topbar({ activePage, loadedAt, excluded, clearRepository, backToLanding
           <span /><span /><span />
         </button>
 
-        {/* Fil d'ariane */}
+        {/* Fil d'ariane — icône + nom de page uniquement, sans sous-titre */}
         <div className="topbar-breadcrumb">
           <span className="topbar-breadcrumb-icon">{pageItem?.icon}</span>
           <span className="topbar-breadcrumb-label">{pageItem?.label}</span>
-          {pageItem?.sublabel && (
-            <><span className="topbar-breadcrumb-sep">›</span>
-            <span className="topbar-breadcrumb-sub">{pageItem.sublabel}</span></>
-          )}
         </div>
 
         <div className="topbar-right">
-          {/* Indicateur live */}
+          {/* Indicateur live + heure de chargement */}
           <div className="topbar-live">
             <span className="live-dot" />
             {loadedAt && <span className="topbar-time">Chargé {loadedAt}</span>}
           </div>
 
-          {/* Paires exclues */}
-          {n > 0 && (
-            <span className="excl-counter visible">
-              {n} exclue{n > 1 ? 's' : ''}
-            </span>
-          )}
-
-          {/* Bouton install / update */}
+          {/* Bouton install / update (conditionnel) */}
           {btnMode && (
             <div className="topbar-install-wrap">
               <button
@@ -164,15 +132,10 @@ function Topbar({ activePage, loadedAt, excluded, clearRepository, backToLanding
               <button className="btn-install-dismiss" onClick={dismissBtn} aria-label="Ignorer">✕</button>
             </div>
           )}
-
-          {/* Retour landing */}
-          <button className="btn-sm btn-sm-ghost" onClick={backToLanding} title="Retour à l'accueil">
-            ← Accueil
-          </button>
         </div>
       </header>
 
-      {/* Guide iOS */}
+      {/* Guide iOS inline */}
       {showIosGuide && btnMode === 'ios' && (
         <div className="ios-guide-bar">
           <span>1. <strong>⎋ Partager</strong></span>
@@ -188,7 +151,7 @@ function Topbar({ activePage, loadedAt, excluded, clearRepository, backToLanding
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────── */
-function Sidebar({ activePage, setActivePage, isOpen, setIsOpen }) {
+function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }) {
   function navigate(page) {
     setActivePage(page)
     setIsOpen(false)
@@ -200,12 +163,13 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen }) {
       {isOpen && <div className="sidebar-overlay" onClick={() => setIsOpen(false)} />}
 
       <aside className={`shell-sidebar${isOpen ? ' sidebar-open' : ''}`}>
+
         {/* Logo */}
         <div className="sidebar-logo-wrap">
           <Logo small />
         </div>
 
-        {/* Nav */}
+        {/* Nav principale */}
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
             <button
@@ -223,13 +187,14 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen }) {
           ))}
         </nav>
 
-        {/* Footer sidebar */}
+        {/* Bouton retour accueil — en bas de sidebar */}
         <div className="sidebar-footer">
-          <div className="sidebar-footer-dot">
-            <span className="live-dot" />
-            <span>Live</span>
-          </div>
+          <button className="sidebar-back-btn" onClick={backToLanding}>
+            <span>←</span>
+            <span>Accueil</span>
+          </button>
         </div>
+
       </aside>
     </>
   )
@@ -251,7 +216,7 @@ function SectionHeader({ icon, title, subtitle }) {
 function PageDashboard({ pairList, excluded }) {
   return (
     <div className="page-content">
-      <SectionHeader icon="🚀" title="Vue Globale" subtitle="Performance consolidée de tous vos investissements" />
+      <SectionHeader icon="📊" title="Performance Globale" subtitle="Vue consolidée de tous vos investissements" />
       <KpiRow pairList={pairList} excluded={excluded} />
 
       <SectionHeader icon="📋" title="Tableau Récapitulatif" subtitle="Détail par paire de trading" />
@@ -278,12 +243,10 @@ function PagePaires({ pairList, excluded, toggleFlag }) {
 export default function AppShell({
   activePage,
   setActivePage,
-  fileName,
   loadedAt,
   excluded,
   pairList,
   repoAvailable,
-  clearRepository,
   backToLanding,
   toggleFlag,
   loadFromFile,
@@ -301,16 +264,13 @@ export default function AppShell({
         setActivePage={setActivePage}
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
+        backToLanding={backToLanding}
       />
 
       <div className="shell-main">
         <Topbar
           activePage={activePage}
           loadedAt={loadedAt}
-          excluded={excluded}
-          clearRepository={clearRepository}
-          backToLanding={backToLanding}
-          sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
         />
 
@@ -333,7 +293,6 @@ export default function AppShell({
               driveErr={driveErr}
               setDriveErr={setDriveErr}
               onRepoUpdated={onRepoUpdated}
-              clearRepository={clearRepository}
             />
           )}
         </main>
