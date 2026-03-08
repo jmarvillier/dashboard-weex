@@ -11,9 +11,9 @@
 }
 
 /* ── Reset global ──────────────────────────────────────────────────────── */
-html { height: 100%; }
-body { height: 100%; }
-#root { height: 100%; }
+html { height: 100%; overflow: hidden; }
+body { height: 100%; overflow: hidden; }
+#root { height: 100%; overflow: hidden; }
 
 /* ═══════════════════════════════════════
    LOGO — styles pour Landing ET Sidebar
@@ -97,8 +97,8 @@ body { height: 100%; }
 /* Le shell occupe tout l'écran sans déborder */
 .shell-layout {
   display: flex;
-  height: 100vh;
-  max-height: 100vh;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   position: fixed;
   inset: 0;
@@ -123,7 +123,6 @@ body { height: 100%; }
   padding: 14px 14px 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  /* inline-flex pour aligner logo + version sur la même ligne */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -253,7 +252,7 @@ body { height: 100%; }
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  min-width: 0;        /* empêche le débordement flex */
+  min-width: 0;
 }
 
 /* ── Topbar ─────────────────────────────────────────────────────────────── */
@@ -340,9 +339,12 @@ body { height: 100%; }
 /* ── Zone de contenu — SEULE zone qui scrolle ──────────────────────────── */
 .shell-content {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: scroll;          /* "scroll" force le scroll natif même sur iOS */
   overflow-x: hidden;
-  min-height: 0;      /* requis pour que flex + overflow fonctionne */
+  -webkit-overflow-scrolling: touch;  /* momentum scroll iOS */
+  overscroll-behavior: contain;       /* empêche le scroll de remonter au body */
+  min-height: 0;
+  will-change: scroll-position;       /* hint GPU pour fluidité */
 }
 
 /* Wrapper interne */
@@ -388,7 +390,6 @@ body { height: 100%; }
 
 /* ── Responsive — tablette / mobile ────────────────────────────────────── */
 @media (max-width: 768px) {
-  /* Sur mobile, sidebar sort du flux et slide depuis la gauche */
   .shell-sidebar {
     position: fixed;
     top: 0; left: 0; bottom: 0;
@@ -401,7 +402,6 @@ body { height: 100%; }
   .sidebar-overlay {
     display: block;
   }
-  /* Le shell-main prend toute la largeur sur mobile */
   .shell-main {
     width: 100%;
   }
