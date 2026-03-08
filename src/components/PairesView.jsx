@@ -25,36 +25,31 @@ export default function PairesView({ pairList, excluded, toggleFlag, onBack, emb
         </div>
       )}
 
-      {/* Bandeau de stats */}
-      <div className="paires-page-header">
-        <div className="paires-page-title">
-          <span>⚡</span> Paires de Trading
-        </div>
-        <div className="paires-page-meta">
-          <span className="paires-badge">
-            <span className="paires-badge-val">{tradingPairs.length}</span>
-            <span className="paires-badge-lbl">Paires</span>
-          </span>
+      {/* Bandeau de stats compact (sans titre) */}
+      <div className="paires-meta-bar">
+        <span className="paires-badge">
+          <span className="paires-badge-val">{tradingPairs.length}</span>
+          <span className="paires-badge-lbl">Paires</span>
+        </span>
+        {actives > 0 && (
           <span className="paires-badge g">
             <span className="paires-badge-val">{actives}</span>
             <span className="paires-badge-lbl">En position</span>
           </span>
-          {exclues > 0 && (
-            <span className="paires-badge r">
-              <span className="paires-badge-val">{exclues}</span>
-              <span className="paires-badge-lbl">Exclue{exclues > 1 ? 's' : ''}</span>
-            </span>
-          )}
-          {depotPairs.length > 0 && (
-            <span className="paires-badge o">
-              <span className="paires-badge-val">{depotPairs.length}</span>
-              <span className="paires-badge-lbl">Dépôt{depotPairs.length > 1 ? 's' : ''}</span>
-            </span>
-          )}
-        </div>
-        <div className="paires-hint">
-          Cliquez sur 🏳 pour exclure une paire des calculs globaux
-        </div>
+        )}
+        {exclues > 0 && (
+          <span className="paires-badge r">
+            <span className="paires-badge-val">{exclues}</span>
+            <span className="paires-badge-lbl">Exclue{exclues > 1 ? 's' : ''}</span>
+          </span>
+        )}
+        {depotPairs.length > 0 && (
+          <span className="paires-badge o">
+            <span className="paires-badge-val">{depotPairs.length}</span>
+            <span className="paires-badge-lbl">Dépôt{depotPairs.length > 1 ? 's' : ''}</span>
+          </span>
+        )}
+        <span className="paires-hint">🏳 pour exclure des calculs</span>
       </div>
 
       {/* Grille ou état vide */}
