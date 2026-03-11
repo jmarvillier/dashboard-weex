@@ -326,37 +326,11 @@
 
 /* ── Page PairesView ───────────────────────────────────────────────────────── */
 
-.paires-page-header {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 20px 24px;
-  margin-bottom: 20px;
-  position: relative;
-  overflow: hidden;
-}
-.paires-page-header::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--green), transparent);
-}
-
-.paires-page-title {
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-  font-size: 1.15rem;
-  color: var(--text);
-  margin-bottom: 10px;
+/* Barre compacte de stats — remplace l'ancien header avec titre */
+.paires-meta-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.paires-page-meta {
-  display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 4px;
 }
@@ -387,6 +361,13 @@
 .paires-badge-lbl {
   color: var(--text2);
   font-size: .58rem;
+}
+
+.paires-hint {
+  font-size: .58rem;
+  color: var(--text2);
+  margin-left: 4px;
+  letter-spacing: .02em;
 }
 
 .paires-empty {

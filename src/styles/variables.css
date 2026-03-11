@@ -15,13 +15,19 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  height: 100%;
+  overflow: hidden;           /* ← empêche tout scroll parasite au niveau root */
+}
+
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Space Mono', monospace;
-  min-height: 100vh;
+  /* ← min-height: 100vh supprimé : il entrait en conflit avec height:100% de shell.css */
 }
 
+/* ── Animations globales ── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -29,11 +35,12 @@ body {
 @keyframes rot   { to { transform: rotate(360deg); } }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
 @keyframes ldp   {
-  0%  { width:0;   margin-left:0; }
-  50% { width:70%; }
-  100%{ width:0;   margin-left:100%; }
+  0%  { width: 0;   margin-left: 0; }
+  50% { width: 70%; }
+  100%{ width: 0;   margin-left: 100%; }
 }
 
+/* ── Spinner ── */
 .spin {
   display: inline-block;
   width: 13px; height: 13px;
@@ -45,11 +52,21 @@ body {
   margin-right: 6px;
 }
 
-@media (max-width: 600px) {
-  .choice-row   { flex-direction: column; }
-  .content      { padding: 16px; }
-  .pairs-grid   { grid-template-columns: 1fr; }
-  .kpi-row      { grid-template-columns: repeat(2,1fr); }
-  .metrics-main { grid-template-columns: 1fr 1fr; }
-  .pnl-row      { grid-template-columns: 1fr; }
+/* ── Loading overlay ── */
+#loadingOverlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(7,9,13,.92);
+  backdrop-filter: blur(10px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
 }
+#loadingOverlay.show { display: flex; }
+.ld-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 2.2rem; color: var(--gold); }
+.ld-bar  { width: 200px; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.ld-fill { height: 100%; background: var(--gold); animation: ldp 1.6s ease-in-out infinite; }
+.ld-txt  { font-size: .68rem; color: var(--text2); }
