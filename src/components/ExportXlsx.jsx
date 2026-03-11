@@ -1,18 +1,17 @@
 /**
  * ExportXlsx.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Exporte le repository (IndexedDB) vers un fichier .xlsx téléchargeable.
+ * Exporte le repository (Firestore) vers un fichier .xlsx téléchargeable.
  *
  * Compatibilité Safari iPad :
  *   → window.XLSX.writeFile ne fonctionne pas sur Safari mobile.
- *   → On utilise writeXLSX({ type: 'array' }) + Blob + URL.createObjectURL
- *     + clic sur un <a download> pour forcer le téléchargement.
+ *   → On utilise write({ type: 'array' }) + Blob + URL.createObjectURL.
  */
 
 import { useState } from 'react'
 import { loadSnapshot } from '../lib/repository.js'
 
-// ── En-têtes colonnes (identiques au journal Excel original) ─────────────────
+// ── En-têtes colonnes ────────────────────────────────────────────────────────
 
 const HEADERS = [
   'Date',
@@ -33,7 +32,7 @@ const HEADERS = [
 // ── Largeurs colonnes ─────────────────────────────────────────────────────────
 
 const COL_WIDTHS = [
-  { wch: 18 }, // Date + heure
+  { wch: 18 }, // Date
   { wch: 14 }, // Paire
   { wch: 10 }, // Sens
   { wch: 12 }, // Statut
@@ -48,11 +47,10 @@ const COL_WIDTHS = [
   { wch: 10 }, // Dashboard
 ]
 
-// ── Conversion types : string → number quand pertinent ───────────────────────
+// ── Cast types numériques ─────────────────────────────────────────────────────
 
 function castRow(row) {
-  return row.map((cell, i) => {
-    // Colonnes numériques : Cours[4], USDT[5], USDC[6], EUR[7], Volume[10]
+  return row.slice(0, 13).map((cell, i) => {
     if ([4, 5, 6, 7, 10].includes(i)) {
       const n = parseFloat(String(cell).replace(',', '.'))
       return isNaN(n) ? '' : n
@@ -64,9 +62,9 @@ function castRow(row) {
 // ── Composant ─────────────────────────────────────────────────────────────────
 
 export default function ExportXlsx({ onClose }) {
-  const [busy, setBusy]       = useState(false)
-  const [error, setError]     = useState(null)
-  const [success, setSuccess] = useState(false)
+  const [busy, setBusy]         = useState(false)
+  const [error, setError]       = useState(null)
+  const [success, setSuccess]   = useState(false)
   const [rowCount, setRowCount] = useState(null)
 
   async function handleExport() {
@@ -74,43 +72,29 @@ export default function ExportXlsx({ onClose }) {
     setError(null)
 
     try {
-      // 1. Charge le snapshot
       const snapshot = await loadSnapshot()
       if (!snapshot?.rows || snapshot.rows.length < 2) {
         throw new Error('Aucune donnée à exporter dans le repository.')
       }
 
-      // 2. Prépare les données
-      //    rows[0] peut être l'en-tête d'origine (importé) ou une vraie ligne
-      //    → on remplace toujours par nos HEADERS propres
       const dataRows = snapshot.rows[0]?.includes?.('Paire')
-        ? snapshot.rows.slice(1)   // skip l'en-tête importée
-        : snapshot.rows            // pas d'en-tête → toutes les lignes sont des data
+        ? snapshot.rows.slice(1)
+        : snapshot.rows
 
-      const nbRows = dataRows.length
-      setRowCount(nbRows)
+      setRowCount(dataRows.length)
 
-      // 3. Cast des types + ajout de l'en-tête propre
       const data = [HEADERS, ...dataRows.map(castRow)]
 
-      // 4. Crée le workbook SheetJS
       const wb = window.XLSX.utils.book_new()
       const ws = window.XLSX.utils.aoa_to_sheet(data)
       ws['!cols'] = COL_WIDTHS
       window.XLSX.utils.book_append_sheet(wb, ws, 'Journal')
 
-      // 5. Export en tableau d'octets (compatible Safari iPad)
-      const wbArray = window.XLSX.write(wb, {
-        bookType : 'xlsx',
-        type     : 'array',
-      })
+      const wbArray = window.XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
 
-      // 6. Crée un Blob XLSX
-      const blob = new Blob([wbArray], {
+      const blob     = new Blob([wbArray], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       })
-
-      // 7. Téléchargement — méthode universelle Safari + Chrome + Firefox
       const fileName = `journal-ydash-${new Date().toISOString().slice(0, 10)}.xlsx`
       const url      = URL.createObjectURL(blob)
       const a        = document.createElement('a')
@@ -119,18 +103,10 @@ export default function ExportXlsx({ onClose }) {
       a.style.display = 'none'
       document.body.appendChild(a)
       a.click()
-
-      // Nettoyage léger
-      setTimeout(() => {
-        URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      }, 300)
+      setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a) }, 300)
 
       setSuccess(true)
-      setTimeout(() => {
-        setSuccess(false)
-        onClose()
-      }, 2000)
+      setTimeout(() => { setSuccess(false); onClose() }, 2000)
 
     } catch (e) {
       setError(e.message)
@@ -143,7 +119,6 @@ export default function ExportXlsx({ onClose }) {
     <div className="ef-overlay">
       <div className="ef-modal ef-modal-sm">
 
-        {/* Header */}
         <div className="ef-header">
           <div className="ef-title">📥 Exporter le repository</div>
           <button className="ef-close" onClick={onClose}>✕</button>
@@ -189,7 +164,6 @@ export default function ExportXlsx({ onClose }) {
 
         </div>
 
-        {/* Footer */}
         <div className="ef-footer">
           <button className="ef-btn-cancel" onClick={onClose} disabled={busy}>
             Annuler
