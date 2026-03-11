@@ -162,11 +162,12 @@
   width: 100%;
   max-width: 1100px;
   min-height: 400px;
+  height: 100%;              /* ← prend toute la hauteur de l'overlay */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  margin: auto;
+  margin: 0 auto;            /* ← centrage horizontal uniquement */
   animation: fadeUp .25s ease;
 }
 
@@ -374,6 +375,7 @@
 .db-table-wrap {
   overflow: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .db-table {
