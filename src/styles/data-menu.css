@@ -145,8 +145,14 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: calc(var(--topbar-h) + 12px) 16px 16px; /* ← topbar-h + marge */
+  padding: calc(var(--topbar-h) + 12px) 16px 16px calc(var(--sidebar-w) + 16px); /* ← sidebar offset */
   overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .db-overlay {
+    padding: calc(var(--topbar-h) + 12px) 16px 16px 16px; /* ← sidebar masquée sur mobile */
+  }
 }
 
 .db-modal {
