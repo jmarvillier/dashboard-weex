@@ -143,15 +143,15 @@
   background: rgba(7, 9, 13, 0.85);
   backdrop-filter: blur(8px);
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;        /* ← la modale s'étire sur toute la hauteur dispo */
   justify-content: center;
-  padding: calc(var(--topbar-h) + 12px) 16px 16px calc(var(--sidebar-w) + 16px); /* ← sidebar offset */
-  overflow-y: auto;
+  padding: calc(var(--topbar-h) + 12px) 16px 16px calc(var(--sidebar-w) + 16px);
+  overflow: hidden;            /* ← plus de scroll sur l'overlay */
 }
 
 @media (max-width: 768px) {
   .db-overlay {
-    padding: calc(var(--topbar-h) + 12px) 16px 16px 16px; /* ← sidebar masquée sur mobile */
+    padding: calc(var(--topbar-h) + 12px) 16px 16px 16px;
   }
 }
 
