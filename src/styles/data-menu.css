@@ -145,7 +145,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 16px;
+  padding: calc(var(--topbar-h) + 12px) 16px 16px; /* ← topbar-h + marge */
   overflow-y: auto;
 }
 
