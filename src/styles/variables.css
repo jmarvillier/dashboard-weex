@@ -15,11 +15,16 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  height: 100%;
+  overflow: hidden;           /* ← empêche tout scroll parasite au niveau root */
+}
+
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Space Mono', monospace;
-  min-height: 100vh;
+  /* ← min-height: 100vh supprimé : il entrait en conflit avec height:100% de shell.css */
 }
 
 /* ── Animations globales ── */
