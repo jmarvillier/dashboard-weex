@@ -47,12 +47,3 @@ export function isAnnul(stat) {
 export function isUsdPair(pair) {
   return /^usd/i.test(pair.trim())
 }
-
-/**
- * Tronque une ligne à 13 colonnes (index 0→12).
- * La colonne 13 (index 13) est réservée à l'UID — on l'ignore à l'import
- * pour ne pas polluer les données internes du repository.
- */
-export function sliceDataRow(row) {
-  return row.slice(0, 13)
-}
