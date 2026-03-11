@@ -1,8 +1,27 @@
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
-import { db } from './firebase.js'
+import { db, auth } from './firebase.js'
 
-const SNAPSHOT_REF = doc(db, 'snapshots', 'latest')
+/* ─── Ref dynamique par utilisateur — attend que l'auth soit prête ─────── */
+function getSnapshotRef() {
+  const user = auth.currentUser
+  if (!user) throw new Error('Utilisateur non connecté. Reconnectez-vous.')
+  return doc(db, 'users', user.uid, 'snapshots', 'latest')
+}
 
+/* ─── Attend que Firebase Auth soit initialisé (max 5s) ────────────────── */
+function waitForAuth() {
+  return new Promise((resolve, reject) => {
+    if (auth.currentUser) { resolve(auth.currentUser); return }
+    const unsub = auth.onAuthStateChanged(user => {
+      unsub()
+      if (user) resolve(user)
+      else reject(new Error('Utilisateur non connecté. Reconnectez-vous.'))
+    })
+    setTimeout(() => { unsub(); reject(new Error('Timeout auth. Reconnectez-vous.')) }, 5000)
+  })
+}
+
+/* ─── Sérialisation (contournement nested arrays Firestore) ─────────────── */
 function serialize(rows) {
   return rows.map((row, i) => ({ i, r: JSON.stringify(row) }))
 }
@@ -16,8 +35,11 @@ function deserialize(rowObjects) {
     })
 }
 
+/* ─── API publique ──────────────────────────────────────────────────────── */
+
 export async function saveSnapshot(rows, source) {
-  await setDoc(SNAPSHOT_REF, {
+  await waitForAuth()
+  await setDoc(getSnapshotRef(), {
     rows     : serialize(rows),
     source,
     loadedAt : new Date().toISOString(),
@@ -26,7 +48,8 @@ export async function saveSnapshot(rows, source) {
 }
 
 export async function loadSnapshot() {
-  const snap = await getDoc(SNAPSHOT_REF)
+  await waitForAuth()
+  const snap = await getDoc(getSnapshotRef())
   if (!snap.exists()) return null
   const data = snap.data()
   return { ...data, rows: deserialize(data.rows) }
@@ -42,6 +65,7 @@ export async function hasSnapshot() {
 }
 
 export async function appendRow(row) {
+  await waitForAuth()
   const snapshot = await loadSnapshot()
   let rows, source
 
@@ -62,6 +86,7 @@ export async function appendRow(row) {
 }
 
 export async function listEntries() {
+  await waitForAuth()
   const snapshot = await loadSnapshot()
   if (!snapshot || !Array.isArray(snapshot.rows) || snapshot.rows.length < 1) return null
 
@@ -76,6 +101,7 @@ export async function listEntries() {
 }
 
 export async function updateRow(rowIndex, newData) {
+  await waitForAuth()
   const snapshot = await loadSnapshot()
   if (!snapshot || !Array.isArray(snapshot.rows)) throw new Error('Aucune donnée dans le repository.')
 
@@ -87,6 +113,7 @@ export async function updateRow(rowIndex, newData) {
 }
 
 export async function deleteRow(rowIndex) {
+  await waitForAuth()
   const snapshot = await loadSnapshot()
   if (!snapshot || !Array.isArray(snapshot.rows)) throw new Error('Aucune donnée dans le repository.')
 
@@ -94,5 +121,6 @@ export async function deleteRow(rowIndex) {
 }
 
 export async function clearSnapshot() {
-  await deleteDoc(SNAPSHOT_REF)
+  await waitForAuth()
+  await deleteDoc(getSnapshotRef())
 }
