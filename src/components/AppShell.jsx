@@ -11,6 +11,7 @@ import KpiRow       from './KpiRow.jsx'
 import SummaryTable from './SummaryTable.jsx'
 import PairesView   from './PairesView.jsx'
 import DataPanel    from './DataPanel.jsx'
+import { auth, signOut } from '../lib/firebase.js'
 
 /* ─── Items de navigation ───────────────────────────────────────────────── */
 const NAV_ITEMS = [
@@ -107,7 +108,7 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
           <span /><span /><span />
         </button>
 
-        {/* Fil d'ariane — icône + nom de page uniquement, sans sous-titre */}
+        {/* Fil d'ariane */}
         <div className="topbar-breadcrumb">
           <span className="topbar-breadcrumb-icon">{pageItem?.icon}</span>
           <span className="topbar-breadcrumb-label">{pageItem?.label}</span>
@@ -157,6 +158,14 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
     setIsOpen(false)
   }
 
+  async function handleSignOut() {
+    try {
+      await signOut(auth)
+    } catch (e) {
+      console.error('Erreur déconnexion :', e)
+    }
+  }
+
   return (
     <>
       {/* Overlay mobile */}
@@ -187,11 +196,15 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
           ))}
         </nav>
 
-        {/* Bouton retour accueil — en bas de sidebar */}
+        {/* Footer sidebar */}
         <div className="sidebar-footer">
           <button className="sidebar-back-btn" onClick={backToLanding}>
             <span>←</span>
             <span>Accueil</span>
+          </button>
+          <button className="sidebar-back-btn sidebar-signout-btn" onClick={handleSignOut}>
+            <span>⎋</span>
+            <span>Déconnexion</span>
           </button>
         </div>
 
