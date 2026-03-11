@@ -1,8 +1,15 @@
-import { initializeApp }                             from 'firebase/app'
-import { initializeFirestore, persistentLocalCache } from 'firebase/firestore'
+import { initializeApp, getApps } from 'firebase/app'
+import { getFirestore }           from 'firebase/firestore'
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth'
 
-// Les valeurs sont injectées au build depuis les secrets GitHub Actions
-// via les variables d'environnement Vite (VITE_*)
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -12,8 +19,16 @@ const firebaseConfig = {
   appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-const app = initializeApp(firebaseConfig)
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig)
 
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache(),
-})
+export const db       = getFirestore(app)
+export const auth     = getAuth(app)
+export const googleProvider = new GoogleAuthProvider()
+
+export {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+}
