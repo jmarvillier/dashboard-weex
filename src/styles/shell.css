@@ -567,3 +567,16 @@
   background: rgba(232,184,75,.05);
 }
 .auth-btn-google:disabled { opacity: .5; cursor: not-allowed; }
+
+.sidebar-signout-btn {
+  margin-top: 6px;
+  border-color: rgba(245, 71, 106, .25);
+  color: var(--red);
+  opacity: .75;
+}
+.sidebar-signout-btn:hover {
+  border-color: var(--red) !important;
+  color: var(--red) !important;
+  background: rgba(245, 71, 106, .08) !important;
+  opacity: 1;
+}
