@@ -11,9 +11,11 @@
 }
 
 /* ── Reset global ──────────────────────────────────────────────────────── */
-html { height: 100%; overflow: hidden; }
-body { height: 100%; overflow: hidden; }
-#root { height: 100%; overflow: hidden; }
+/* html et body sont déjà contraints dans variables.css */
+#root {
+  height: 100%;
+  overflow: hidden;
+}
 
 /* ═══════════════════════════════════════
    LOGO — styles pour Landing ET Sidebar
