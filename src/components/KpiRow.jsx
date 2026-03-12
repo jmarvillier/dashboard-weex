@@ -8,7 +8,7 @@ const fmtS = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−
 const cc   = v => v > 0 ? 'g' : v < 0 ? 'r' : ''
 const pct  = (val, ref) => ref > 0 ? ((val / ref) * 100) : null
 
-export default function KpiRow({ pairList, excluded, pricesLoading, lastPriceUpdate, refreshPrices }) {
+export default function KpiRow({ pairList, excluded, pricesLoading, lastPriceUpdate, refreshPrices, priceSource }) {
   const active  = pairList.filter(p => !excluded.has(p.name))
   const trading = active.filter(p => !p.is_depot)
 
@@ -124,7 +124,7 @@ export default function KpiRow({ pairList, excluded, pricesLoading, lastPriceUpd
       <div className="kpi-live-bar">
         <div className="kpi-live-header">
           <span className={`live-dot${pricesLoading ? ' live-dot-loading' : ''}`}></span>
-          <span className="kpi-live-label">COURS TEMPS RÉEL — CoinGecko</span>
+          <span className="kpi-live-label">COURS TEMPS RÉEL — {priceSource || 'chargement…'}</span>
           <span className="kpi-live-update">
             {pricesLoading ? 'Mise à jour…' : `Mis à jour à ${updateLabel}`}
           </span>
