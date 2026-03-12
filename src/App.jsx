@@ -24,6 +24,8 @@ export default function App() {
     view, zone, loading, loadingTxt,
     fileName, loadedAt, pairList, excluded, driveErr,
     repoAvailable,
+    // Prix live
+    pricesLoading, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
@@ -40,8 +42,7 @@ export default function App() {
     if (view === 'landing') setActivePage('dashboard')
   }, [view])
 
-  // Quand l'utilisateur change (déconnexion / reconnexion avec autre compte)
-  // → on revient sur la landing pour forcer un rechargement propre des données
+  // Quand l'utilisateur change → revenir sur landing
   useEffect(() => {
     if (authUid !== null) {
       backToLanding()
@@ -58,7 +59,7 @@ export default function App() {
     backToLanding()
   }
 
-  // Vérification auth en cours → écran vide (évite le flash)
+  // Vérification auth en cours → écran vide
   if (authUser === undefined) {
     return <LoadingOverlay visible text="Vérification…" />
   }
@@ -104,6 +105,9 @@ export default function App() {
           driveErr={driveErr}
           setDriveErr={setDriveErr}
           onRepoUpdated={refreshRepoAvailable}
+          pricesLoading={pricesLoading}
+          lastPriceUpdate={lastPriceUpdate}
+          refreshPrices={refreshPrices}
         />
       )}
 
