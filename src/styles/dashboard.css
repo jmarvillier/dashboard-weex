@@ -338,6 +338,173 @@ tr.excluded-row td:first-child { text-decoration: none; }
   .pnl-row      { grid-template-columns: 1fr; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   KPI SECTION (wrapper journal + live)
+   ══════════════════════════════════════════════════════════════════════════ */
+.kpi-section { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+
+/* Tag source (journal / live) dans le label KPI */
+.kpi-source-tag {
+  display: inline-block;
+  font-size: .42rem;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+  background: rgba(255,255,255,.06);
+  color: var(--text2);
+  vertical-align: middle;
+}
+.kpi-source-tag.live {
+  background: rgba(0,214,143,.12);
+  color: var(--green);
+}
+
+/* Valeur en attente (prix pas encore chargés) */
+.kpi-v-pending { color: var(--muted) !important; font-size: 1.1rem !important; }
+
+/* ── Barre live ─────────────────────────────────────────────────────────── */
+.kpi-live-bar {
+  background: rgba(0,214,143,.03);
+  border: 1px solid rgba(0,214,143,.15);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kpi-live-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.kpi-live-label {
+  font-size: .5rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--green);
+  font-weight: 700;
+  flex: 1;
+}
+.kpi-live-update {
+  font-size: .5rem;
+  color: var(--text2);
+  font-family: 'Space Mono', monospace;
+}
+.kpi-live-refresh {
+  background: none;
+  border: 1px solid rgba(0,214,143,.25);
+  color: var(--green);
+  border-radius: 6px;
+  width: 24px; height: 24px;
+  font-size: .8rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.kpi-live-refresh:hover { background: rgba(0,214,143,.1); }
+
+.kpi-live-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+/* KPI live : légèrement distinct */
+.kpi.kpi-live {
+  border-color: rgba(0,214,143,.1);
+}
+.kpi.kpi-live::before {
+  background: linear-gradient(90deg, rgba(0,214,143,.4), transparent);
+  opacity: 1;
+}
+.kpi.kpi-live.g::before { background: linear-gradient(90deg, var(--green), transparent); opacity: .7; }
+.kpi.kpi-live.r::before { background: linear-gradient(90deg, var(--red), transparent); opacity: .7; }
+
+/* Live dot variants */
+.live-dot-loading {
+  animation: blink-fast .5s ease-in-out infinite !important;
+  background: var(--gold) !important;
+  box-shadow: 0 0 8px rgba(232,184,75,.6) !important;
+}
+.live-dot-sm {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 5px rgba(0,214,143,.5);
+  animation: blink 2s ease-in-out infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ── PnL sections dans PairCard ─────────────────────────────────────────── */
+.pnl-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .5rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text2);
+  font-weight: 600;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.pnl-section-label-live { color: var(--green); border-color: rgba(0,214,143,.2); }
+.pnl-section-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); font-size: .48rem; }
+.pnl-live-price {
+  margin-left: auto;
+  font-family: 'Space Mono', monospace;
+  font-size: .52rem;
+  color: var(--green);
+  background: rgba(0,214,143,.08);
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(0,214,143,.2);
+}
+
+/* PnL box live : bordure verte subtile */
+.pnl-box-live { border-color: rgba(0,214,143,.12) !important; }
+.pnl-box-live.g { border-color: rgba(0,214,143,.25) !important; background: rgba(0,214,143,.05) !important; }
+.pnl-box-live.r { border-color: rgba(245,71,106,.25) !important; background: rgba(245,71,106,.05) !important; }
+
+/* Valeur pending dans pnl-box */
+.pnl-val-pending { color: var(--muted) !important; }
+
+/* Prix live sous le nom dans le header de la carte */
+.pc-price-live {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: .52rem;
+  font-family: 'Space Mono', monospace;
+  color: var(--green);
+  margin-top: 3px;
+}
+
+/* Badge source "live" dans le header de la carte */
+.pc-pnl-source {
+  font-size: .45rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--green);
+  background: rgba(0,214,143,.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+  align-self: flex-start;
+}
+
+@keyframes blink-fast {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
+
 /* ── Keyframes ──────────────────────────────────────────────────────────── */
 @keyframes pulse-gold {
   0%,100% { box-shadow: 0 0 0 0 rgba(232,184,75,0); }
