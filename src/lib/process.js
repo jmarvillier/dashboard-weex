@@ -87,15 +87,16 @@ export function process(rows) {
     }
   })
 
-  // ── Calculs dérivés ──
+  // ── Calculs dérivés (statiques, basés sur le journal) ──
   Object.values(P).forEach(p => {
     p.position       = p.vol_achete - p.vol_vendu
     p.prix_moy       = p.vol_achete > 0 ? p.usdt_investi / p.vol_achete : 0
     p.prix_moy_vente = p.vol_vendu  > 0 ? p.usdt_recu    / p.vol_vendu  : 0
 
-    const cout_vendu    = p.prix_moy * p.vol_vendu
-    p.investi_en_cours  = Math.max(0, p.usdt_investi - cout_vendu)
+    const cout_vendu   = p.prix_moy * p.vol_vendu
+    p.investi_en_cours = Math.max(0, p.usdt_investi - cout_vendu)
 
+    // PnL basés sur le JOURNAL (dernier prix enregistré)
     p.pnl_realise = p.vol_vendu > 0 && p.prix_moy > 0
       ? p.usdt_recu - cout_vendu
       : p.usdt_recu
@@ -105,9 +106,53 @@ export function process(rows) {
       : 0
 
     p.pnl_total = p.pnl_realise + p.pnl_latent
+
+    // PnL live : initialisés à null (calculés dynamiquement dans enrichWithPrices)
+    p.prix_live          = null
+    p.pnl_realise_live   = null
+    p.pnl_latent_live    = null
+    p.pnl_total_live     = null
   })
 
   return P
+}
+
+/**
+ * Enrichit les paires avec les prix live et recalcule les PnL live.
+ * Appelé par useTrading à chaque mise à jour des prix.
+ * @param {Object[]} pairList - liste issue de buildPairList()
+ * @param {Object}   prices   - map pairName → prix USD
+ * @returns {Object[]} nouvelle liste avec champs _live calculés
+ */
+export function enrichWithPrices(pairList, prices) {
+  return pairList.map(p => {
+    const livePrice = prices[p.name]
+
+    if (!livePrice || p.is_depot || p.prix_moy <= 0) {
+      return { ...p, prix_live: livePrice ?? null }
+    }
+
+    const cout_vendu = p.prix_moy * p.vol_vendu
+
+    // PnL Réalisé live : même calcul que journal (les ventes sont déjà exécutées)
+    // On recalcule en restant cohérent — la seule différence sera sur le latent
+    const pnl_realise_live = p.pnl_realise // identique, les ventes sont closes
+
+    // PnL Latent live : position ouverte × (prix live − prix moyen d'achat)
+    const pnl_latent_live = p.position > 0
+      ? p.position * (livePrice - p.prix_moy)
+      : 0
+
+    const pnl_total_live = pnl_realise_live + pnl_latent_live
+
+    return {
+      ...p,
+      prix_live,
+      pnl_realise_live,
+      pnl_latent_live,
+      pnl_total_live,
+    }
+  })
 }
 
 /** Retourne la liste triée des paires actives à partir de process() */
