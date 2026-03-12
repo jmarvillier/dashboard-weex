@@ -49,7 +49,7 @@ export function useTrading() {
   const [repoAvailable, setRepoAvailable] = useState(false)
 
   // ── Prix live ─────────────────────────────────────────────────────────────
-  const { prices, pricesLoading, pricesError, lastPriceUpdate, refreshPrices } = usePrices(
+  const { prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices } = usePrices(
     view === 'dashboard' ? pairList : []
   )
 
@@ -217,7 +217,7 @@ export function useTrading() {
     fileName, loadedAt, pairList, excluded, driveErr,
     repoAvailable,
     // Prix live
-    prices, pricesLoading, pricesError, lastPriceUpdate, refreshPrices,
+    prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
