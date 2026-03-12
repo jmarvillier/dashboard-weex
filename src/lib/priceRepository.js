@@ -1,148 +1,148 @@
 /**
  * priceRepository.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Fetcher de cours temps réel avec fallback multi-sources :
- *   1. Binance (paires USDT, très fiable, CORS permissif)
- *   2. CoinGecko (fallback, peut être bloqué selon environnement)
+ * Fetcher de cours temps réel — 3 sources en cascade :
+ *   1. Binance  (paires USDT directes)
+ *   2. Kraken   (CORS ouvert, couvre BTC/ETH/SOL etc.)
+ *   3. CryptoCompare (API publique avec clé optionnelle)
  */
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function getBaseSymbol(pairName) {
-  return pairName.split('/')[0].toUpperCase()
-}
-
-function getQuoteSymbol(pairName) {
-  return (pairName.split('/')[1] || 'USDT').toUpperCase()
-}
 
 const STABLES = new Set(['USDT','USDC','BUSD','DAI','TUSD','FDUSD','USDP'])
 
-function isTradingPair(pairName) {
-  return !STABLES.has(getBaseSymbol(pairName))
-}
+function getBase(pair)  { return pair.split('/')[0].toUpperCase() }
+function getQuote(pair) { return (pair.split('/')[1] || 'USDT').toUpperCase() }
+function isTrading(pair) { return !STABLES.has(getBase(pair)) }
 
 // ── Source 1 : Binance ───────────────────────────────────────────────────────
 
-/**
- * Binance ticker API — renvoie les prix pour une liste de symboles XXXUSDT
- * CORS ouvert, pas de clé requise, rate limit généreux.
- */
-async function fetchFromBinance(pairNames) {
-  const symbols = pairNames
-    .filter(isTradingPair)
-    .map(p => `${getBaseSymbol(p)}${getQuoteSymbol(p)}`)  // ex: BTCUSDT
+async function fromBinance(pairs) {
+  const trading = pairs.filter(isTrading)
+  if (trading.length === 0) return {}
 
-  if (symbols.length === 0) return {}
+  const symbols = trading.map(p => `"${getBase(p)}${getQuote(p)}"`)
+  const url = `https://api.binance.com/api/v3/ticker/price?symbols=[${symbols.join(',')}]`
 
-  // Binance bookTicker : prix ask/bid pour une liste de symboles
-  const qs = symbols.length === 1
-    ? `symbol=${symbols[0]}`
-    : `symbols=${encodeURIComponent(JSON.stringify(symbols))}`
-
-  const url = `https://api.binance.com/api/v3/ticker/price?${qs}`
-
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
-  if (!res.ok) throw new Error(`Binance HTTP ${res.status}`)
+  const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+  if (!res.ok) throw new Error(`Binance ${res.status}`)
   const data = await res.json()
 
-  // data peut être un objet ou un tableau selon le nombre de symboles
-  const arr = Array.isArray(data) ? data : [data]
-
   const prices = {}
-  for (const pairName of pairNames) {
-    const sym = `${getBaseSymbol(pairName)}${getQuoteSymbol(pairName)}`
-    const entry = arr.find(d => d.symbol === sym)
-    if (entry?.price) prices[pairName] = parseFloat(entry.price)
+  for (const p of trading) {
+    const sym   = `${getBase(p)}${getQuote(p)}`
+    const entry = data.find(d => d.symbol === sym)
+    if (entry?.price) prices[p] = parseFloat(entry.price)
   }
   return prices
 }
 
-// ── Source 2 : CoinGecko ─────────────────────────────────────────────────────
+// ── Source 2 : Kraken ────────────────────────────────────────────────────────
 
-const COINGECKO_IDS = {
-  BTC:  'bitcoin',        ETH:  'ethereum',       BNB:  'binancecoin',
-  SOL:  'solana',         XRP:  'ripple',          ADA:  'cardano',
-  DOGE: 'dogecoin',       DOT:  'polkadot',        MATIC:'matic-network',
-  POL:  'matic-network',  AVAX: 'avalanche-2',     LINK: 'chainlink',
-  LTC:  'litecoin',       UNI:  'uniswap',         ATOM: 'cosmos',
-  XLM:  'stellar',        NEAR: 'near',            APT:  'aptos',
-  ARB:  'arbitrum',       OP:   'optimism',        INJ:  'injective-protocol',
-  SUI:  'sui',            TIA:  'celestia',        JUP:  'jupiter-exchange-solana',
-  WIF:  'dogwifcoin',     PEPE: 'pepe',            BONK: 'bonk',
-  FIL:  'filecoin',       ICP:  'internet-computer', FTM: 'fantom',
-  SAND: 'the-sandbox',    MANA: 'decentraland',    AXS:  'axie-infinity',
-  GALA: 'gala',           ENJ:  'enjincoin',       CRV:  'curve-dao-token',
-  AAVE: 'aave',           MKR:  'maker',           COMP: 'compound-governance-token',
-  SNX:  'synthetix-network-token', LDO: 'lido-dao', RPL: 'rocket-pool',
-  RUNE: 'thorchain',      ALGO: 'algorand',        VET:  'vechain',
-  HBAR: 'hedera-hashgraph', ETC: 'ethereum-classic', BCH: 'bitcoin-cash',
-  TRX:  'tron',           TON:  'the-open-network', SHIB: 'shiba-inu',
-  FLOKI:'floki',          SEI:  'sei-network',     STX:  'blockstack',
-  XAG:  'silver',         XAU:  'gold',
-  GRT:  'the-graph',      SUSHI:'sushi',           YFI:  'yearn-finance',
-  '1INCH':'1inch',        CAKE: 'pancakeswap-token', APE: 'apecoin',
+// Mapping paire → symbole Kraken
+const KRAKEN_MAP = {
+  'BTC/USDT':  'XBTUSDT',  'ETH/USDT':  'ETHUSDT',   'SOL/USDT':  'SOLUSDT',
+  'XRP/USDT':  'XRPUSDT',  'ADA/USDT':  'ADAUSDT',   'DOT/USDT':  'DOTUSDT',
+  'DOGE/USDT': 'DOGEUSDT', 'AVAX/USDT': 'AVAXUSDT',  'LINK/USDT': 'LINKUSDT',
+  'LTC/USDT':  'LTCUSDT',  'ATOM/USDT': 'ATOMUSDT',  'UNI/USDT':  'UNIUSDT',
+  'NEAR/USDT': 'NEARUSDT', 'ARB/USDT':  'ARBUSDT',   'OP/USDT':   'OPUSDT',
+  'BTC/USD':   'XBTUSD',   'ETH/USD':   'ETHUSD',
+  'XAG/USDT':  null,        'XAU/USDT':  null,
 }
 
-async function fetchFromCoinGecko(pairNames) {
-  const idMap = {}
-  const cgIds = []
-  for (const pair of pairNames.filter(isTradingPair)) {
-    const sym = getBaseSymbol(pair)
-    const id  = COINGECKO_IDS[sym]
-    if (id) { idMap[pair] = id; if (!cgIds.includes(id)) cgIds.push(id) }
-  }
-  if (cgIds.length === 0) return {}
+async function fromKraken(pairs) {
+  const trading = pairs.filter(isTrading)
+  if (trading.length === 0) return {}
 
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${cgIds.join(',')}&vs_currencies=usd`
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
-  if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`)
+  // Construit la liste des paires Kraken connues
+  const krakenPairs = trading
+    .map(p => ({ pair: p, kraken: KRAKEN_MAP[p] ?? `${getBase(p)}USDT` }))
+    .filter(x => x.kraken !== null)
+
+  if (krakenPairs.length === 0) return {}
+
+  const pairParam = krakenPairs.map(x => x.kraken).join(',')
+  const url = `https://api.kraken.com/0/public/Ticker?pair=${pairParam}`
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+  if (!res.ok) throw new Error(`Kraken ${res.status}`)
   const data = await res.json()
+  if (data.error?.length) throw new Error(`Kraken: ${data.error[0]}`)
 
   const prices = {}
-  for (const [pair, cgId] of Object.entries(idMap)) {
-    if (data[cgId]?.usd) prices[pair] = data[cgId].usd
+  for (const { pair, kraken } of krakenPairs) {
+    // Kraken peut retourner la clé avec un préfixe X/Z ou telle quelle
+    const result = data.result?.[kraken]
+      ?? Object.values(data.result ?? {}).find((_, i) =>
+          Object.keys(data.result)[i].includes(getBase(pair))
+        )
+    if (result?.c?.[0]) prices[pair] = parseFloat(result.c[0])
+  }
+  return prices
+}
+
+// ── Source 3 : CryptoCompare ─────────────────────────────────────────────────
+
+async function fromCryptoCompare(pairs) {
+  const trading = pairs.filter(isTrading)
+  if (trading.length === 0) return {}
+
+  const fsyms = [...new Set(trading.map(getBase))].join(',')
+  const url = `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=USD,USDT`
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+  if (!res.ok) throw new Error(`CryptoCompare ${res.status}`)
+  const data = await res.json()
+  if (data.Response === 'Error') throw new Error(`CryptoCompare: ${data.Message}`)
+
+  const prices = {}
+  for (const p of trading) {
+    const base  = getBase(p)
+    const entry = data[base]
+    if (entry?.USDT)  prices[p] = entry.USDT
+    else if (entry?.USD) prices[p] = entry.USD
   }
   return prices
 }
 
 // ── API publique ──────────────────────────────────────────────────────────────
 
-/**
- * Récupère les prix live avec fallback automatique Binance → CoinGecko.
- * @param {string[]} pairNames - ex: ['BTC/USDT', 'ETH/USDT', 'XAG/USDT']
- * @returns {Promise<{ prices: Object, source: string }>}
- */
 export async function fetchLivePrices(pairNames) {
-  const trading = pairNames.filter(isTradingPair)
+  const trading = pairNames.filter(isTrading)
   if (trading.length === 0) return { prices: {}, source: 'none' }
 
-  // Tentative 1 : Binance
+  // Source 1 : Binance
   try {
-    const prices = await fetchFromBinance(trading)
-    // Binance ne couvre pas XAG, XAU — complète avec CoinGecko si nécessaire
+    const prices = await fromBinance(trading)
     const missing = trading.filter(p => prices[p] === undefined)
+    // Pour les paires non trouvées sur Binance (XAG, XAU…) → CryptoCompare
     if (missing.length > 0) {
       try {
-        const extra = await fetchFromCoinGecko(missing)
+        const extra = await fromCryptoCompare(missing)
         Object.assign(prices, extra)
-      } catch {
-        // CoinGecko en fallback partiel — on ignore l'erreur
-      }
+      } catch { /* silencieux */ }
     }
-    const found = Object.keys(prices).length
-    if (found > 0) return { prices, source: 'Binance' }
-    throw new Error('Aucun prix retourné par Binance')
-  } catch (binanceErr) {
-    console.warn('[priceRepository] Binance failed:', binanceErr.message, '→ Fallback CoinGecko')
+    if (Object.keys(prices).length > 0) return { prices, source: 'Binance' }
+    throw new Error('Aucun résultat')
+  } catch (e) {
+    console.warn('[prices] Binance failed:', e.message)
   }
 
-  // Tentative 2 : CoinGecko
+  // Source 2 : Kraken
   try {
-    const prices = await fetchFromCoinGecko(trading)
-    return { prices, source: 'CoinGecko' }
-  } catch (cgErr) {
-    console.warn('[priceRepository] CoinGecko failed:', cgErr.message)
-    return { prices: {}, source: 'error' }
+    const prices = await fromKraken(trading)
+    if (Object.keys(prices).length > 0) return { prices, source: 'Kraken' }
+    throw new Error('Aucun résultat')
+  } catch (e) {
+    console.warn('[prices] Kraken failed:', e.message)
   }
+
+  // Source 3 : CryptoCompare
+  try {
+    const prices = await fromCryptoCompare(trading)
+    if (Object.keys(prices).length > 0) return { prices, source: 'CryptoCompare' }
+    throw new Error('Aucun résultat')
+  } catch (e) {
+    console.warn('[prices] CryptoCompare failed:', e.message)
+  }
+
+  return { prices: {}, source: 'error' }
 }
