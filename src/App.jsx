@@ -8,10 +8,9 @@ import AuthGate                       from './components/AuthGate.jsx'
 import { auth, onAuthStateChanged }   from './lib/firebase.js'
 
 export default function App() {
-  const [authUser, setAuthUser]     = useState(undefined)  // undefined = vérif en cours
-  const [authUid, setAuthUid]       = useState(null)       // uid de l'utilisateur actif
+  const [authUser, setAuthUser] = useState(undefined)
+  const [authUid, setAuthUid]   = useState(null)
 
-  // Écoute l'état de connexion Firebase
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, user => {
       setAuthUser(user ?? null)
@@ -25,7 +24,7 @@ export default function App() {
     fileName, loadedAt, pairList, excluded, driveErr,
     repoAvailable,
     // Prix live
-    pricesLoading, priceSource, lastPriceUpdate, refreshPrices,
+    pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
@@ -42,11 +41,8 @@ export default function App() {
     if (view === 'landing') setActivePage('dashboard')
   }, [view])
 
-  // Quand l'utilisateur change → revenir sur landing
   useEffect(() => {
-    if (authUid !== null) {
-      backToLanding()
-    }
+    if (authUid !== null) backToLanding()
   }, [authUid])
 
   const handleEnterApp = (page = 'dashboard') => {
@@ -59,17 +55,9 @@ export default function App() {
     backToLanding()
   }
 
-  // Vérification auth en cours → écran vide
-  if (authUser === undefined) {
-    return <LoadingOverlay visible text="Vérification…" />
-  }
+  if (authUser === undefined) return <LoadingOverlay visible text="Vérification…" />
+  if (!authUser) return <AuthGate />
 
-  // Non connecté → AuthGate
-  if (!authUser) {
-    return <AuthGate />
-  }
-
-  // Connecté → app normale
   return (
     <>
       <LoadingOverlay visible={loading} text={loadingTxt} />
@@ -106,6 +94,8 @@ export default function App() {
           setDriveErr={setDriveErr}
           onRepoUpdated={refreshRepoAvailable}
           pricesLoading={pricesLoading}
+          pricesError={pricesError}
+          priceSource={priceSource}
           lastPriceUpdate={lastPriceUpdate}
           refreshPrices={refreshPrices}
         />
