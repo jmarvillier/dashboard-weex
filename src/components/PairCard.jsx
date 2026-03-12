@@ -19,15 +19,12 @@ const pctSign = (val, ref) => {
 
 export default function PairCard({ p, excluded, onToggle, index }) {
   const isExcl = excluded.has(p.name)
-  const bc     = p.is_depot ? 'n' : cc(p.pnl_total)
   const sym    = p.name.split('/')[0]
 
-  const hasLive = p.pnl_latent_live !== null
-
-  // Badge header : on affiche le PnL total live si dispo, sinon journal
-  const badgePnl    = hasLive ? p.pnl_total_live : p.pnl_total
-  const badgeRef    = p.usdt_investi
-  const badgeClass  = p.is_depot ? 'n' : cc(badgePnl)
+  const hasLive   = p.pnl_latent_live !== null && p.pnl_latent_live !== undefined
+  const badgePnl  = hasLive ? p.pnl_total_live : p.pnl_total
+  const badgeRef  = p.usdt_investi
+  const badgeClass = p.is_depot ? 'n' : cc(badgePnl)
 
   const execRate = p.nb_total > 0 ? (p.nb_exec / p.nb_total * 100) : 0
 
@@ -153,13 +150,15 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               </>}
             </div>
 
-            {/* ── PnL Journal (anciens indicateurs) ── */}
-            <div className="pnl-section-label">📒 PnL Journal <span className="pnl-section-hint">(dernier prix saisi)</span></div>
+            {/* ── PnL Journal ── */}
+            <div className="pnl-section-label">
+              📒 PnL Journal <span className="pnl-section-hint">(dernier prix saisi)</span>
+            </div>
             <div className="pnl-row">
               {[
-                { l: 'PnL Réalisé', v: p.pnl_realise, ref: p.usdt_investi },
-                { l: 'PnL Latent',  v: p.pnl_latent,  ref: p.investi_en_cours },
-                { l: 'PnL Total',   v: p.pnl_total,   ref: p.usdt_investi, big: true },
+                { l: 'PnL Réalisé', v: p.pnl_realise,  ref: p.usdt_investi },
+                { l: 'PnL Latent',  v: p.pnl_latent,   ref: p.investi_en_cours },
+                { l: 'PnL Total',   v: p.pnl_total,    ref: p.usdt_investi, big: true },
               ].map(({ l, v, ref, big }) => (
                 <div key={l} className={`pnl-box ${cc(v)}`}>
                   <div className="pnl-label">{l}</div>
@@ -173,11 +172,11 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               ))}
             </div>
 
-            {/* ── PnL Live (nouveaux indicateurs) ── */}
+            {/* ── PnL Live ── */}
             <div className="pnl-section-label pnl-section-label-live">
               <span className="live-dot live-dot-sm"></span>
-              PnL Live <span className="pnl-section-hint">(cours actuel CoinGecko)</span>
-              {p.prix_live && (
+              PnL Live <span className="pnl-section-hint">(cours actuel)</span>
+              {p.prix_live != null && (
                 <span className="pnl-live-price">{fmt(p.prix_live)} USDT</span>
               )}
             </div>
@@ -187,9 +186,9 @@ export default function PairCard({ p, excluded, onToggle, index }) {
                 { l: 'PnL Latent',  v: p.pnl_latent_live,  ref: p.investi_en_cours },
                 { l: 'PnL Total',   v: p.pnl_total_live,   ref: p.usdt_investi, big: true },
               ].map(({ l, v, ref, big }) => (
-                <div key={l} className={`pnl-box pnl-box-live ${v !== null ? cc(v) : 'n'}`}>
+                <div key={l} className={`pnl-box pnl-box-live ${v != null ? cc(v) : 'n'}`}>
                   <div className="pnl-label">{l}</div>
-                  {v !== null ? (
+                  {v != null ? (
                     <>
                       <div className={`pnl-val ${cc(v)}${big ? ' pnl-val-big' : ''}`}>
                         {fmtS(v)} <span className="pnl-unit">USDT</span>
@@ -208,11 +207,11 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             {/* ── Barre de stats ── */}
             <div className="tbar">
               {[
-                { cls: 'tot', v: p.nb_total,  l: 'Total' },
-                { cls: 'exc', v: p.nb_exec,   l: 'Exec.' },
+                { cls: 'tot', v: p.nb_total,  l: 'Total'   },
+                { cls: 'exc', v: p.nb_exec,   l: 'Exec.'   },
                 { cls: 'can', v: p.nb_annule, l: 'Annulés' },
-                { cls: 'buy', v: p.nb_achat,  l: 'Achats' },
-                { cls: 'sel', v: p.nb_vente,  l: 'Ventes' },
+                { cls: 'buy', v: p.nb_achat,  l: 'Achats'  },
+                { cls: 'sel', v: p.nb_vente,  l: 'Ventes'  },
               ].map(({ cls, v, l }) => (
                 <div key={l} className={`tc ${cls}`}>
                   <span className="tn">{v}</span>
