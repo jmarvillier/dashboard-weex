@@ -1,8 +1,5 @@
 /**
  * usePrices.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Hook qui gère le cycle de vie des prix live.
- * Rafraîchit toutes les 60s tant que le dashboard est actif.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -14,7 +11,7 @@ export function usePrices(pairList) {
   const [prices, setPrices]               = useState({})
   const [pricesLoading, setPricesLoading] = useState(false)
   const [pricesError, setPricesError]     = useState(null)
-  const [priceSource, setPriceSource]     = useState(null)   // 'Binance' | 'CoinGecko' | 'error'
+  const [priceSource, setPriceSource]     = useState(null)
   const [lastPriceUpdate, setLastPriceUpdate] = useState(null)
   const timerRef = useRef(null)
 
@@ -23,17 +20,21 @@ export function usePrices(pairList) {
     setPricesLoading(true)
     setPricesError(null)
     try {
-      const { prices: result, source } = await fetchLivePrices(pairs.map(p => p.name))
-      setPrices(result)
-      setPriceSource(source)
-      if (Object.keys(result).length > 0) {
+      const result = await fetchLivePrices(pairs.map(p => p.name))
+      const { prices: data, source } = result || { prices: {}, source: 'error' }
+      setPrices(data || {})
+      setPriceSource(source || 'error')
+      if (data && Object.keys(data).length > 0) {
         setLastPriceUpdate(new Date())
+        setPricesError(null)
       } else {
-        setPricesError('Aucun cours disponible (Binance + CoinGecko hors ligne)')
+        setPricesError('Aucun cours disponible')
       }
     } catch (err) {
-      setPricesError(err.message)
+      console.warn('[usePrices] error:', err)
+      setPricesError('Erreur de chargement')
       setPriceSource('error')
+      setPrices({})
     } finally {
       setPricesLoading(false)
     }
@@ -42,6 +43,7 @@ export function usePrices(pairList) {
   useEffect(() => {
     if (!pairList || pairList.length === 0) {
       setPrices({})
+      clearInterval(timerRef.current)
       return
     }
 
