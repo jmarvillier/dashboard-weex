@@ -2,19 +2,13 @@
  * useTrading.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Hook principal de l'application.
- *
- * Architecture des sources de données :
- *   1. Charger depuis l'iPad  → parse → saveSnapshot() → ingest
- *   2. Charger depuis GSheets → parse → saveSnapshot() → ingest
- *   3. Ouvrir le dashboard    → loadSnapshot()         → ingest
- *
- * La source de vérité est IndexedDB (repository local gratuit).
  */
 
 import { useState, useCallback, useEffect } from 'react'
 import { parseCSV, isUsdPair } from '../lib/parser.js'
-import { process, buildPairList } from '../lib/process.js'
+import { process, buildPairList, enrichWithPrices } from '../lib/process.js'
 import { saveSnapshot, loadSnapshot, hasSnapshot, clearSnapshot } from '../lib/repository.js'
+import { usePrices } from './usePrices.js'
 
 // ── Fetcher CSV depuis un Google Sheet ID ────────────────────────────────────
 
@@ -44,7 +38,7 @@ async function fetchCSV(id) {
 
 export function useTrading() {
   const [view, setView]               = useState('landing')
-  const [zone, setZone]               = useState(null)       // null | 'local' | 'drive'
+  const [zone, setZone]               = useState(null)
   const [loading, setLoading]         = useState(false)
   const [loadingTxt, setLoadingTxt]   = useState('')
   const [fileName, setFileName]       = useState('')
@@ -53,6 +47,17 @@ export function useTrading() {
   const [excluded, setExcluded]       = useState(new Set())
   const [driveErr, setDriveErr]       = useState(null)
   const [repoAvailable, setRepoAvailable] = useState(false)
+
+  // ── Prix live ─────────────────────────────────────────────────────────────
+  const { prices, pricesLoading, pricesError, lastPriceUpdate, refreshPrices } = usePrices(
+    view === 'dashboard' ? pairList : []
+  )
+
+  // Quand les prix arrivent, enrichit la pairList avec les PnL live
+  useEffect(() => {
+    if (!prices || Object.keys(prices).length === 0) return
+    setPairList(prev => enrichWithPrices(prev, prices))
+  }, [prices])
 
   // Vérifie si des données existent au montage
   useEffect(() => {
@@ -81,7 +86,7 @@ export function useTrading() {
     setRepoAvailable(true)
   }
 
-  // ── Action 1 : Ouvrir depuis le repository (IndexedDB) ───────────────────
+  // ── Action 1 : Ouvrir depuis le repository ───────────────────────────────
 
   const openFromRepository = useCallback(async () => {
     startLoading('Chargement depuis le repository…')
@@ -99,7 +104,7 @@ export function useTrading() {
     }
   }, [])
 
-  // ── Action 2 : Importer depuis un fichier local (iPad) ───────────────────
+  // ── Action 2 : Importer depuis un fichier local ───────────────────────────
 
   const loadFromFile = useCallback((file) => {
     const reader = new FileReader()
@@ -171,7 +176,7 @@ export function useTrading() {
     ingest(rows, 'Google Sheet')
   }, [])
 
-  // ── Rafraîchir l'état du repository (après ajout manuel d'une entrée) ──────
+  // ── Rafraîchir l'état du repository ──────────────────────────────────────
 
   const refreshRepoAvailable = useCallback(async () => {
     const available = await hasSnapshot()
@@ -211,6 +216,8 @@ export function useTrading() {
     view, zone, loading, loadingTxt,
     fileName, loadedAt, pairList, excluded, driveErr,
     repoAvailable,
+    // Prix live
+    prices, pricesLoading, pricesError, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
