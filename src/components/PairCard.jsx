@@ -1,5 +1,5 @@
 /**
- * PairCard.jsx — Carte par paire avec PnL en % et layout amélioré
+ * PairCard.jsx — Carte par paire avec PnL journal + PnL live
  */
 
 const fmt  = (v, d = 2) => isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
@@ -11,7 +11,6 @@ const fmtV = v => {
 }
 const fmtS = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(n)) }
 const cc   = v => v > 0 ? 'g' : v < 0 ? 'r' : 'n'
-const pct  = (val, ref) => ref > 0 ? fmt(Math.abs(val / ref * 100), 1) + ' %' : null
 const pctSign = (val, ref) => {
   if (ref <= 0) return null
   const p = val / ref * 100
@@ -23,7 +22,13 @@ export default function PairCard({ p, excluded, onToggle, index }) {
   const bc     = p.is_depot ? 'n' : cc(p.pnl_total)
   const sym    = p.name.split('/')[0]
 
-  // Taux d'exécution
+  const hasLive = p.pnl_latent_live !== null
+
+  // Badge header : on affiche le PnL total live si dispo, sinon journal
+  const badgePnl    = hasLive ? p.pnl_total_live : p.pnl_total
+  const badgeRef    = p.usdt_investi
+  const badgeClass  = p.is_depot ? 'n' : cc(badgePnl)
+
   const execRate = p.nb_total > 0 ? (p.nb_exec / p.nb_total * 100) : 0
 
   return (
@@ -42,14 +47,22 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               : `${p.nb_exec} exéc · ${p.nb_annule} annulés`
             }
           </div>
+          {/* Prix live sous le nom */}
+          {!p.is_depot && p.prix_live && (
+            <div className="pc-price-live">
+              <span className="live-dot live-dot-sm"></span>
+              <span>{fmt(p.prix_live)} USDT</span>
+            </div>
+          )}
         </div>
         <div className="pc-head-right">
           {!p.is_depot && (
-            <div className={`pc-pnl-badge ${bc}`}>
-              <span className="pc-pnl-usdt">{fmtS(p.pnl_total)} USDT</span>
-              {pctSign(p.pnl_total, p.usdt_investi) && (
-                <span className="pc-pnl-pct">{pctSign(p.pnl_total, p.usdt_investi)}</span>
+            <div className={`pc-pnl-badge ${badgeClass}`}>
+              <span className="pc-pnl-usdt">{fmtS(badgePnl)} USDT</span>
+              {pctSign(badgePnl, badgeRef) && (
+                <span className="pc-pnl-pct">{pctSign(badgePnl, badgeRef)}</span>
               )}
+              {hasLive && <span className="pc-pnl-source">live</span>}
             </div>
           )}
           {p.is_depot && (
@@ -140,7 +153,8 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               </>}
             </div>
 
-            {/* ── PnL row avec % ── */}
+            {/* ── PnL Journal (anciens indicateurs) ── */}
+            <div className="pnl-section-label">📒 PnL Journal <span className="pnl-section-hint">(dernier prix saisi)</span></div>
             <div className="pnl-row">
               {[
                 { l: 'PnL Réalisé', v: p.pnl_realise, ref: p.usdt_investi },
@@ -154,6 +168,38 @@ export default function PairCard({ p, excluded, onToggle, index }) {
                   </div>
                   {pctSign(v, ref) && (
                     <div className={`pnl-pct ${cc(v)}`}>{pctSign(v, ref)}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ── PnL Live (nouveaux indicateurs) ── */}
+            <div className="pnl-section-label pnl-section-label-live">
+              <span className="live-dot live-dot-sm"></span>
+              PnL Live <span className="pnl-section-hint">(cours actuel CoinGecko)</span>
+              {p.prix_live && (
+                <span className="pnl-live-price">{fmt(p.prix_live)} USDT</span>
+              )}
+            </div>
+            <div className="pnl-row">
+              {[
+                { l: 'PnL Réalisé', v: p.pnl_realise_live, ref: p.usdt_investi },
+                { l: 'PnL Latent',  v: p.pnl_latent_live,  ref: p.investi_en_cours },
+                { l: 'PnL Total',   v: p.pnl_total_live,   ref: p.usdt_investi, big: true },
+              ].map(({ l, v, ref, big }) => (
+                <div key={l} className={`pnl-box pnl-box-live ${v !== null ? cc(v) : 'n'}`}>
+                  <div className="pnl-label">{l}</div>
+                  {v !== null ? (
+                    <>
+                      <div className={`pnl-val ${cc(v)}${big ? ' pnl-val-big' : ''}`}>
+                        {fmtS(v)} <span className="pnl-unit">USDT</span>
+                      </div>
+                      {pctSign(v, ref) && (
+                        <div className={`pnl-pct ${cc(v)}`}>{pctSign(v, ref)}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="pnl-val pnl-val-pending">—</div>
                   )}
                 </div>
               ))}
