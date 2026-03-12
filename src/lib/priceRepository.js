@@ -2,16 +2,24 @@
  * priceRepository.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Fetcher de cours temps réel — 3 sources en cascade :
- *   1. Binance  (paires USDT directes)
- *   2. Kraken   (CORS ouvert, couvre BTC/ETH/SOL etc.)
- *   3. CryptoCompare (API publique avec clé optionnelle)
+ *   1. Binance
+ *   2. Kraken
+ *   3. CryptoCompare
  */
 
 const STABLES = new Set(['USDT','USDC','BUSD','DAI','TUSD','FDUSD','USDP'])
 
-function getBase(pair)  { return pair.split('/')[0].toUpperCase() }
-function getQuote(pair) { return (pair.split('/')[1] || 'USDT').toUpperCase() }
+function getBase(pair)   { return pair.split('/')[0].toUpperCase() }
+function getQuote(pair)  { return (pair.split('/')[1] || 'USDT').toUpperCase() }
 function isTrading(pair) { return !STABLES.has(getBase(pair)) }
+
+// Timeout compatible Safari / iOS (pas de AbortSignal.timeout)
+function fetchWithTimeout(url, ms = 7000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  return fetch(url, { signal: controller.signal })
+    .finally(() => clearTimeout(timer))
+}
 
 // ── Source 1 : Binance ───────────────────────────────────────────────────────
 
@@ -22,7 +30,7 @@ async function fromBinance(pairs) {
   const symbols = trading.map(p => `"${getBase(p)}${getQuote(p)}"`)
   const url = `https://api.binance.com/api/v3/ticker/price?symbols=[${symbols.join(',')}]`
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+  const res = await fetchWithTimeout(url)
   if (!res.ok) throw new Error(`Binance ${res.status}`)
   const data = await res.json()
 
@@ -37,7 +45,6 @@ async function fromBinance(pairs) {
 
 // ── Source 2 : Kraken ────────────────────────────────────────────────────────
 
-// Mapping paire → symbole Kraken
 const KRAKEN_MAP = {
   'BTC/USDT':  'XBTUSDT',  'ETH/USDT':  'ETHUSDT',   'SOL/USDT':  'SOLUSDT',
   'XRP/USDT':  'XRPUSDT',  'ADA/USDT':  'ADAUSDT',   'DOT/USDT':  'DOTUSDT',
@@ -45,36 +52,30 @@ const KRAKEN_MAP = {
   'LTC/USDT':  'LTCUSDT',  'ATOM/USDT': 'ATOMUSDT',  'UNI/USDT':  'UNIUSDT',
   'NEAR/USDT': 'NEARUSDT', 'ARB/USDT':  'ARBUSDT',   'OP/USDT':   'OPUSDT',
   'BTC/USD':   'XBTUSD',   'ETH/USD':   'ETHUSD',
-  'XAG/USDT':  null,        'XAU/USDT':  null,
 }
 
 async function fromKraken(pairs) {
   const trading = pairs.filter(isTrading)
   if (trading.length === 0) return {}
 
-  // Construit la liste des paires Kraken connues
   const krakenPairs = trading
     .map(p => ({ pair: p, kraken: KRAKEN_MAP[p] ?? `${getBase(p)}USDT` }))
-    .filter(x => x.kraken !== null)
-
-  if (krakenPairs.length === 0) return {}
 
   const pairParam = krakenPairs.map(x => x.kraken).join(',')
   const url = `https://api.kraken.com/0/public/Ticker?pair=${pairParam}`
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+  const res = await fetchWithTimeout(url)
   if (!res.ok) throw new Error(`Kraken ${res.status}`)
   const data = await res.json()
-  if (data.error?.length) throw new Error(`Kraken: ${data.error[0]}`)
+  if (data.error && data.error.length > 0) throw new Error(`Kraken: ${data.error[0]}`)
 
   const prices = {}
+  const resultKeys = Object.keys(data.result || {})
   for (const { pair, kraken } of krakenPairs) {
-    // Kraken peut retourner la clé avec un préfixe X/Z ou telle quelle
-    const result = data.result?.[kraken]
-      ?? Object.values(data.result ?? {}).find((_, i) =>
-          Object.keys(data.result)[i].includes(getBase(pair))
-        )
-    if (result?.c?.[0]) prices[pair] = parseFloat(result.c[0])
+    const key = resultKeys.find(k => k === kraken || k.includes(getBase(pair)))
+    if (key && data.result[key]?.c?.[0]) {
+      prices[pair] = parseFloat(data.result[key].c[0])
+    }
   }
   return prices
 }
@@ -88,17 +89,16 @@ async function fromCryptoCompare(pairs) {
   const fsyms = [...new Set(trading.map(getBase))].join(',')
   const url = `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=USD,USDT`
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+  const res = await fetchWithTimeout(url)
   if (!res.ok) throw new Error(`CryptoCompare ${res.status}`)
   const data = await res.json()
   if (data.Response === 'Error') throw new Error(`CryptoCompare: ${data.Message}`)
 
   const prices = {}
   for (const p of trading) {
-    const base  = getBase(p)
-    const entry = data[base]
-    if (entry?.USDT)  prices[p] = entry.USDT
-    else if (entry?.USD) prices[p] = entry.USD
+    const entry = data[getBase(p)]
+    if (entry?.USDT)      prices[p] = entry.USDT
+    else if (entry?.USD)  prices[p] = entry.USD
   }
   return prices
 }
@@ -112,8 +112,8 @@ export async function fetchLivePrices(pairNames) {
   // Source 1 : Binance
   try {
     const prices = await fromBinance(trading)
+    // Paires manquantes (XAG, XAU…) → CryptoCompare en complément
     const missing = trading.filter(p => prices[p] === undefined)
-    // Pour les paires non trouvées sur Binance (XAG, XAU…) → CryptoCompare
     if (missing.length > 0) {
       try {
         const extra = await fromCryptoCompare(missing)
