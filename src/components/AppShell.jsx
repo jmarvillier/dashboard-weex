@@ -226,11 +226,17 @@ function SectionHeader({ icon, title, subtitle }) {
 }
 
 /* ─── Page : Dashboard ───────────────────────────────────────────────────── */
-function PageDashboard({ pairList, excluded }) {
+function PageDashboard({ pairList, excluded, pricesLoading, lastPriceUpdate, refreshPrices }) {
   return (
     <div className="page-content">
       <SectionHeader icon="📊" title="Performance Globale" subtitle="Vue consolidée de tous vos investissements" />
-      <KpiRow pairList={pairList} excluded={excluded} />
+      <KpiRow
+        pairList={pairList}
+        excluded={excluded}
+        pricesLoading={pricesLoading}
+        lastPriceUpdate={lastPriceUpdate}
+        refreshPrices={refreshPrices}
+      />
 
       <SectionHeader icon="📋" title="Tableau Récapitulatif" subtitle="Détail par paire de trading" />
       <SummaryTable pairList={pairList} excluded={excluded} />
@@ -267,6 +273,9 @@ export default function AppShell({
   driveErr,
   setDriveErr,
   onRepoUpdated,
+  pricesLoading,
+  lastPriceUpdate,
+  refreshPrices,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -289,7 +298,13 @@ export default function AppShell({
 
         <main className="shell-content">
           {activePage === 'dashboard' && (
-            <PageDashboard pairList={pairList} excluded={excluded} />
+            <PageDashboard
+              pairList={pairList}
+              excluded={excluded}
+              pricesLoading={pricesLoading}
+              lastPriceUpdate={lastPriceUpdate}
+              refreshPrices={refreshPrices}
+            />
           )}
           {activePage === 'paires' && (
             <PagePaires
