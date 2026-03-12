@@ -1,7 +1,5 @@
 /**
  * useTrading.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Hook principal de l'application.
  */
 
 import { useState, useCallback, useEffect } from 'react'
@@ -9,8 +7,6 @@ import { parseCSV, isUsdPair } from '../lib/parser.js'
 import { process, buildPairList, enrichWithPrices } from '../lib/process.js'
 import { saveSnapshot, loadSnapshot, hasSnapshot, clearSnapshot } from '../lib/repository.js'
 import { usePrices } from './usePrices.js'
-
-// ── Fetcher CSV depuis un Google Sheet ID ────────────────────────────────────
 
 const SHEET_URLS = (id) => [
   `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
@@ -34,8 +30,6 @@ async function fetchCSV(id) {
   return { csv: null, err: lastErr }
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useTrading() {
   const [view, setView]               = useState('landing')
   const [zone, setZone]               = useState(null)
@@ -49,9 +43,14 @@ export function useTrading() {
   const [repoAvailable, setRepoAvailable] = useState(false)
 
   // ── Prix live ─────────────────────────────────────────────────────────────
-  const { prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices } = usePrices(
-    view === 'dashboard' ? pairList : []
-  )
+  const {
+    prices,
+    pricesLoading,
+    pricesError,
+    priceSource,
+    lastPriceUpdate,
+    refreshPrices,
+  } = usePrices(view === 'dashboard' ? pairList : [])
 
   // Quand les prix arrivent, enrichit la pairList avec les PnL live
   useEffect(() => {
@@ -59,12 +58,9 @@ export function useTrading() {
     setPairList(prev => enrichWithPrices(prev, prices))
   }, [prices])
 
-  // Vérifie si des données existent au montage
   useEffect(() => {
     hasSnapshot().then(setRepoAvailable)
   }, [])
-
-  // ── Helpers ──────────────────────────────────────────────────────────────
 
   const startLoading = (txt) => { setLoadingTxt(txt); setLoading(true) }
   const stopLoading  = ()    => setLoading(false)
@@ -86,8 +82,6 @@ export function useTrading() {
     setRepoAvailable(true)
   }
 
-  // ── Action 1 : Ouvrir depuis le repository ───────────────────────────────
-
   const openFromRepository = useCallback(async () => {
     startLoading('Chargement depuis le repository…')
     try {
@@ -103,8 +97,6 @@ export function useTrading() {
       alert('Erreur repository : ' + err.message)
     }
   }, [])
-
-  // ── Action 2 : Importer depuis un fichier local ───────────────────────────
 
   const loadFromFile = useCallback((file) => {
     const reader = new FileReader()
@@ -135,8 +127,6 @@ export function useTrading() {
     }
     reader.readAsArrayBuffer(file)
   }, [])
-
-  // ── Action 3 : Importer depuis Google Sheets ─────────────────────────────
 
   const loadFromDrive = useCallback(async (rawUrl) => {
     const m  = rawUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/)
@@ -176,14 +166,10 @@ export function useTrading() {
     ingest(rows, 'Google Sheet')
   }, [])
 
-  // ── Rafraîchir l'état du repository ──────────────────────────────────────
-
   const refreshRepoAvailable = useCallback(async () => {
     const available = await hasSnapshot()
     setRepoAvailable(available)
   }, [])
-
-  // ── Effacer le repository ─────────────────────────────────────────────────
 
   const clearRepository = useCallback(async () => {
     if (!window.confirm('Supprimer toutes les données sauvegardées ?')) return
@@ -192,8 +178,6 @@ export function useTrading() {
     backToLanding()
   }, [])
 
-  // ── Flag exclusion ────────────────────────────────────────────────────────
-
   const toggleFlag = useCallback((pairName) => {
     setExcluded((prev) => {
       const next = new Set(prev)
@@ -201,8 +185,6 @@ export function useTrading() {
       return next
     })
   }, [])
-
-  // ── Navigation ────────────────────────────────────────────────────────────
 
   const backToLanding = useCallback(() => {
     setView('landing')
