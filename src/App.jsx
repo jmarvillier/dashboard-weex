@@ -25,7 +25,7 @@ export default function App() {
     fileName, loadedAt, pairList, excluded, driveErr,
     repoAvailable,
     // Prix live
-    pricesLoading, lastPriceUpdate, refreshPrices,
+    pricesLoading, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
