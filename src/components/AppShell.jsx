@@ -1,8 +1,5 @@
 /**
  * AppShell.jsx
- * ─────────────────────────────────────────────────────────────────────────────
- * Shell principal de l'application.
- * Structure : Sidebar fixe | Topbar fixe | Zone de contenu scrollable
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -13,14 +10,12 @@ import PairesView   from './PairesView.jsx'
 import DataPanel    from './DataPanel.jsx'
 import { auth, signOut } from '../lib/firebase.js'
 
-/* ─── Items de navigation ───────────────────────────────────────────────── */
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '🚀', label: 'Dashboard',  sublabel: 'Vue globale'      },
   { id: 'paires',    icon: '📊', label: 'Paires',     sublabel: 'Détail par paire' },
   { id: 'donnees',   icon: '🗃️', label: 'Données',    sublabel: 'Gérer le journal' },
 ]
 
-/* ─── Topbar ─────────────────────────────────────────────────────────────── */
 function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   const pageItem = NAV_ITEMS.find(i => i.id === activePage)
 
@@ -103,25 +98,18 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   return (
     <>
       <header className="shell-topbar">
-        {/* Burger mobile */}
         <button className="topbar-burger" onClick={() => setSidebarOpen(v => !v)} aria-label="Menu">
           <span /><span /><span />
         </button>
-
-        {/* Fil d'ariane */}
         <div className="topbar-breadcrumb">
           <span className="topbar-breadcrumb-icon">{pageItem?.icon}</span>
           <span className="topbar-breadcrumb-label">{pageItem?.label}</span>
         </div>
-
         <div className="topbar-right">
-          {/* Indicateur live + heure de chargement */}
           <div className="topbar-live">
             <span className="live-dot" />
             {loadedAt && <span className="topbar-time">Chargé {loadedAt}</span>}
           </div>
-
-          {/* Bouton install / update (conditionnel) */}
           {btnMode && (
             <div className="topbar-install-wrap">
               <button
@@ -136,7 +124,6 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
         </div>
       </header>
 
-      {/* Guide iOS inline */}
       {showIosGuide && btnMode === 'ios' && (
         <div className="ios-guide-bar">
           <span>1. <strong>⎋ Partager</strong></span>
@@ -151,7 +138,6 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   )
 }
 
-/* ─── Sidebar ────────────────────────────────────────────────────────────── */
 function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }) {
   function navigate(page) {
     setActivePage(page)
@@ -159,26 +145,16 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
   }
 
   async function handleSignOut() {
-    try {
-      await signOut(auth)
-    } catch (e) {
-      console.error('Erreur déconnexion :', e)
-    }
+    try { await signOut(auth) } catch (e) { console.error('Erreur déconnexion :', e) }
   }
 
   return (
     <>
-      {/* Overlay mobile */}
       {isOpen && <div className="sidebar-overlay" onClick={() => setIsOpen(false)} />}
-
       <aside className={`shell-sidebar${isOpen ? ' sidebar-open' : ''}`}>
-
-        {/* Logo */}
         <div className="sidebar-logo-wrap">
           <Logo small />
         </div>
-
-        {/* Nav principale */}
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
             <button
@@ -195,38 +171,29 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
             </button>
           ))}
         </nav>
-
-        {/* Footer sidebar */}
         <div className="sidebar-footer">
           <button className="sidebar-back-btn" onClick={backToLanding}>
-            <span>←</span>
-            <span>Accueil</span>
+            <span>←</span><span>Accueil</span>
           </button>
           <button className="sidebar-back-btn sidebar-signout-btn" onClick={handleSignOut}>
-            <span>⎋</span>
-            <span>Déconnexion</span>
+            <span>⎋</span><span>Déconnexion</span>
           </button>
         </div>
-
       </aside>
     </>
   )
 }
 
-/* ─── Section header réutilisable ───────────────────────────────────────── */
 function SectionHeader({ icon, title, subtitle }) {
   return (
     <div className="page-section-header">
-      <div className="page-section-title">
-        <span>{icon}</span> {title}
-      </div>
+      <div className="page-section-title"><span>{icon}</span> {title}</div>
       {subtitle && <div className="page-section-sub">{subtitle}</div>}
     </div>
   )
 }
 
-/* ─── Page : Dashboard ───────────────────────────────────────────────────── */
-function PageDashboard({ pairList, excluded, pricesLoading, lastPriceUpdate, refreshPrices }) {
+function PageDashboard({ pairList, excluded, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices }) {
   return (
     <div className="page-content">
       <SectionHeader icon="📊" title="Performance Globale" subtitle="Vue consolidée de tous vos investissements" />
@@ -234,17 +201,17 @@ function PageDashboard({ pairList, excluded, pricesLoading, lastPriceUpdate, ref
         pairList={pairList}
         excluded={excluded}
         pricesLoading={pricesLoading}
+        pricesError={pricesError}
+        priceSource={priceSource}
         lastPriceUpdate={lastPriceUpdate}
         refreshPrices={refreshPrices}
       />
-
       <SectionHeader icon="📋" title="Tableau Récapitulatif" subtitle="Détail par paire de trading" />
       <SummaryTable pairList={pairList} excluded={excluded} />
     </div>
   )
 }
 
-/* ─── Page : Paires ──────────────────────────────────────────────────────── */
 function PagePaires({ pairList, excluded, toggleFlag }) {
   return (
     <div className="page-content">
@@ -258,7 +225,6 @@ function PagePaires({ pairList, excluded, toggleFlag }) {
   )
 }
 
-/* ─── Composant principal AppShell ───────────────────────────────────────── */
 export default function AppShell({
   activePage,
   setActivePage,
@@ -274,6 +240,8 @@ export default function AppShell({
   setDriveErr,
   onRepoUpdated,
   pricesLoading,
+  pricesError,
+  priceSource,
   lastPriceUpdate,
   refreshPrices,
 }) {
@@ -288,20 +256,20 @@ export default function AppShell({
         setIsOpen={setSidebarOpen}
         backToLanding={backToLanding}
       />
-
       <div className="shell-main">
         <Topbar
           activePage={activePage}
           loadedAt={loadedAt}
           setSidebarOpen={setSidebarOpen}
         />
-
         <main className="shell-content">
           {activePage === 'dashboard' && (
             <PageDashboard
               pairList={pairList}
               excluded={excluded}
               pricesLoading={pricesLoading}
+              pricesError={pricesError}
+              priceSource={priceSource}
               lastPriceUpdate={lastPriceUpdate}
               refreshPrices={refreshPrices}
             />
