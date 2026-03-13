@@ -20,7 +20,7 @@
     <!-- ── Fonts & libs ── -->
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script type="module" crossorigin src="/dashboard-weex/staging/assets/index-DlworjwS.js"></script>
+    <script type="module" crossorigin src="/dashboard-weex/staging/assets/index-Dn0fTIGo.js"></script>
     <link rel="stylesheet" crossorigin href="/dashboard-weex/staging/assets/index-bAoQ7yez.css">
   </head>
   <body>
@@ -33,16 +33,37 @@
           try {
             const reg = await navigator.serviceWorker.register(
               '/dashboard-weex/sw.js',
-              { scope: '/dashboard-weex/' }
+              { scope: '/dashboard-weex/', updateViaCache: 'none' }
             )
-            // Force la vérification d'une MAJ à chaque chargement.
-            // La gestion du bouton MAJ et du reload est déléguée
-            // à InstallPrompt.jsx / Topbar.jsx via les événements SW.
+            // Vérifie une MAJ à chaque chargement
             reg.update()
+
+            // Si un nouveau SW attend déjà → l'activer immédiatement
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+            }
+
+            // Si un nouveau SW s'installe pendant la session → l'activer dès qu'il est prêt
+            reg.addEventListener('updatefound', () => {
+              const newSW = reg.installing
+              if (!newSW) return
+              newSW.addEventListener('statechange', () => {
+                if (newSW.state === 'installed') {
+                  newSW.postMessage({ type: 'SKIP_WAITING' })
+                }
+              })
+            })
+
             console.log('[SW] Registered:', reg.scope)
           } catch (err) {
             console.warn('[SW] Registration failed:', err)
           }
+        })
+
+        // Quand le SW prend le contrôle → recharger la page pour servir les nouveaux assets
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('[SW] Controller changé → reload')
+          window.location.reload()
         })
       }
     </script>
