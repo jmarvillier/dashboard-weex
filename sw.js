@@ -1,6 +1,6 @@
 /**
  * sw.js — Service Worker Ydash
- * 1.0.10-pre-5 et f01c9a4 sont injectés par vite.config.js au build.
+ * 1.0.10-pre-6 et dc60c3a sont injectés par vite.config.js au build.
  *
  * Stratégie anti-cache-zombie :
  *  - install  : skipWaiting() immédiat → activation sans attendre
@@ -12,8 +12,8 @@
  *      • Autres (fonts, images)     → Network First
  */
 
-const VERSION    = '1.0.10-pre-5'
-const GIT_SHA    = 'f01c9a4'
+const VERSION    = '1.0.10-pre-6'
+const GIT_SHA    = 'dc60c3a'
 const CACHE_NAME = `ydash-${VERSION}-${GIT_SHA}`
 
 /* ── Install ─────────────────────────────────────────────────────────────── */
