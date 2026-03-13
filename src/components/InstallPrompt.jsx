@@ -85,53 +85,17 @@ export default function InstallPrompt() {
     return () => clearTimeout(t)
   }, [])
 
-  /* ── Écoute les mises à jour SW ── */
+ /* ── Écoute les mises à jour SW ── */
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
 
-    navigator.serviceWorker.ready.then(reg => {
-      swReg.current = reg
-
-      const checkWaiting = (waiting) => {
-        if (!waiting) return
-        // Récupère le SHA du nouveau SW via un message (ou fallback Date.now)
-        const sha = waiting._sha ?? String(Date.now())
-        const dismissedSha = localStorage.getItem(KEY_UPDATE_DISMISSED)
-        if (sha !== dismissedSha) {
-          setPendingSW(waiting)
-          setNewSWsha(sha)
-          setMode('update')
-        }
-      }
-
-      // SW déjà en attente au chargement
-      if (reg.waiting) checkWaiting(reg.waiting)
-
-      // Nouveau SW qui s'installe après le chargement
-      reg.addEventListener('updatefound', () => {
-        const installing = reg.installing
-        if (!installing) return
-        installing.addEventListener('statechange', () => {
-          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-            checkWaiting(installing)
-          }
-        })
-      })
-    })
-
-    // Quand le SW s'active (après skipWaiting), recharge la page
+    // Quand un nouveau SW prend le contrôle → reload propre
+    // (le SW fait skipWaiting automatiquement, donc ça arrive dès le prochain load)
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       window.location.reload()
     })
-
-    // Écoute SW_ACTIVATED pour confirmation
-    navigator.serviceWorker.addEventListener('message', event => {
-      if (event.data?.type === 'SW_ACTIVATED') {
-        console.log('[App] SW activé :', event.data.version)
-      }
-    })
   }, [])
-
+  
   /* ── Appliquer la mise à jour ── */
   function applyUpdate() {
     const sw = pendingSW || swReg.current?.waiting
