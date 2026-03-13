@@ -16,6 +16,18 @@ export default function App() {
     return unsub
   }, [])
 
+  // Rechargement automatique quand le nouveau SW est activé
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === 'SW_ACTIVATED') {
+        console.log('[App] Nouveau SW actif, rechargement…')
+        window.location.reload()
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message', handler)
+    return () => navigator.serviceWorker?.removeEventListener('message', handler)
+  }, [])
+
   const {
     loading, loadingTxt,
     fileName, loadedAt, pairList, excluded, driveErr,
