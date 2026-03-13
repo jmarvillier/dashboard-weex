@@ -1,6 +1,6 @@
 /**
  * sw.js — Service Worker Ydash
- * 1.0.10-pre-5 et cd322a1 sont injectés par vite.config.js au build.
+ * 1.0.10-pre-5 et f01c9a4 sont injectés par vite.config.js au build.
  *
  * Stratégie anti-cache-zombie :
  *  - install  : skipWaiting() immédiat → activation sans attendre
@@ -12,15 +12,13 @@
  *      • Autres (fonts, images)     → Network First
  */
 
-const VERSION    = '__VERSION__'
-const GIT_SHA    = '__GIT_SHA__'
+const VERSION    = '1.0.10-pre-5'
+const GIT_SHA    = 'f01c9a4'
 const CACHE_NAME = `ydash-${VERSION}-${GIT_SHA}`
 
 /* ── Install ─────────────────────────────────────────────────────────────── */
 self.addEventListener('install', event => {
   console.log(`[SW] install ${CACHE_NAME}`)
-  // skipWaiting immédiat : le nouveau SW prend le contrôle dès qu'il est prêt
-  // Pas de précache de index.html — il sera mis en cache au premier fetch
   self.skipWaiting()
 })
 
@@ -48,7 +46,6 @@ self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Ignorer non-GET et hors-origine
   if (request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
 
@@ -58,7 +55,6 @@ self.addEventListener('fetch', event => {
   if (path.endsWith('/sw.js') || path.endsWith('/version.json')) return
 
   // Assets hashés Vite (contiennent un hash dans le nom) → Cache First
-  // Ex: /assets/index-bAoQ7yez.css, /assets/index-tesAGcla.js
   if (path.includes('/assets/') && /\.[a-z0-9]{8,}\.(js|css)$/i.test(path)) {
     event.respondWith(
       caches.match(request).then(cached => {
@@ -76,7 +72,6 @@ self.addEventListener('fetch', event => {
   }
 
   // TOUT LE RESTE (HTML, images, fonts…) → Network First
-  // C'est la clé : index.html est TOUJOURS servi depuis le réseau si dispo
   event.respondWith(
     fetch(request)
       .then(response => {
@@ -86,6 +81,6 @@ self.addEventListener('fetch', event => {
         }
         return response
       })
-      .catch(() => caches.match(request)) // Fallback hors-ligne
+      .catch(() => caches.match(request))
   )
 })

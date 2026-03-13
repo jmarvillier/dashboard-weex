@@ -6,7 +6,7 @@
     <title>Ydash — Dashboard</title>
 
     <!-- ── PWA ── -->
-    <link rel="manifest" href="/dashboard-weex/manifest.json" />
+    <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#e8b84b" />
     <meta name="mobile-web-app-capable" content="yes" />
 
@@ -14,14 +14,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Ydash" />
-    <link rel="apple-touch-icon" href="/dashboard-weex/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <meta name="apple-touch-fullscreen" content="yes" />
 
     <!-- ── Fonts & libs ── -->
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script type="module" crossorigin src="/dashboard-weex/assets/index-Dg_Jckuh.js"></script>
-    <link rel="stylesheet" crossorigin href="/dashboard-weex/assets/index-bAoQ7yez.css">
+    <script type="module" crossorigin src="/dashboard-weex/staging/assets/index-Dg_Jckuh.js"></script>
+    <link rel="stylesheet" crossorigin href="/dashboard-weex/staging/assets/index-bAoQ7yez.css">
   </head>
   <body>
     <div id="root"></div>
@@ -30,15 +30,22 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register(
-            '/dashboard-weex/sw.js',
-            {
-              scope: '/dashboard-weex/',
-              updateViaCache: 'none'   // le navigateur NE CACHE JAMAIS sw.js
-            }
-          )
+          // Détecte le base path dynamiquement depuis l'URL courante
+          // Fonctionne pour /dashboard-weex/ ET /dashboard-weex/staging/
+          var base = document.baseURI
+          if (!base) {
+            // Fallback : extrait le chemin jusqu'au dernier /
+            base = location.href.split('?')[0].split('#')[0]
+            if (!base.endsWith('/')) base = base.substring(0, base.lastIndexOf('/') + 1)
+          }
+          var swUrl = new URL('sw.js', base).href
+          var scope = new URL('./', base).href
+
+          navigator.serviceWorker.register(swUrl, {
+            scope: scope,
+            updateViaCache: 'none'
+          })
           .then(function (reg) {
-            // Force une vérification réseau du SW à chaque chargement de page
             reg.update()
             console.log('[SW] registered:', reg.scope)
           })
