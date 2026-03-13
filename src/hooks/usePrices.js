@@ -1,7 +1,3 @@
-/**
- * usePrices.js
- */
-
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchLivePrices } from '../lib/priceRepository.js'
 
@@ -12,7 +8,7 @@ export function usePrices(pairList) {
   const [pricesLoading, setPricesLoading] = useState(false)
   const [pricesError, setPricesError]     = useState(null)
   const [priceSource, setPriceSource]     = useState(null)
-  const [lastPriceUpdate, setLastPriceUpdate] = useState(null)
+  const [lastPriceUpdate, setLastPriceUpdate] = useState(null) // string HH:MM, pas un Date
   const timerRef = useRef(null)
 
   const refresh = useCallback(async (pairs) => {
@@ -25,7 +21,11 @@ export function usePrices(pairList) {
       setPrices(data || {})
       setPriceSource(source || 'error')
       if (data && Object.keys(data).length > 0) {
-        setLastPriceUpdate(new Date())
+        // Stocke une string fixe, pas un objet Date qui change à chaque render
+        const now = new Date()
+        setLastPriceUpdate(
+          now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        )
         setPricesError(null)
       } else {
         setPricesError('Aucun cours disponible')
@@ -46,7 +46,6 @@ export function usePrices(pairList) {
       clearInterval(timerRef.current)
       return
     }
-
     refresh(pairList)
     timerRef.current = setInterval(() => refresh(pairList), REFRESH_INTERVAL)
     return () => clearInterval(timerRef.current)
@@ -57,7 +56,7 @@ export function usePrices(pairList) {
     pricesLoading,
     pricesError,
     priceSource,
-    lastPriceUpdate,
+    lastPriceUpdate,  // string 'HH:MM' ou null
     refreshPrices: () => refresh(pairList),
   }
 }
