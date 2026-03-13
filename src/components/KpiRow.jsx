@@ -20,7 +20,7 @@ export default function KpiRow({ pairList, excluded, pricesLoading, pricesError,
   const sPnl   = sPnlR + sPnlL
 
   // PnL live
-  const hasLive = trading.some(p => p.pnl_latent_live !== null)
+  const hasLive = trading.some(p => p.pnl_latent_live != null)
   const sPnlRL  = hasLive ? trading.reduce((s, p) => s + (p.pnl_realise_live ?? p.pnl_realise), 0) : null
   const sPnlLL  = hasLive ? trading.reduce((s, p) => s + (p.pnl_latent_live  ?? 0), 0) : null
   const sPnlTL  = (sPnlRL !== null && sPnlLL !== null) ? sPnlRL + sPnlLL : null
@@ -33,16 +33,15 @@ export default function KpiRow({ pairList, excluded, pricesLoading, pricesError,
 
   const pctPnlR  = pct(sPnlR, sInv)
   const pctPnlL  = pct(sPnlL, sInv)
-  const pctPnl   = pct(sPnl, sInv)
+  const pctPnl   = pct(sPnl,  sInv)
   const pctPnlTL = sPnlTL !== null ? pct(sPnlTL, sInv) : null
 
+  // lastPriceUpdate est déjà une string 'HH:MM'
   const updateLabel = lastPriceUpdate ?? '—'
 
   const sourceLabel = pricesError
     ? '⚠️ Erreur'
-    : priceSource
-      ? priceSource
-      : 'chargement…'
+    : priceSource ?? 'chargement…'
 
   return (
     <div className="kpi-section">
@@ -114,9 +113,7 @@ export default function KpiRow({ pairList, excluded, pricesLoading, pricesError,
       <div className="kpi-live-bar">
         <div className="kpi-live-header">
           <span className={`live-dot${pricesLoading ? ' live-dot-loading' : ''}`}></span>
-          <span className="kpi-live-label">
-            COURS TEMPS RÉEL — {sourceLabel}
-          </span>
+          <span className="kpi-live-label">COURS TEMPS RÉEL — {sourceLabel}</span>
           <span className="kpi-live-update">
             {pricesLoading
               ? 'Mise à jour…'
