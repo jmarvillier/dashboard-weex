@@ -37,7 +37,7 @@ function isStandalone() {
 }
 
 /* ─── Composant ──────────────────────────────────────────────────────────── */
-export default function Topbar({ loadedAt, excluded, backToLanding }) {
+export default function Topbar({ loadedAt, excluded }) {
   const n = excluded.size
 
   const [btnMode, setBtnMode]       = useState(null)  // null | 'ios' | 'android' | 'update'
@@ -163,8 +163,6 @@ export default function Topbar({ loadedAt, excluded, backToLanding }) {
               >✕</button>
             </div>
           )}
-
-          <button className="btn-sm" onClick={backToLanding}>← Menu principal</button>
         </div>
       </div>
 
