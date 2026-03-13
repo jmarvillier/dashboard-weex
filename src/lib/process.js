@@ -1,11 +1,6 @@
 import { normPair, parseN, isExec, isAnnul, isUsdPair } from './parser.js'
 
-/**
- * Transforme les lignes brutes du journal en objets par paire
- * avec tous les calculs financiers (PnL réalisé, latent, positions…)
- */
 export function process(rows) {
-  // Trouve la ligne d'en-tête
   let start = 1
   for (let i = 0; i < Math.min(5, rows.length); i++) {
     if (rows[i].some(c => String(c).toUpperCase().includes('PAIRE'))) { start = i + 1; break }
@@ -27,8 +22,7 @@ export function process(rows) {
 
     if (!pair) return
 
-    // Colonne Dashboard (index 12) : si false → ligne exclue du calcul
-    const dash = r[12]
+    const dash    = r[12]
     const dashStr = String(dash).trim().toLowerCase()
     if (dash === false || dashStr === 'false' || dashStr === '0') return
 
@@ -53,7 +47,6 @@ export function process(rows) {
 
     const p = P[pair]
 
-    // ── Ligne DÉPÔT ──
     if (sens === 'Dépôt' || sens === 'Depot' || sens.toLowerCase().includes('dép') || sens.toLowerCase().includes('dep')) {
       p.is_depot = true
       if (isExec(stat)) {
@@ -87,14 +80,13 @@ export function process(rows) {
     }
   })
 
-  // ── Calculs dérivés ──
   Object.values(P).forEach(p => {
     p.position       = p.vol_achete - p.vol_vendu
     p.prix_moy       = p.vol_achete > 0 ? p.usdt_investi / p.vol_achete : 0
     p.prix_moy_vente = p.vol_vendu  > 0 ? p.usdt_recu    / p.vol_vendu  : 0
 
-    const cout_vendu    = p.prix_moy * p.vol_vendu
-    p.investi_en_cours  = Math.max(0, p.usdt_investi - cout_vendu)
+    const cout_vendu   = p.prix_moy * p.vol_vendu
+    p.investi_en_cours = Math.max(0, p.usdt_investi - cout_vendu)
 
     p.pnl_realise = p.vol_vendu > 0 && p.prix_moy > 0
       ? p.usdt_recu - cout_vendu
@@ -105,12 +97,38 @@ export function process(rows) {
       : 0
 
     p.pnl_total = p.pnl_realise + p.pnl_latent
+
+    // Champs live — initialisés à null
+    p.cours_live        = null
+    p.pnl_realise_live  = null
+    p.pnl_latent_live   = null
+    p.pnl_total_live    = null
   })
 
   return P
 }
 
-/** Retourne la liste triée des paires actives à partir de process() */
+export function enrichWithPrices(pairList, prices) {
+  return pairList.map(function(p) {
+    var coursLive = prices[p.name]
+
+    if (coursLive == null || p.is_depot || p.prix_moy <= 0) {
+      return Object.assign({}, p, { cours_live: coursLive != null ? coursLive : null })
+    }
+
+    var pnlRealiseLive = p.pnl_realise
+    var pnlLatentLive  = p.position > 0 ? p.position * (coursLive - p.prix_moy) : 0
+    var pnlTotalLive   = pnlRealiseLive + pnlLatentLive
+
+    return Object.assign({}, p, {
+      cours_live:       coursLive,
+      pnl_realise_live: pnlRealiseLive,
+      pnl_latent_live:  pnlLatentLive,
+      pnl_total_live:   pnlTotalLive,
+    })
+  })
+}
+
 export function buildPairList(P) {
   return Object.values(P)
     .filter(p => p.nb_exec > 0 || p.vol_achete > 0 || p.vol_vendu > 0)

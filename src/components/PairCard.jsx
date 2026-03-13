@@ -1,36 +1,44 @@
 /**
- * PairCard.jsx — Carte par paire avec PnL en % et layout amélioré
+ * PairCard.jsx
  */
 
 const fmt  = (v, d = 2) => isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const fmtV = v => {
   if (isNaN(+v)) return '—'
-  const n = +v; if (n === 0) return '0'
+  const n = +v
+  if (n === 0) return '0'
   const dec = n >= 1 ? 4 : n >= 0.01 ? 6 : 8
   return n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: dec })
 }
-const fmtS = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(n)) }
-const cc   = v => v > 0 ? 'g' : v < 0 ? 'r' : 'n'
-const pct  = (val, ref) => ref > 0 ? fmt(Math.abs(val / ref * 100), 1) + ' %' : null
+const fmtS    = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(n)) }
+const cc      = v => v > 0 ? 'g' : v < 0 ? 'r' : 'n'
 const pctSign = (val, ref) => {
-  if (ref <= 0) return null
-  const p = val / ref * 100
-  return (p >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(p), 1) + ' %'
+  if (!(ref > 0)) return null
+  const pp = val / ref * 100
+  return (pp >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(pp), 1) + ' %'
 }
 
 export default function PairCard({ p, excluded, onToggle, index }) {
   const isExcl = excluded.has(p.name)
-  const bc     = p.is_depot ? 'n' : cc(p.pnl_total)
   const sym    = p.name.split('/')[0]
 
-  // Taux d'exécution
-  const execRate = p.nb_total > 0 ? (p.nb_exec / p.nb_total * 100) : 0
+  // Utilise cours_live (nouveau nom) — jamais de variable libre
+  const coursLive    = p.cours_live        != null ? p.cours_live        : null
+  const pnlRLive     = p.pnl_realise_live  != null ? p.pnl_realise_live  : null
+  const pnlLLive     = p.pnl_latent_live   != null ? p.pnl_latent_live   : null
+  const pnlTLive     = p.pnl_total_live    != null ? p.pnl_total_live    : null
+  const hasLive      = pnlTLive != null
+
+  const badgePnl   = hasLive ? pnlTLive : p.pnl_total
+  const badgeRef   = p.usdt_investi
+  const badgeClass = p.is_depot ? 'n' : cc(badgePnl)
+  const execRate   = p.nb_total > 0 ? (p.nb_exec / p.nb_total * 100) : 0
 
   return (
     <div
       className={`pc${isExcl ? ' excluded' : ''}`}
-      id={`pc-${p.name.replace(/\//g,'_')}`}
-      style={{ animationDelay: `${index * .08}s` }}
+      id={`pc-${p.name.replace(/\//g, '_')}`}
+      style={{ animationDelay: `${index * 0.08}s` }}
     >
       {/* ── Header ── */}
       <div className="pc-head">
@@ -42,14 +50,21 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               : `${p.nb_exec} exéc · ${p.nb_annule} annulés`
             }
           </div>
+          {!p.is_depot && coursLive != null && (
+            <div className="pc-price-live">
+              <span className="live-dot live-dot-sm"></span>
+              <span>{fmt(coursLive)} USDT</span>
+            </div>
+          )}
         </div>
         <div className="pc-head-right">
           {!p.is_depot && (
-            <div className={`pc-pnl-badge ${bc}`}>
-              <span className="pc-pnl-usdt">{fmtS(p.pnl_total)} USDT</span>
-              {pctSign(p.pnl_total, p.usdt_investi) && (
-                <span className="pc-pnl-pct">{pctSign(p.pnl_total, p.usdt_investi)}</span>
+            <div className={`pc-pnl-badge ${badgeClass}`}>
+              <span className="pc-pnl-usdt">{fmtS(badgePnl)} USDT</span>
+              {pctSign(badgePnl, badgeRef) && (
+                <span className="pc-pnl-pct">{pctSign(badgePnl, badgeRef)}</span>
               )}
+              {hasLive && <span className="pc-pnl-source">live</span>}
             </div>
           )}
           {p.is_depot && (
@@ -82,15 +97,13 @@ export default function PairCard({ p, excluded, onToggle, index }) {
           </div>
         ) : (
           <>
-            {/* ── Métriques principales ── */}
+            {/* ── Métriques ── */}
             <div className="metrics-grid">
               <div className="m-cell">
                 <div className="ml">Investi</div>
                 <div className="mv o">{fmt(p.investi_en_cours)}</div>
                 <div className="mv-sub">
-                  {p.investi_en_cours !== p.usdt_investi
-                    ? `/ ${fmt(p.usdt_investi)} total`
-                    : 'USDT'}
+                  {p.investi_en_cours !== p.usdt_investi ? `/ ${fmt(p.usdt_investi)} total` : 'USDT'}
                 </div>
               </div>
               <div className="m-cell">
@@ -140,7 +153,10 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               </>}
             </div>
 
-            {/* ── PnL row avec % ── */}
+            {/* ── PnL Journal ── */}
+            <div className="pnl-section-label">
+              📒 PnL Journal <span className="pnl-section-hint">(dernier prix saisi)</span>
+            </div>
             <div className="pnl-row">
               {[
                 { l: 'PnL Réalisé', v: p.pnl_realise, ref: p.usdt_investi },
@@ -159,14 +175,46 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               ))}
             </div>
 
-            {/* ── Barre de stats ── */}
+            {/* ── PnL Live ── */}
+            <div className="pnl-section-label pnl-section-label-live">
+              <span className="live-dot live-dot-sm"></span>
+              PnL Live <span className="pnl-section-hint">(cours actuel)</span>
+              {coursLive != null && (
+                <span className="pnl-live-price">{fmt(coursLive)} USDT</span>
+              )}
+            </div>
+            <div className="pnl-row">
+              {[
+                { l: 'PnL Réalisé', v: pnlRLive, ref: p.usdt_investi },
+                { l: 'PnL Latent',  v: pnlLLive, ref: p.investi_en_cours },
+                { l: 'PnL Total',   v: pnlTLive, ref: p.usdt_investi, big: true },
+              ].map(({ l, v, ref, big }) => (
+                <div key={l} className={`pnl-box pnl-box-live ${v != null ? cc(v) : 'n'}`}>
+                  <div className="pnl-label">{l}</div>
+                  {v != null ? (
+                    <>
+                      <div className={`pnl-val ${cc(v)}${big ? ' pnl-val-big' : ''}`}>
+                        {fmtS(v)} <span className="pnl-unit">USDT</span>
+                      </div>
+                      {pctSign(v, ref) && (
+                        <div className={`pnl-pct ${cc(v)}`}>{pctSign(v, ref)}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="pnl-val pnl-val-pending">—</div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* ── Stats ── */}
             <div className="tbar">
               {[
-                { cls: 'tot', v: p.nb_total,  l: 'Total' },
-                { cls: 'exc', v: p.nb_exec,   l: 'Exec.' },
+                { cls: 'tot', v: p.nb_total,  l: 'Total'   },
+                { cls: 'exc', v: p.nb_exec,   l: 'Exec.'   },
                 { cls: 'can', v: p.nb_annule, l: 'Annulés' },
-                { cls: 'buy', v: p.nb_achat,  l: 'Achats' },
-                { cls: 'sel', v: p.nb_vente,  l: 'Ventes' },
+                { cls: 'buy', v: p.nb_achat,  l: 'Achats'  },
+                { cls: 'sel', v: p.nb_vente,  l: 'Ventes'  },
               ].map(({ cls, v, l }) => (
                 <div key={l} className={`tc ${cls}`}>
                   <span className="tn">{v}</span>

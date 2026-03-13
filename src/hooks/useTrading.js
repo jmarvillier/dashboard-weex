@@ -1,22 +1,12 @@
 /**
  * useTrading.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Hook principal de l'application.
- *
- * Architecture des sources de données :
- *   1. Charger depuis l'iPad  → parse → saveSnapshot() → ingest
- *   2. Charger depuis GSheets → parse → saveSnapshot() → ingest
- *   3. Ouvrir le dashboard    → loadSnapshot()         → ingest
- *
- * La source de vérité est IndexedDB (repository local gratuit).
  */
 
 import { useState, useCallback, useEffect } from 'react'
 import { parseCSV, isUsdPair } from '../lib/parser.js'
-import { process, buildPairList } from '../lib/process.js'
+import { process, buildPairList, enrichWithPrices } from '../lib/process.js'
 import { saveSnapshot, loadSnapshot, hasSnapshot, clearSnapshot } from '../lib/repository.js'
-
-// ── Fetcher CSV depuis un Google Sheet ID ────────────────────────────────────
+import { usePrices } from './usePrices.js'
 
 const SHEET_URLS = (id) => [
   `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
@@ -40,11 +30,9 @@ async function fetchCSV(id) {
   return { csv: null, err: lastErr }
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useTrading() {
   const [view, setView]               = useState('landing')
-  const [zone, setZone]               = useState(null)       // null | 'local' | 'drive'
+  const [zone, setZone]               = useState(null)
   const [loading, setLoading]         = useState(false)
   const [loadingTxt, setLoadingTxt]   = useState('')
   const [fileName, setFileName]       = useState('')
@@ -54,12 +42,25 @@ export function useTrading() {
   const [driveErr, setDriveErr]       = useState(null)
   const [repoAvailable, setRepoAvailable] = useState(false)
 
-  // Vérifie si des données existent au montage
+  // ── Prix live ─────────────────────────────────────────────────────────────
+  const {
+    prices,
+    pricesLoading,
+    pricesError,
+    priceSource,
+    lastPriceUpdate,
+    refreshPrices,
+  } = usePrices(view === 'dashboard' ? pairList : [])
+
+  // Quand les prix arrivent, enrichit la pairList avec les PnL live
+  useEffect(() => {
+    if (!prices || Object.keys(prices).length === 0) return
+    setPairList(prev => enrichWithPrices(prev, prices))
+  }, [prices])
+
   useEffect(() => {
     hasSnapshot().then(setRepoAvailable)
   }, [])
-
-  // ── Helpers ──────────────────────────────────────────────────────────────
 
   const startLoading = (txt) => { setLoadingTxt(txt); setLoading(true) }
   const stopLoading  = ()    => setLoading(false)
@@ -81,8 +82,6 @@ export function useTrading() {
     setRepoAvailable(true)
   }
 
-  // ── Action 1 : Ouvrir depuis le repository (IndexedDB) ───────────────────
-
   const openFromRepository = useCallback(async () => {
     startLoading('Chargement depuis le repository…')
     try {
@@ -98,8 +97,6 @@ export function useTrading() {
       alert('Erreur repository : ' + err.message)
     }
   }, [])
-
-  // ── Action 2 : Importer depuis un fichier local (iPad) ───────────────────
 
   const loadFromFile = useCallback((file) => {
     const reader = new FileReader()
@@ -130,8 +127,6 @@ export function useTrading() {
     }
     reader.readAsArrayBuffer(file)
   }, [])
-
-  // ── Action 3 : Importer depuis Google Sheets ─────────────────────────────
 
   const loadFromDrive = useCallback(async (rawUrl) => {
     const m  = rawUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/)
@@ -171,14 +166,10 @@ export function useTrading() {
     ingest(rows, 'Google Sheet')
   }, [])
 
-  // ── Rafraîchir l'état du repository (après ajout manuel d'une entrée) ──────
-
   const refreshRepoAvailable = useCallback(async () => {
     const available = await hasSnapshot()
     setRepoAvailable(available)
   }, [])
-
-  // ── Effacer le repository ─────────────────────────────────────────────────
 
   const clearRepository = useCallback(async () => {
     if (!window.confirm('Supprimer toutes les données sauvegardées ?')) return
@@ -187,8 +178,6 @@ export function useTrading() {
     backToLanding()
   }, [])
 
-  // ── Flag exclusion ────────────────────────────────────────────────────────
-
   const toggleFlag = useCallback((pairName) => {
     setExcluded((prev) => {
       const next = new Set(prev)
@@ -196,8 +185,6 @@ export function useTrading() {
       return next
     })
   }, [])
-
-  // ── Navigation ────────────────────────────────────────────────────────────
 
   const backToLanding = useCallback(() => {
     setView('landing')
@@ -211,6 +198,8 @@ export function useTrading() {
     view, zone, loading, loadingTxt,
     fileName, loadedAt, pairList, excluded, driveErr,
     repoAvailable,
+    // Prix live
+    prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
