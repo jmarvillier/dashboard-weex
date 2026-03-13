@@ -31,8 +31,6 @@ async function fetchCSV(id) {
 }
 
 export function useTrading() {
-  const [view, setView]               = useState('landing')
-  const [zone, setZone]               = useState(null)
   const [loading, setLoading]         = useState(false)
   const [loadingTxt, setLoadingTxt]   = useState('')
   const [fileName, setFileName]       = useState('')
@@ -50,7 +48,7 @@ export function useTrading() {
     priceSource,
     lastPriceUpdate,
     refreshPrices,
-  } = usePrices(view === 'dashboard' ? pairList : [])
+  } = usePrices(pairList)
 
   // Quand les prix arrivent, enrichit la pairList avec les PnL live
   useEffect(() => {
@@ -77,8 +75,6 @@ export function useTrading() {
         ? new Date(isoDate).toLocaleTimeString('fr-FR')
         : new Date().toLocaleTimeString('fr-FR')
     )
-    setView('dashboard')
-    setZone(null)
     setRepoAvailable(true)
   }
 
@@ -175,7 +171,9 @@ export function useTrading() {
     if (!window.confirm('Supprimer toutes les données sauvegardées ?')) return
     await clearSnapshot()
     setRepoAvailable(false)
-    backToLanding()
+    setPairList([])
+    setExcluded(new Set())
+    setDriveErr(null)
   }, [])
 
   const toggleFlag = useCallback((pairName) => {
@@ -186,27 +184,18 @@ export function useTrading() {
     })
   }, [])
 
-  const backToLanding = useCallback(() => {
-    setView('landing')
-    setZone(null)
-    setPairList([])
-    setExcluded(new Set())
-    setDriveErr(null)
-  }, [])
-
   return {
-    view, zone, loading, loadingTxt,
+    loading, loadingTxt,
     fileName, loadedAt, pairList, excluded, driveErr,
     repoAvailable,
     // Prix live
     prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
-    setZone, setDriveErr,
+    setDriveErr,
     openFromRepository,
     loadFromFile,
     loadFromDrive,
     clearRepository,
     refreshRepoAvailable,
     toggleFlag,
-    backToLanding,
   }
 }
