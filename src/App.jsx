@@ -16,21 +16,15 @@ export default function App() {
     return unsub
   }, [])
 
-  // Rechargement automatique quand le nouveau SW est activé
+  // Reload unique quand un nouveau SW prend le contrôle
   useEffect(() => {
-    const handler = (e) => {
-      if (e.data?.type === 'SW_ACTIVATED') {
-        console.log('[App] Nouveau SW actif, rechargement…')
-        window.location.reload()
-      }
+    let reloading = false
+    const handler = () => {
+      if (reloading) return
+      reloading = true
+      console.log('[App] Nouveau SW actif → reload')
+      window.location.reload()
     }
-    navigator.serviceWorker?.addEventListener('message', handler)
-    return () => navigator.serviceWorker?.removeEventListener('message', handler)
-  }, [])
-
-  // Reload automatique quand un nouveau SW prend le contrôle
-  useEffect(() => {
-    const handler = () => window.location.reload()
     navigator.serviceWorker?.addEventListener('controllerchange', handler)
     return () => navigator.serviceWorker?.removeEventListener('controllerchange', handler)
   }, [])
@@ -62,7 +56,6 @@ export default function App() {
   return (
     <>
       <LoadingOverlay visible={loading} text={loadingTxt} />
-
       <AppShell
         activePage={activePage}
         setActivePage={setActivePage}
@@ -72,7 +65,7 @@ export default function App() {
         pairList={pairList}
         repoAvailable={repoAvailable}
         clearRepository={clearRepository}
-        backToLanding={() => {}}   // no-op, plus d'écran landing
+        backToLanding={() => {}}
         toggleFlag={toggleFlag}
         loadFromFile={loadFromFile}
         loadFromDrive={loadFromDrive}
@@ -85,7 +78,6 @@ export default function App() {
         lastPriceUpdate={lastPriceUpdate}
         refreshPrices={refreshPrices}
       />
-
       <InstallPrompt />
     </>
   )
