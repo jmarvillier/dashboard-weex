@@ -40,7 +40,7 @@ function isStandalone() {
 export default function Topbar({ excluded }) {
   const n = excluded.size
 
-  const [btnMode, setBtnMode]       = useState(null)  // null | 'ios' | 'android' | 'update'
+  const [btnMode, setBtnMode]       = useState(null)
   const [showIosGuide, setShowIos]  = useState(false)
   const deferredPrompt              = useRef(null)
   const pendingSW                   = useRef(null)
@@ -61,12 +61,10 @@ export default function Topbar({ excluded }) {
 
   /* ── Détection iOS + SW updates ── */
   useEffect(() => {
-    // iOS install
     if (isIosSafari() && !localStorage.getItem(KEY_DISMISSED)) {
       setBtnMode('ios')
     }
 
-    // Surveillance SW
     if (!('serviceWorker' in navigator)) return
     navigator.serviceWorker.ready.then(reg => {
       const onWaiting = (sw) => {
@@ -143,7 +141,6 @@ export default function Topbar({ excluded }) {
               {n} paire{n > 1 ? 's' : ''} exclue{n > 1 ? 's' : ''}
             </span>
           )}
-
           {btnMode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button
@@ -163,7 +160,6 @@ export default function Topbar({ excluded }) {
         </div>
       </div>
 
-      {/* Guide iOS inline */}
       {showIosGuide && btnMode === 'ios' && (
         <div className="ios-guide-bar">
           <span>1. <strong>⎋ Partager</strong></span>
