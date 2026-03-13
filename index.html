@@ -24,47 +24,25 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-
+    
     <!-- ── Service Worker ── -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', async () => {
-          try {
-            const reg = await navigator.serviceWorker.register(
-              '/dashboard-weex/sw.js',
-              { scope: '/dashboard-weex/', updateViaCache: 'none' }
-            )
-            // Vérifie une MAJ à chaque chargement
-            reg.update()
-
-            // Si un nouveau SW attend déjà → l'activer immédiatement
-            if (reg.waiting) {
-              reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register(
+            '/dashboard-weex/sw.js',
+            {
+              scope: '/dashboard-weex/',
+              updateViaCache: 'none'    // sw.js jamais servi depuis le cache HTTP
             }
-
-            // Si un nouveau SW s'installe pendant la session → l'activer dès qu'il est prêt
-            reg.addEventListener('updatefound', () => {
-              const newSW = reg.installing
-              if (!newSW) return
-              newSW.addEventListener('statechange', () => {
-                if (newSW.state === 'installed') {
-                  newSW.postMessage({ type: 'SKIP_WAITING' })
-                }
-              })
-            })
-
-            console.log('[SW] Registered:', reg.scope)
-          } catch (err) {
-            console.warn('[SW] Registration failed:', err)
-          }
-        })
-
-        // Quand le SW prend le contrôle → recharger la page pour servir les nouveaux assets
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          console.log('[SW] Controller changé → reload')
-          window.location.reload()
+          )
+          .then(reg => {
+            reg.update()               // vérifie une MAJ à chaque chargement
+            console.log('[SW] enregistré :', reg.scope)
+          })
+          .catch(err => console.warn('[SW] échec :', err))
         })
       }
-    </script>
+    </script>   
 </body>
 </html>
