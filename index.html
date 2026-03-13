@@ -20,30 +20,33 @@
     <!-- ── Fonts & libs ── -->
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script type="module" crossorigin src="/dashboard-weex/staging/assets/index-CHsRPoeq.js"></script>
-    <link rel="stylesheet" crossorigin href="/dashboard-weex/staging/assets/index-bAoQ7yez.css">
+    <script type="module" crossorigin src="/dashboard-weex/assets/index-Dg_Jckuh.js"></script>
+    <link rel="stylesheet" crossorigin href="/dashboard-weex/assets/index-bAoQ7yez.css">
   </head>
   <body>
     <div id="root"></div>
-    
+
     <!-- ── Service Worker ── -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
+        window.addEventListener('load', function () {
           navigator.serviceWorker.register(
             '/dashboard-weex/sw.js',
             {
               scope: '/dashboard-weex/',
-              updateViaCache: 'none'    // sw.js jamais servi depuis le cache HTTP
+              updateViaCache: 'none'   // le navigateur NE CACHE JAMAIS sw.js
             }
           )
-          .then(reg => {
-            reg.update()               // vérifie une MAJ à chaque chargement
-            console.log('[SW] enregistré :', reg.scope)
+          .then(function (reg) {
+            // Force une vérification réseau du SW à chaque chargement de page
+            reg.update()
+            console.log('[SW] registered:', reg.scope)
           })
-          .catch(err => console.warn('[SW] échec :', err))
+          .catch(function (err) {
+            console.warn('[SW] registration failed:', err)
+          })
         })
       }
-    </script>   
-</body>
+    </script>
+  </body>
 </html>
