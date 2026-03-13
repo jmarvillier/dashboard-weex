@@ -1,32 +1,25 @@
-import { useState, useEffect }       from 'react'
-import { useTrading }                 from './hooks/useTrading.js'
-import LoadingOverlay                 from './components/LoadingOverlay.jsx'
-import AppShell                       from './components/AppShell.jsx'
-import InstallPrompt                  from './components/InstallPrompt.jsx'
-import AuthGate                       from './components/AuthGate.jsx'
-import { auth, onAuthStateChanged }   from './lib/firebase.js'
+import { useState, useEffect }        from 'react'
+import { useTrading }                  from './hooks/useTrading.js'
+import { checkAndRefreshVersion }      from './hooks/useVersionCheck.js'
+import LoadingOverlay                  from './components/LoadingOverlay.jsx'
+import AppShell                        from './components/AppShell.jsx'
+import InstallPrompt                   from './components/InstallPrompt.jsx'
+import AuthGate                        from './components/AuthGate.jsx'
+import { auth, onAuthStateChanged }    from './lib/firebase.js'
 
 export default function App() {
   const [authUser, setAuthUser] = useState(undefined)
+
+  // Vérification de version au tout premier rendu
+  useEffect(() => {
+    checkAndRefreshVersion()
+  }, [])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, user => {
       setAuthUser(user ?? null)
     })
     return unsub
-  }, [])
-
-  // Reload unique quand un nouveau SW prend le contrôle
-  useEffect(() => {
-    let reloading = false
-    const handler = () => {
-      if (reloading) return
-      reloading = true
-      console.log('[App] Nouveau SW actif → reload')
-      window.location.reload()
-    }
-    navigator.serviceWorker?.addEventListener('controllerchange', handler)
-    return () => navigator.serviceWorker?.removeEventListener('controllerchange', handler)
   }, [])
 
   const {
@@ -45,7 +38,6 @@ export default function App() {
 
   const [activePage, setActivePage] = useState('dashboard')
 
-  // Dès que l'utilisateur est authentifié, on charge les données depuis le repo
   useEffect(() => {
     if (authUser) openFromRepository()
   }, [authUser])
