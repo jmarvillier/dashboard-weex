@@ -1,34 +1,39 @@
 /**
  * sw.js — Service Worker Ydash
- * 1.0.10-pre-5 et 12be218 sont remplacés par vite.config.js au build.
+ * 1.0.10-pre-5 et 112eb92 sont injectés par vite.config.js au build.
  *
  * Stratégie :
- *  - Cache nommé par version+sha → purge automatique à chaque déploiement
- *  - Install  : précache les assets + skipWaiting immédiat
- *  - Activate : purge tous les anciens caches + claim
- *  - Fetch    : Network First sur index.html, Cache First sur assets hashés
- *  - Message  : SKIP_WAITING → activation immédiate
+ *  - skipWaiting() immédiat dans install → activation sans attendre
+ *  - clients.claim() dans activate → contrôle immédiat de tous les onglets
+ *  - index.html : Network First → toujours la page la plus récente
+ *  - assets JS/CSS (noms hashés) : Cache First → performance
+ *  - sw.js / version.json : jamais interceptés → toujours réseau
  */
 
 const VERSION    = '1.0.10-pre-5'
-const GIT_SHA    = '12be218'
-const CACHE_NAME = `weex-${VERSION}-${GIT_SHA}`
+const GIT_SHA    = '112eb92'
+const CACHE_NAME = `ydash-${VERSION}-${GIT_SHA}`
 
-const PRECACHE_URLS = ['./', './index.html', './manifest.json', './version.json']
+const PRECACHE = [
+  './',
+  './index.html',
+  './manifest.json',
+  './version.json',
+]
 
-/* ── Install ──────────────────────────────────────────────────────────────── */
+/* ── Install : précache + activation immédiate ────────────────────────────── */
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(cache => cache.addAll(PRECACHE))
       .then(() => {
-        console.log(`[SW] Installed ${CACHE_NAME}`)
-        return self.skipWaiting() // Activation immédiate, sans attendre
+        console.log(`[SW] install ${CACHE_NAME}`)
+        self.skipWaiting()          // ← clé : pas besoin de message SKIP_WAITING
       })
   )
 })
 
-/* ── Activate ─────────────────────────────────────────────────────────────── */
+/* ── Activate : purge anciens caches + prise de contrôle immédiate ────────── */
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
@@ -36,20 +41,15 @@ self.addEventListener('activate', event => {
         keys
           .filter(k => k !== CACHE_NAME)
           .map(k => {
-            console.log(`[SW] Suppression cache obsolète : ${k}`)
+            console.log(`[SW] purge : ${k}`)
             return caches.delete(k)
           })
       ))
-      .then(() => self.clients.claim()) // Prend le contrôle de tous les onglets ouverts
-      .then(() => console.log(`[SW] Actif : ${CACHE_NAME}`))
+      .then(() => {
+        console.log(`[SW] activate ${CACHE_NAME}`)
+        return self.clients.claim()  // ← prend le contrôle sans attendre de reload
+      })
   )
-})
-
-/* ── Message ──────────────────────────────────────────────────────────────── */
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting()
-  }
 })
 
 /* ── Fetch ────────────────────────────────────────────────────────────────── */
@@ -57,38 +57,36 @@ self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
+  // Ignorer les requêtes non-GET et hors-origine
   if (request.method !== 'GET') return
-  if (url.origin !== location.origin) return
+  if (url.origin !== self.location.origin) return
 
-  // version.json et sw.js → toujours réseau, jamais en cache
-  if (url.pathname.endsWith('version.json') || url.pathname.endsWith('sw.js')) {
-    event.respondWith(fetch(request))
-    return
-  }
+  // sw.js et version.json → toujours réseau, jamais intercepté
+  const path = url.pathname
+  if (path.endsWith('/sw.js') || path.endsWith('/version.json')) return
 
-  // index.html → Network First : la page fraîche en priorité, cache en fallback offline
-  if (url.pathname === '/dashboard-weex/' ||
-      url.pathname === '/dashboard-weex/index.html' ||
-      url.pathname.endsWith('/')) {
+  // index.html → Network First
+  // Garantit que la dernière version est servie quand on est en ligne
+  if (path.endsWith('/') || path.endsWith('/index.html')) {
     event.respondWith(
       fetch(request)
         .then(response => {
           const clone = response.clone()
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
+          caches.open(CACHE_NAME).then(c => c.put(request, clone))
           return response
         })
-        .catch(() => caches.match(request)) // fallback offline
+        .catch(() => caches.match(request))   // fallback hors-ligne
     )
     return
   }
 
-  // Assets JS/CSS/images (noms hashés par Vite) → Cache First
+  // Tout le reste (assets JS/CSS/images avec hash Vite) → Cache First
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached
       return fetch(request).then(response => {
         if (response?.status === 200 && response.type === 'basic') {
-          caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()))
+          caches.open(CACHE_NAME).then(c => c.put(request, response.clone()))
         }
         return response
       })
