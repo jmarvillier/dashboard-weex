@@ -1,41 +1,21 @@
 /**
  * InstallPrompt.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Gère deux cas distincts :
- *
- *  1. INSTALLATION INITIALE
- *     - iOS/iPadOS Safari  → détection UA corrigée (iPad 13+ = "Macintosh")
- *     - Android / Chrome   → prompt natif beforeinstallprompt
- *     - Dismissable définitivement (localStorage)
- *
- *  2. MISE À JOUR DISPONIBLE
- *     - Détectée via l'événement SW "updatefound" (nouveau SW en attente)
- *     - Un bouton "Mettre à jour" envoie SKIP_WAITING au SW → reload propre
- *     - PAS de désinstallation/réinstallation nécessaire
- *     - Ré-affiché à chaque nouvelle version même si dismissé avant
+ * Gère l'installation PWA uniquement (iOS et Android).
+ * La gestion des mises à jour SW est déléguée au SW lui-même
+ * (skipWaiting automatique dans install) + reload sur controllerchange.
  */
 
 import { useState, useEffect, useRef } from 'react'
 
 /* ─── Clés localStorage ──────────────────────────────────────────────────── */
-const KEY_DISMISSED         = 'ydash-install-dismissed'
-const KEY_UPDATE_DISMISSED  = 'ydash-update-dismissed-sha'
-
-/* ─── Version courante (injectée par Vite) ───────────────────────────────── */
-export const CURRENT_VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
+const KEY_DISMISSED = 'ydash-install-dismissed'
 
 /* ─── Helpers détection plateforme ──────────────────────────────────────── */
-
-/**
- * iOS 13+ sur iPad : le UA contient "Macintosh" et non "iPad".
- * On doit aussi vérifier maxTouchPoints pour distinguer iPad de Mac.
- */
 function isIosDevice() {
   const ua = navigator.userAgent
-  const classicIos = /iphone|ipad|ipod/i.test(ua)
-  // iPad 13+ se présente comme "Macintosh" mais avec touch
-  const modernIpad = /macintosh/i.test(ua) && navigator.maxTouchPoints > 1
-  return classicIos || modernIpad
+  return /iphone|ipad|ipod/i.test(ua) ||
+    (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
 }
 
 function isIosSafari() {
@@ -53,14 +33,10 @@ function isStandalone() {
 }
 
 /* ─── Composant ──────────────────────────────────────────────────────────── */
-
 export default function InstallPrompt() {
-  // 'install-ios' | 'install-android' | 'update' | null
-  const [mode, setMode]               = useState(null)
-  const [pendingSW, setPendingSW]     = useState(null)   // registration du SW en attente
-  const [newSWsha, setNewSWsha]       = useState(null)   // SHA du nouveau SW (pour dédoublonner dismiss)
-  const deferredPrompt                = useRef(null)
-  const swReg                         = useRef(null)
+  // 'install-ios' | 'install-android' | null
+  const [mode, setMode]     = useState(null)
+  const deferredPrompt      = useRef(null)
 
   /* ── Capture le prompt natif Android ── */
   useEffect(() => {
@@ -85,70 +61,23 @@ export default function InstallPrompt() {
     return () => clearTimeout(t)
   }, [])
 
-  /* ── Écoute les mises à jour SW ── */
+  /* ── Reload automatique quand un nouveau SW prend le contrôle ── */
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
-
-    navigator.serviceWorker.ready.then(reg => {
-      swReg.current = reg
-
-      const checkWaiting = (waiting) => {
-        if (!waiting) return
-        // Récupère le SHA du nouveau SW via un message (ou fallback Date.now)
-        const sha = waiting._sha ?? String(Date.now())
-        const dismissedSha = localStorage.getItem(KEY_UPDATE_DISMISSED)
-        if (sha !== dismissedSha) {
-          setPendingSW(waiting)
-          setNewSWsha(sha)
-          setMode('update')
-        }
-      }
-
-      // SW déjà en attente au chargement
-      if (reg.waiting) checkWaiting(reg.waiting)
-
-      // Nouveau SW qui s'installe après le chargement
-      reg.addEventListener('updatefound', () => {
-        const installing = reg.installing
-        if (!installing) return
-        installing.addEventListener('statechange', () => {
-          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-            checkWaiting(installing)
-          }
-        })
-      })
-    })
-
-    // Quand le SW s'active (après skipWaiting), recharge la page
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload()
-    })
-
-    // Écoute SW_ACTIVATED pour confirmation
-    navigator.serviceWorker.addEventListener('message', event => {
-      if (event.data?.type === 'SW_ACTIVATED') {
-        console.log('[App] SW activé :', event.data.version)
-      }
-    })
-  }, [])
-
-  /* ── Appliquer la mise à jour ── */
-  function applyUpdate() {
-    const sw = pendingSW || swReg.current?.waiting
-    if (sw) {
-      sw.postMessage({ type: 'SKIP_WAITING' })
-    } else {
+    let reloading = false
+    const handler = () => {
+      if (reloading) return
+      reloading = true
+      console.log('[SW] controllerchange → reload')
       window.location.reload()
     }
-  }
+    navigator.serviceWorker.addEventListener('controllerchange', handler)
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', handler)
+  }, [])
 
   /* ── Dismiss ── */
   function dismiss() {
-    if (mode === 'update') {
-      if (newSWsha) localStorage.setItem(KEY_UPDATE_DISMISSED, newSWsha)
-    } else {
-      localStorage.setItem(KEY_DISMISSED, '1')
-    }
+    localStorage.setItem(KEY_DISMISSED, '1')
     setMode(null)
   }
 
@@ -159,38 +88,16 @@ export default function InstallPrompt() {
     const { outcome } = await deferredPrompt.current.userChoice
     deferredPrompt.current = null
     if (outcome === 'accepted') {
-      setMode(null)
       localStorage.setItem(KEY_DISMISSED, '1')
-    } else {
-      dismiss()
     }
+    setMode(null)
   }
 
   if (!mode) return null
 
   return (
-    <div className={`install-prompt${mode === 'update' ? ' install-prompt--update' : ''}`}>
+    <div className="install-prompt">
       <button className="install-close" onClick={dismiss} aria-label="Fermer">✕</button>
-
-      {/* ── Mise à jour disponible ── */}
-      {mode === 'update' && (
-        <>
-          <div className="install-header">
-            <span className="install-icon">🔄</span>
-            <div>
-              <div className="install-title">Mise à jour disponible</div>
-              <div className="install-sub">Une nouvelle version est prête à être installée</div>
-            </div>
-          </div>
-          <div className="install-why" style={{ marginBottom: 12 }}>
-            Applique la mise à jour maintenant sans perdre tes données.<br />
-            L'app se rechargera automatiquement.
-          </div>
-          <button className="install-cta install-cta--update" onClick={applyUpdate}>
-            🔄 Mettre à jour maintenant
-          </button>
-        </>
-      )}
 
       {/* ── Installation iOS/iPadOS ── */}
       {mode === 'install-ios' && (
