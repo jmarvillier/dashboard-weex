@@ -172,9 +172,6 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
           ))}
         </nav>
         <div className="sidebar-footer">
-          <button className="sidebar-back-btn" onClick={backToLanding}>
-            <span>←</span><span>Accueil</span>
-          </button>
           <button className="sidebar-back-btn sidebar-signout-btn" onClick={handleSignOut}>
             <span>⎋</span><span>Déconnexion</span>
           </button>
