@@ -36,9 +36,7 @@ export default function KpiRow({ pairList, excluded, pricesLoading, pricesError,
   const pctPnl   = pct(sPnl, sInv)
   const pctPnlTL = sPnlTL !== null ? pct(sPnlTL, sInv) : null
 
-  const updateLabel = lastPriceUpdate
-    ? lastPriceUpdate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    : '—'
+  const updateLabel = lastPriceUpdate ?? '—'
 
   const sourceLabel = pricesError
     ? '⚠️ Erreur'
