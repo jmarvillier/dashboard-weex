@@ -37,7 +37,7 @@ function isStandalone() {
 }
 
 /* ─── Composant ──────────────────────────────────────────────────────────── */
-export default function Topbar({ loadedAt, excluded }) {
+export default function Topbar({ excluded }) {
   const n = excluded.size
 
   const [btnMode, setBtnMode]       = useState(null)  // null | 'ios' | 'android' | 'update'
@@ -138,9 +138,6 @@ export default function Topbar({ loadedAt, excluded }) {
         </div>
         <div className="topbar-actions">
           <div className="live-dot" />
-          <span style={{ fontSize: '.58rem', color: 'var(--text2)' }}>
-            {loadedAt ? `Chargé à ${loadedAt}` : ''}
-          </span>
           {n > 0 && (
             <span className="excl-counter visible">
               {n} paire{n > 1 ? 's' : ''} exclue{n > 1 ? 's' : ''}
