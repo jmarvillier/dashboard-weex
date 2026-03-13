@@ -135,7 +135,6 @@ export default function Topbar({ excluded }) {
           <Logo small />
         </div>
         <div className="topbar-actions">
-          <div className="live-dot" />
           {n > 0 && (
             <span className="excl-counter visible">
               {n} paire{n > 1 ? 's' : ''} exclue{n > 1 ? 's' : ''}
