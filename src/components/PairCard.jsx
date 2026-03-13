@@ -1,38 +1,44 @@
 /**
- * PairCard.jsx — Carte par paire avec PnL journal + PnL live
+ * PairCard.jsx
  */
 
 const fmt  = (v, d = 2) => isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const fmtV = v => {
   if (isNaN(+v)) return '—'
-  const n = +v; if (n === 0) return '0'
+  const n = +v
+  if (n === 0) return '0'
   const dec = n >= 1 ? 4 : n >= 0.01 ? 6 : 8
   return n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: dec })
 }
-const fmtS = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(n)) }
-const cc   = v => v > 0 ? 'g' : v < 0 ? 'r' : 'n'
+const fmtS    = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(n)) }
+const cc      = v => v > 0 ? 'g' : v < 0 ? 'r' : 'n'
 const pctSign = (val, ref) => {
-  if (ref <= 0) return null
-  const p = val / ref * 100
-  return (p >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(p), 1) + ' %'
+  if (!(ref > 0)) return null
+  const pp = val / ref * 100
+  return (pp >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(pp), 1) + ' %'
 }
 
 export default function PairCard({ p, excluded, onToggle, index }) {
   const isExcl = excluded.has(p.name)
   const sym    = p.name.split('/')[0]
 
-  const hasLive   = p.pnl_latent_live !== null && p.pnl_latent_live !== undefined
-  const badgePnl  = hasLive ? p.pnl_total_live : p.pnl_total
-  const badgeRef  = p.usdt_investi
-  const badgeClass = p.is_depot ? 'n' : cc(badgePnl)
+  // Utilise cours_live (nouveau nom) — jamais de variable libre
+  const coursLive    = p.cours_live        != null ? p.cours_live        : null
+  const pnlRLive     = p.pnl_realise_live  != null ? p.pnl_realise_live  : null
+  const pnlLLive     = p.pnl_latent_live   != null ? p.pnl_latent_live   : null
+  const pnlTLive     = p.pnl_total_live    != null ? p.pnl_total_live    : null
+  const hasLive      = pnlTLive != null
 
-  const execRate = p.nb_total > 0 ? (p.nb_exec / p.nb_total * 100) : 0
+  const badgePnl   = hasLive ? pnlTLive : p.pnl_total
+  const badgeRef   = p.usdt_investi
+  const badgeClass = p.is_depot ? 'n' : cc(badgePnl)
+  const execRate   = p.nb_total > 0 ? (p.nb_exec / p.nb_total * 100) : 0
 
   return (
     <div
       className={`pc${isExcl ? ' excluded' : ''}`}
-      id={`pc-${p.name.replace(/\//g,'_')}`}
-      style={{ animationDelay: `${index * .08}s` }}
+      id={`pc-${p.name.replace(/\//g, '_')}`}
+      style={{ animationDelay: `${index * 0.08}s` }}
     >
       {/* ── Header ── */}
       <div className="pc-head">
@@ -44,11 +50,10 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               : `${p.nb_exec} exéc · ${p.nb_annule} annulés`
             }
           </div>
-          {/* Prix live sous le nom */}
-          {!p.is_depot && p.prix_live && (
+          {!p.is_depot && coursLive != null && (
             <div className="pc-price-live">
               <span className="live-dot live-dot-sm"></span>
-              <span>{fmt(p.prix_live)} USDT</span>
+              <span>{fmt(coursLive)} USDT</span>
             </div>
           )}
         </div>
@@ -92,15 +97,13 @@ export default function PairCard({ p, excluded, onToggle, index }) {
           </div>
         ) : (
           <>
-            {/* ── Métriques principales ── */}
+            {/* ── Métriques ── */}
             <div className="metrics-grid">
               <div className="m-cell">
                 <div className="ml">Investi</div>
                 <div className="mv o">{fmt(p.investi_en_cours)}</div>
                 <div className="mv-sub">
-                  {p.investi_en_cours !== p.usdt_investi
-                    ? `/ ${fmt(p.usdt_investi)} total`
-                    : 'USDT'}
+                  {p.investi_en_cours !== p.usdt_investi ? `/ ${fmt(p.usdt_investi)} total` : 'USDT'}
                 </div>
               </div>
               <div className="m-cell">
@@ -156,9 +159,9 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             </div>
             <div className="pnl-row">
               {[
-                { l: 'PnL Réalisé', v: p.pnl_realise,  ref: p.usdt_investi },
-                { l: 'PnL Latent',  v: p.pnl_latent,   ref: p.investi_en_cours },
-                { l: 'PnL Total',   v: p.pnl_total,    ref: p.usdt_investi, big: true },
+                { l: 'PnL Réalisé', v: p.pnl_realise, ref: p.usdt_investi },
+                { l: 'PnL Latent',  v: p.pnl_latent,  ref: p.investi_en_cours },
+                { l: 'PnL Total',   v: p.pnl_total,   ref: p.usdt_investi, big: true },
               ].map(({ l, v, ref, big }) => (
                 <div key={l} className={`pnl-box ${cc(v)}`}>
                   <div className="pnl-label">{l}</div>
@@ -176,15 +179,15 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             <div className="pnl-section-label pnl-section-label-live">
               <span className="live-dot live-dot-sm"></span>
               PnL Live <span className="pnl-section-hint">(cours actuel)</span>
-              {p.prix_live != null && (
-                <span className="pnl-live-price">{fmt(p.prix_live)} USDT</span>
+              {coursLive != null && (
+                <span className="pnl-live-price">{fmt(coursLive)} USDT</span>
               )}
             </div>
             <div className="pnl-row">
               {[
-                { l: 'PnL Réalisé', v: p.pnl_realise_live, ref: p.usdt_investi },
-                { l: 'PnL Latent',  v: p.pnl_latent_live,  ref: p.investi_en_cours },
-                { l: 'PnL Total',   v: p.pnl_total_live,   ref: p.usdt_investi, big: true },
+                { l: 'PnL Réalisé', v: pnlRLive, ref: p.usdt_investi },
+                { l: 'PnL Latent',  v: pnlLLive, ref: p.investi_en_cours },
+                { l: 'PnL Total',   v: pnlTLive, ref: p.usdt_investi, big: true },
               ].map(({ l, v, ref, big }) => (
                 <div key={l} className={`pnl-box pnl-box-live ${v != null ? cc(v) : 'n'}`}>
                   <div className="pnl-label">{l}</div>
@@ -204,7 +207,7 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               ))}
             </div>
 
-            {/* ── Barre de stats ── */}
+            {/* ── Stats ── */}
             <div className="tbar">
               {[
                 { cls: 'tot', v: p.nb_total,  l: 'Total'   },
