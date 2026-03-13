@@ -28,6 +28,13 @@ export default function App() {
     return () => navigator.serviceWorker?.removeEventListener('message', handler)
   }, [])
 
+  // Reload automatique quand un nouveau SW prend le contrôle
+  useEffect(() => {
+    const handler = () => window.location.reload()
+    navigator.serviceWorker?.addEventListener('controllerchange', handler)
+    return () => navigator.serviceWorker?.removeEventListener('controllerchange', handler)
+  }, [])
+
   const {
     loading, loadingTxt,
     fileName, loadedAt, pairList, excluded, driveErr,
