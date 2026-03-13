@@ -24,25 +24,28 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    
+
     <!-- ── Service Worker ── -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
+        window.addEventListener('load', function () {
           navigator.serviceWorker.register(
             '/dashboard-weex/sw.js',
             {
               scope: '/dashboard-weex/',
-              updateViaCache: 'none'    // sw.js jamais servi depuis le cache HTTP
+              updateViaCache: 'none'   // le navigateur NE CACHE JAMAIS sw.js
             }
           )
-          .then(reg => {
-            reg.update()               // vérifie une MAJ à chaque chargement
-            console.log('[SW] enregistré :', reg.scope)
+          .then(function (reg) {
+            // Force une vérification réseau du SW à chaque chargement de page
+            reg.update()
+            console.log('[SW] registered:', reg.scope)
           })
-          .catch(err => console.warn('[SW] échec :', err))
+          .catch(function (err) {
+            console.warn('[SW] registration failed:', err)
+          })
         })
       }
-    </script>   
-</body>
+    </script>
+  </body>
 </html>

@@ -19,122 +19,22 @@ const NAV_ITEMS = [
 function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   const pageItem = NAV_ITEMS.find(i => i.id === activePage)
 
-  const [btnMode, setBtnMode]      = useState(null)
-  const [showIosGuide, setShowIos] = useState(false)
-  const deferredPrompt             = useRef(null)
-  const pendingSW                  = useRef(null)
-  const newSWsha                   = useRef(null)
-
-  function isIosDevice() {
-    const ua = navigator.userAgent
-    return /iphone|ipad|ipod/i.test(ua) ||
-      (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
-  }
-  function isIosSafari() {
-    const ua = navigator.userAgent
-    return isIosDevice() && /safari/i.test(ua) && !/chrome|crios|fxios|android/i.test(ua) && window.navigator.standalone !== true
-  }
-  function isStandalone() {
-    return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches
-  }
-
-  useEffect(() => {
-    const handler = e => {
-      e.preventDefault()
-      deferredPrompt.current = e
-      if (!isStandalone() && !localStorage.getItem('ydash-install-dismissed')) setBtnMode('android')
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  useEffect(() => {
-    if (isIosSafari() && !localStorage.getItem('ydash-install-dismissed')) setBtnMode('ios')
-    if (!('serviceWorker' in navigator)) return
-    navigator.serviceWorker.ready.then(reg => {
-      const onWaiting = sw => {
-        const sha = String(Date.now())
-        newSWsha.current = sha
-        if (localStorage.getItem('ydash-update-dismissed-sha') !== sha) {
-          pendingSW.current = sw
-          setBtnMode('update')
-        }
-      }
-      if (reg.waiting) onWaiting(reg.waiting)
-      reg.addEventListener('updatefound', () => {
-        const inst = reg.installing
-        if (!inst) return
-        inst.addEventListener('statechange', () => {
-          if (inst.state === 'installed' && navigator.serviceWorker.controller) onWaiting(inst)
-        })
-      })
-    })
-    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload())
-  }, [])
-
-  async function handleBtn() {
-    if (btnMode === 'ios') { setShowIos(v => !v); return }
-    if (btnMode === 'android' && deferredPrompt.current) {
-      deferredPrompt.current.prompt()
-      const { outcome } = await deferredPrompt.current.userChoice
-      deferredPrompt.current = null
-      if (outcome === 'accepted') { setBtnMode(null); localStorage.setItem('ydash-install-dismissed', '1') }
-      return
-    }
-    if (btnMode === 'update') {
-      const sw = pendingSW.current
-      if (sw) sw.postMessage({ type: 'SKIP_WAITING' })
-      else window.location.reload()
-    }
-  }
-
-  function dismissBtn() {
-    if (btnMode === 'update') localStorage.setItem('ydash-update-dismissed-sha', newSWsha.current ?? '')
-    else localStorage.setItem('ydash-install-dismissed', '1')
-    setBtnMode(null)
-    setShowIos(false)
-  }
-
   return (
-    <>
-      <header className="shell-topbar">
-        <button className="topbar-burger" onClick={() => setSidebarOpen(v => !v)} aria-label="Menu">
-          <span /><span /><span />
-        </button>
-        <div className="topbar-breadcrumb">
-          <span className="topbar-breadcrumb-icon">{pageItem?.icon}</span>
-          <span className="topbar-breadcrumb-label">{pageItem?.label}</span>
+    <header className="shell-topbar">
+      <button className="topbar-burger" onClick={() => setSidebarOpen(v => !v)} aria-label="Menu">
+        <span /><span /><span />
+      </button>
+      <div className="topbar-breadcrumb">
+        <span className="topbar-breadcrumb-icon">{pageItem?.icon}</span>
+        <span className="topbar-breadcrumb-label">{pageItem?.label}</span>
+      </div>
+      <div className="topbar-right">
+        <div className="topbar-live">
+          <span className="live-dot" />
+          {loadedAt && <span className="topbar-time">Chargé {loadedAt}</span>}
         </div>
-        <div className="topbar-right">
-          <div className="topbar-live">
-            <span className="live-dot" />
-            {loadedAt && <span className="topbar-time">Chargé {loadedAt}</span>}
-          </div>
-          {btnMode && (
-            <div className="topbar-install-wrap">
-              <button
-                className={`btn-sm btn-install-topbar${btnMode === 'update' ? ' btn-install-update' : ''}`}
-                onClick={handleBtn}
-              >
-                {btnMode === 'update' ? '🔄 Màj' : '📲 Installer'}
-              </button>
-              <button className="btn-install-dismiss" onClick={dismissBtn} aria-label="Ignorer">✕</button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {showIosGuide && btnMode === 'ios' && (
-        <div className="ios-guide-bar">
-          <span>1. <strong>⎋ Partager</strong></span>
-          <span className="ios-guide-sep">›</span>
-          <span>2. <strong>"Sur l'écran d'accueil"</strong></span>
-          <span className="ios-guide-sep">›</span>
-          <span>3. <strong>Ajouter</strong></span>
-          <button className="ios-guide-close" onClick={() => setShowIos(false)}>✕</button>
-        </div>
-      )}
-    </>
+      </div>
+    </header>
   )
 }
 
