@@ -6,8 +6,8 @@
   "scope": "/dashboard-weex/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#07090d",
-  "theme_color": "#e8b84b",
+  "background_color": "#06101c",
+  "theme_color": "#c8a020",
   "lang": "fr",
   "categories": ["finance", "productivity"],
   "icons": [
