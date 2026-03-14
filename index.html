@@ -6,7 +6,7 @@
     <title>Ydash — Dashboard</title>
 
     <!-- ── PWA ── -->
-    <link rel="manifest" href="manifest.json" />
+    <link rel="manifest" href="/dashboard-weex/manifest.json" />
     <meta name="theme-color" content="#e8b84b" />
     <meta name="mobile-web-app-capable" content="yes" />
 
@@ -14,13 +14,13 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Ydash" />
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/dashboard-weex/icons/apple-touch-icon.png" />
     <meta name="apple-touch-fullscreen" content="yes" />
 
     <!-- ── Fonts & libs ── -->
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script type="module" crossorigin src="/dashboard-weex/staging/assets/index-Dst4qXrn.js"></script>
+    <script type="module" crossorigin src="/dashboard-weex/staging/assets/index-tesAGcla.js"></script>
     <link rel="stylesheet" crossorigin href="/dashboard-weex/staging/assets/index-bAoQ7yez.css">
   </head>
   <body>
@@ -29,31 +29,22 @@
     <!-- ── Service Worker ── -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          // Détecte le base path dynamiquement depuis l'URL courante
-          // Fonctionne pour /dashboard-weex/ ET /dashboard-weex/staging/
-          var base = document.baseURI
-          if (!base) {
-            // Fallback : extrait le chemin jusqu'au dernier /
-            base = location.href.split('?')[0].split('#')[0]
-            if (!base.endsWith('/')) base = base.substring(0, base.lastIndexOf('/') + 1)
-          }
-          var swUrl = new URL('sw.js', base).href
-          var scope = new URL('./', base).href
-
-          navigator.serviceWorker.register(swUrl, {
-            scope: scope,
-            updateViaCache: 'none'
-          })
-          .then(function (reg) {
+        window.addEventListener('load', async () => {
+          try {
+            const reg = await navigator.serviceWorker.register(
+              '/dashboard-weex/sw.js',
+              { scope: '/dashboard-weex/' }
+            )
+            // Force la vérification d'une MAJ à chaque chargement.
+            // La gestion du bouton MAJ et du reload est déléguée
+            // à InstallPrompt.jsx / Topbar.jsx via les événements SW.
             reg.update()
-            console.log('[SW] registered:', reg.scope)
-          })
-          .catch(function (err) {
-            console.warn('[SW] registration failed:', err)
-          })
+            console.log('[SW] Registered:', reg.scope)
+          } catch (err) {
+            console.warn('[SW] Registration failed:', err)
+          }
         })
       }
     </script>
-  </body>
+</body>
 </html>

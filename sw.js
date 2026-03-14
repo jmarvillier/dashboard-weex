@@ -1,44 +1,59 @@
 /**
  * sw.js — Service Worker Ydash
- * 1.0.10-pre-6 et dc60c3a sont injectés par vite.config.js au build.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 1.0.10-pre-3 et 9e2cd45 sont remplacés par vite.config.js au build.
  *
- * Stratégie anti-cache-zombie :
- *  - install  : skipWaiting() immédiat → activation sans attendre
- *  - activate : purge TOUS les anciens caches + clients.claim()
- *  - fetch    :
- *      • sw.js / version.json       → jamais intercepté (réseau direct)
- *      • HTML (index.html, nav)     → Network First (+ fallback cache hors-ligne)
- *      • Assets hashés Vite (js/css)→ Cache First (le hash change à chaque build)
- *      • Autres (fonts, images)     → Network First
+ * Stratégie :
+ *  - Cache nommé par version+sha → purge automatique à chaque déploiement
+ *  - Install  : mise en cache des assets de base
+ *  - Activate : purge anciens caches + claim + notifie les clients (SW_ACTIVATED)
+ *  - Fetch    : version.json → réseau direct | reste → Cache First
+ *  - Message  : SKIP_WAITING → activation immédiate sur demande de l'app
  */
 
-const VERSION    = '1.0.10-pre-6'
-const GIT_SHA    = 'dc60c3a'
-const CACHE_NAME = `ydash-${VERSION}-${GIT_SHA}`
+const VERSION    = '1.0.10-pre-3'
+const GIT_SHA    = '9e2cd45'
+const CACHE_NAME = `weex-${VERSION}-${GIT_SHA}-assets`
 
-/* ── Install ─────────────────────────────────────────────────────────────── */
+const PRECACHE_URLS = ['./', './index.html', './manifest.json', './version.json']
+
+/* ── Install ──────────────────────────────────────────────────────────────── */
 self.addEventListener('install', event => {
-  console.log(`[SW] install ${CACHE_NAME}`)
-  self.skipWaiting()
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(() => console.log(`[SW] Installed v${VERSION}@${GIT_SHA}`))
+    // Pas de skipWaiting ici : on laisse l'app décider via message
+  )
 })
 
-/* ── Activate ────────────────────────────────────────────────────────────── */
+/* ── Activate ─────────────────────────────────────────────────────────────── */
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys
-          .filter(k => k !== CACHE_NAME)
-          .map(k => {
-            console.log(`[SW] purge : ${k}`)
-            return caches.delete(k)
-          })
+        keys.filter(k => k !== CACHE_NAME).map(k => {
+          console.log(`[SW] Purge cache obsolète : ${k}`)
+          return caches.delete(k)
+        })
       ))
+      .then(() => self.clients.claim())
       .then(() => {
-        console.log(`[SW] activate ${CACHE_NAME} → claim`)
-        return self.clients.claim()
+        // Notifie tous les clients que le nouveau SW est actif → l'app affiche le toast
+        return self.clients.matchAll({ includeUncontrolled: true }).then(clients =>
+          clients.forEach(c => c.postMessage({ type: 'SW_ACTIVATED', version: VERSION, sha: GIT_SHA }))
+        )
       })
+      .then(() => console.log(`[SW] Activé v${VERSION}@${GIT_SHA}`))
   )
+})
+
+/* ── Message ──────────────────────────────────────────────────────────────── */
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    console.log('[SW] skipWaiting demandé par l\'app')
+    self.skipWaiting()
+  }
 })
 
 /* ── Fetch ────────────────────────────────────────────────────────────────── */
@@ -47,40 +62,24 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url)
 
   if (request.method !== 'GET') return
-  if (url.origin !== self.location.origin) return
+  if (url.origin !== location.origin) return
 
-  const path = url.pathname
-
-  // sw.js et version.json → JAMAIS intercepté, toujours réseau direct
-  if (path.endsWith('/sw.js') || path.endsWith('/version.json')) return
-
-  // Assets hashés Vite (contiennent un hash dans le nom) → Cache First
-  if (path.includes('/assets/') && /\.[a-z0-9]{8,}\.(js|css)$/i.test(path)) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        if (cached) return cached
-        return fetch(request).then(response => {
-          if (response?.status === 200) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then(c => c.put(request, clone))
-          }
-          return response
-        })
-      })
-    )
+  // version.json → toujours réseau (ne jamais servir une version périmée)
+  if (url.pathname.endsWith('version.json')) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)))
     return
   }
 
-  // TOUT LE RESTE (HTML, images, fonts…) → Network First
+  // Cache First pour tout le reste
   event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response?.status === 200) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then(c => c.put(request, clone))
+    caches.match(request).then(cached => {
+      if (cached) return cached
+      return fetch(request).then(response => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()))
         }
         return response
       })
-      .catch(() => caches.match(request))
+    })
   )
 })
