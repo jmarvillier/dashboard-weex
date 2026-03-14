@@ -1,6 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
    pair-card.css — PairCard v2 · charte v5 Ydash
-   Grille : 2 cartes par ligne · intérieur : mono-colonne
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Grille 2 colonnes ─────────────────────────────────────────────────── */
@@ -40,7 +39,7 @@
   gap: 12px;
 }
 .pc2-head-left  { flex: 1; min-width: 0; }
-.pc2-head-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.pc2-head-right { display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0; }
 
 .pc2-name {
   font-family: 'Space Mono', monospace;
@@ -48,7 +47,10 @@
   font-size: 1.05rem;
   color: var(--text);
   letter-spacing: -.01em;
+  line-height: 1;
 }
+
+/* Ligne prix + live dot + delta breakeven */
 .pc2-sub {
   display: flex;
   align-items: center;
@@ -70,6 +72,27 @@
 .pc2-be.neg { color: var(--red); }
 .pc2-be.neu { color: var(--muted); }
 
+/* Deltas vs moy. achat / vente — dans le header */
+.pc2-deltas {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pc2-delta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Space Mono', monospace;
+  font-size: .54rem;
+  gap: 12px;
+}
+.pc2-delta-lbl { color: var(--muted); flex-shrink: 0; }
+.pc2-delta-val { font-weight: 600; text-align: right; }
+.pc2-delta-val.pos { color: var(--green); }
+.pc2-delta-val.neg { color: var(--red); }
+.pc2-delta-val.neu { color: var(--muted); font-style: italic; font-weight: 400; }
+
 /* Badge PnL */
 .pc2-badge {
   display: flex;
@@ -78,6 +101,7 @@
   gap: 2px;
   padding: 6px 12px;
   border-radius: 10px;
+  white-space: nowrap;
 }
 .pc2-badge.pos { background: rgba(61,191,144,.1);   border: 1px solid rgba(61,191,144,.28); }
 .pc2-badge.neg { background: rgba(212,90,80,.1);    border: 1px solid rgba(212,90,80,.28); }
@@ -111,8 +135,8 @@
   transition: all .2s;
   flex-shrink: 0;
 }
-.pc2-flag:hover  { border-color: var(--red); }
-.pc2-flag.on     { background: rgba(212,90,80,.1); border-color: rgba(212,90,80,.4); }
+.pc2-flag:hover { border-color: var(--red); }
+.pc2-flag.on    { background: rgba(212,90,80,.1); border-color: rgba(212,90,80,.4); }
 
 /* ── Excluded banner ───────────────────────────────────────────────────── */
 .pc2-excl {
@@ -154,8 +178,8 @@
 }
 
 /* ── Grilles internes ──────────────────────────────────────────────────── */
-.pc2-g2 { display: grid; grid-template-columns: 1fr 1fr;       gap: 8px; }
-.pc2-g3 { display: grid; grid-template-columns: 1fr 1fr 1fr;   gap: 8px; }
+.pc2-g2 { display: grid; grid-template-columns: 1fr 1fr;     gap: 8px; }
+.pc2-g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 
 /* ── KpiBox ────────────────────────────────────────────────────────────── */
 .kb {
@@ -193,40 +217,6 @@
 .kb-val.pos { color: var(--green); }
 .kb-val.neg { color: var(--red); }
 .kb-val.neu { color: var(--muted); }
-
-/* ── Bloc prix actuel ──────────────────────────────────────────────────── */
-.pc2-prix-box {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 11px 14px;
-  position: relative;
-  overflow: visible;
-}
-.pc2-prix-val {
-  font-family: 'Space Mono', monospace;
-  font-weight: 700;
-  font-size: .9rem;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-.pc2-prix-sep {
-  border-top: 1px solid var(--border);
-  margin: 8px 0;
-}
-.pc2-delta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-family: 'Space Mono', monospace;
-  font-size: .54rem;
-  margin-top: 5px;
-}
-.pc2-delta-lbl { color: var(--muted); }
-.pc2-delta-val { font-weight: 600; }
-.pc2-delta-val.pos { color: var(--green); }
-.pc2-delta-val.neg { color: var(--red); }
-.pc2-delta-val.neu { color: var(--muted); font-style: italic; font-weight: 400; }
 
 /* ── Tooltip ───────────────────────────────────────────────────────────── */
 .pc2-tip-wrap {
@@ -273,8 +263,8 @@
   flex-direction: column;
   gap: 5px;
 }
-.pc2-tip-title  { font-size: .58rem; font-weight: 600; color: var(--text); letter-spacing: .03em; }
-.pc2-tip-desc   { color: var(--text2); }
+.pc2-tip-title   { font-size: .58rem; font-weight: 600; color: var(--text); letter-spacing: .03em; }
+.pc2-tip-desc    { color: var(--text2); }
 .pc2-tip-formula {
   background: var(--bg3);
   padding: 4px 7px;
@@ -323,7 +313,12 @@
 /* ── Dépôt ─────────────────────────────────────────────────────────────── */
 .pc2-depot      { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
 .pc2-depot-stat { display: flex; flex-direction: column; gap: 3px; }
-.pc2-depot-val  { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--text); }
+.pc2-depot-val  {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text);
+}
 .pc2-depot-val.gold { color: var(--gold); }
 .pc2-depot-unit { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .pc2-depot-note { font-size: .52rem; color: var(--muted); font-style: italic; margin-top: 8px; }
