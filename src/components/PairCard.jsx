@@ -72,20 +72,22 @@ export default function PairCard({ p, excluded, onToggle, index }) {
            id={`pc-${id.replace(/\//g,'_')}`}
            style={{ animationDelay:`${index*.08}s` }}>
         <div className="pc2-head">
-          <div className="pc2-head-left">
-            <div className="pc2-name">{p.name}</div>
-            <div className="pc2-sub">
-              <span className="pc2-price">{p.nb_depot} dépôt{p.nb_depot > 1 ? 's' : ''}</span>
+          <div className="pc2-head-top">
+            <div className="pc2-head-left">
+              <div className="pc2-name">{p.name}</div>
+              <div className="pc2-sub">
+                <span className="pc2-price">{p.nb_depot} dépôt{p.nb_depot > 1 ? 's' : ''}</span>
+              </div>
             </div>
-          </div>
-          <div className="pc2-head-right">
-            <div className="pc2-badge neu">
-              <span className="pc2-badge-val">💰 {fmt(p.capital_depose)} USDT</span>
+            <div className="pc2-head-right">
+              <div className="pc2-badge neu">
+                <span className="pc2-badge-val">💰 {fmt(p.capital_depose)} USDT</span>
+              </div>
+              <button className={`pc2-flag${isExcl?' on':''}`}
+                      onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
+                {isExcl?'🚩':'🏳'}
+              </button>
             </div>
-            <button className={`pc2-flag${isExcl?' on':''}`}
-                    onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
-              {isExcl?'🚩':'🏳'}
-            </button>
           </div>
         </div>
         <div className="pc2-section">
@@ -115,44 +117,49 @@ export default function PairCard({ p, excluded, onToggle, index }) {
     >
       {/* ── EN-TÊTE ── */}
       <div className="pc2-head">
-        <div className="pc2-head-left">
-          <div className="pc2-name">{p.name}</div>
-          <div className="pc2-sub">
-            {price > 0 && <span className="pc2-price">{fmtPrice(price)} USDT</span>}
-            {hasLive   && <span className="live-dot" style={{width:6,height:6,flexShrink:0}}></span>}
-            {dBePct != null && (
-              <span className={`pc2-be ${cc(dBePct)}`}>{fmtPct(dBePct)} vs breakeven</span>
-            )}
-          </div>
-          {/* Deltas prix — déplacés ici depuis la section position */}
-          {(dBuy != null || p.avgSellPrice != null) && (
-            <div className="pc2-deltas">
-              <div className="pc2-delta">
-                <span className="pc2-delta-lbl">vs moy. achat</span>
-                <span className={`pc2-delta-val ${cc(dBuy)}`}>
-                  {dBuy != null ? `${fmtSign(dBuy)} USDT (${fmtPct(dBuyPct)})` : '—'}
-                </span>
-              </div>
-              <div className="pc2-delta">
-                <span className="pc2-delta-lbl">vs moy. vente</span>
-                {dSell != null
-                  ? <span className={`pc2-delta-val ${cc(dSell)}`}>{fmtSign(dSell)} USDT ({fmtPct(dSellPct)})</span>
-                  : <span className="pc2-delta-val neu">— (pas de vente)</span>
-                }
-              </div>
+
+        {/* Rangée 1 : nom + badge + flag */}
+        <div className="pc2-head-top">
+          <div className="pc2-head-left">
+            <div className="pc2-name">{p.name}</div>
+            <div className="pc2-sub">
+              {price > 0 && <span className="pc2-price">{fmtPrice(price)} USDT</span>}
+              {hasLive   && <span className="live-dot" style={{width:6,height:6,flexShrink:0}}></span>}
+              {dBePct != null && (
+                <span className={`pc2-be ${cc(dBePct)}`}>{fmtPct(dBePct)} vs breakeven</span>
+              )}
             </div>
-          )}
-        </div>
-        <div className="pc2-head-right">
-          <div className={`pc2-badge ${cc(pnlT)}`}>
-            <span className="pc2-badge-val">{fmtSign(pnlT)} USDT</span>
-            {fmtPct(pnlTPct) && <span className="pc2-badge-pct">{fmtPct(pnlTPct)}</span>}
           </div>
-          <button className={`pc2-flag${isExcl?' on':''}`}
-                  onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
-            {isExcl?'🚩':'🏳'}
-          </button>
+          <div className="pc2-head-right">
+            <div className={`pc2-badge ${cc(pnlT)}`}>
+              <span className="pc2-badge-val">{fmtSign(pnlT)} USDT</span>
+              {fmtPct(pnlTPct) && <span className="pc2-badge-pct">{fmtPct(pnlTPct)}</span>}
+            </div>
+            <button className={`pc2-flag${isExcl?' on':''}`}
+                    onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
+              {isExcl?'🚩':'🏳'}
+            </button>
+          </div>
         </div>
+
+        {/* Rangée 2 : deltas pleine largeur */}
+        {(dBuy != null || p.avgSellPrice != null) && (
+          <div className="pc2-deltas">
+            <div className="pc2-delta">
+              <span className="pc2-delta-lbl">vs moy. achat</span>
+              <span className={`pc2-delta-val ${cc(dBuy)}`}>
+                {dBuy != null ? `${fmtSign(dBuy)} USDT (${fmtPct(dBuyPct)})` : '—'}
+              </span>
+            </div>
+            <div className="pc2-delta">
+              <span className="pc2-delta-lbl">vs moy. vente</span>
+              {dSell != null
+                ? <span className={`pc2-delta-val ${cc(dSell)}`}>{fmtSign(dSell)} USDT ({fmtPct(dSellPct)})</span>
+                : <span className="pc2-delta-val neu">— (pas de vente)</span>
+              }
+            </div>
+          </div>
+        )}
       </div>
 
       {isExcl && <div className="pc2-excl">🚩 Paire exclue des calculs globaux</div>}
