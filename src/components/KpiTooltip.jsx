@@ -1,19 +1,26 @@
 /**
  * KpiTooltip.jsx
- * Icône ⓘ + bulle tooltip — un seul ouvert à la fois par carte
+ * Bulle en position: fixed — jamais coupée par overflow parent
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export default function KpiTooltip({ title, description, formula, openId, setOpenId, id }) {
-  const btnRef = useRef(null)
-  const isOpen = openId === id
+  const btnRef  = useRef(null)
+  const isOpen  = openId === id
+  const [pos, setPos] = useState({ top: 0, left: 0 })
 
   function toggle(e) {
     e.stopPropagation()
+    if (!isOpen && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({
+        top:  r.top - 8,           // au-dessus du bouton
+        left: r.left,
+      })
+    }
     setOpenId(isOpen ? null : id)
   }
 
-  // Ferme si clic en dehors du bouton
   useEffect(() => {
     if (!isOpen) return
     function onDoc(e) {
@@ -36,7 +43,14 @@ export default function KpiTooltip({ title, description, formula, openId, setOpe
         i
       </button>
       {isOpen && (
-        <div className="kpi-tooltip-bubble">
+        <div
+          className="kpi-tooltip-bubble"
+          style={{
+            top:       pos.top,
+            left:      pos.left,
+            transform: 'translateY(-100%)',
+          }}
+        >
           {title       && <div className="kpi-tooltip-title">{title}</div>}
           {description && <div className="kpi-tooltip-desc">{description}</div>}
           {formula     && <div className="kpi-tooltip-formula">{formula}</div>}

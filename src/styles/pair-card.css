@@ -1,14 +1,14 @@
 /* ══════════════════════════════════════════════════════════════════════════
    pair-card.css — PairCard v2
-   Charte v5 : bleu nuit · Space Mono · layout horizontal compact
+   Charte v5 · Space Mono · layout horizontal aéré
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Grille des cards ──────────────────────────────────────────────────── */
 .pairs-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 20px;
+  margin-bottom: 16px;
 }
 
 /* ── Carte wrapper ─────────────────────────────────────────────────────── */
@@ -16,9 +16,10 @@
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 14px;
-  overflow: visible;
+  overflow: visible;           /* ← critique pour les tooltips */
   transition: transform .2s, border-color .2s, box-shadow .2s;
   animation: fadeUp .4s ease both;
+  position: relative;
 }
 .pc-v2:hover {
   transform: translateY(-2px);
@@ -35,23 +36,24 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 12px 16px;
+  padding: 16px 20px 14px;
   background: var(--bg3);
   border-bottom: 1px solid var(--border);
-  gap: 10px;
+  border-radius: 14px 14px 0 0;
+  gap: 12px;
 }
 .pc2-header-left  { flex: 1; min-width: 0; }
 .pc2-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .pc2-pair-name {
   font-family: 'Space Mono', monospace;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.1rem;
   letter-spacing: -.01em;
   color: var(--text);
   line-height: 1;
@@ -61,17 +63,17 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 .pc2-current-price {
   font-family: 'Space Mono', monospace;
-  font-size: .68rem;
+  font-size: .72rem;
   font-weight: 500;
   color: var(--text2);
 }
 .pc2-delta-be {
   font-family: 'Space Mono', monospace;
-  font-size: .6rem;
+  font-size: .62rem;
   font-weight: 600;
 }
 .pc2-delta-be.pos { color: var(--green); }
@@ -83,23 +85,23 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 1px;
-  padding: 5px 11px;
+  gap: 2px;
+  padding: 6px 13px;
   border-radius: 10px;
   font-weight: 700;
   white-space: nowrap;
 }
-.pc2-badge-pos { background: rgba(61,191,144,.1);  border: 1px solid rgba(61,191,144,.28); }
-.pc2-badge-neg { background: rgba(212,90,80,.1);   border: 1px solid rgba(212,90,80,.28); }
+.pc2-badge-pos { background: rgba(61,191,144,.1);   border: 1px solid rgba(61,191,144,.28); }
+.pc2-badge-neg { background: rgba(212,90,80,.1);    border: 1px solid rgba(212,90,80,.28); }
 .pc2-badge-neu { background: rgba(255,255,255,.04); border: 1px solid var(--border); }
 
 .pc2-badge-usdt {
   font-family: 'Space Mono', monospace;
-  font-size: .65rem;
+  font-size: .72rem;
 }
 .pc2-badge-pct {
   font-family: 'Space Mono', monospace;
-  font-size: .55rem;
+  font-size: .58rem;
   opacity: .85;
 }
 .pc2-badge-pos .pc2-badge-usdt,
@@ -109,74 +111,86 @@
 .pc2-badge-neu .pc2-badge-usdt,
 .pc2-badge-neu .pc2-badge-pct { color: var(--text2); }
 
-/* ── Corps de la carte : layout 2 colonnes ─────────────────────────────── */
+/* ── Excluded banner ───────────────────────────────────────────────────── */
+.pc2-excluded-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(212,90,80,.07);
+  border-bottom: 1px solid rgba(212,90,80,.2);
+  padding: 6px 20px;
+  font-family: 'Space Mono', monospace;
+  font-size: .55rem;
+  color: var(--red);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* ── Corps : 2 colonnes ────────────────────────────────────────────────── */
 .pc2-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
+  overflow: visible;
 }
 
 /* ── Sections ──────────────────────────────────────────────────────────── */
 .pc2-section {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 18px 20px;
   border-right: 1px solid var(--border);
+  position: relative;
+  overflow: visible;
 }
+.pc2-section:last-child,
 .pc2-section:nth-child(2n) {
   border-right: none;
 }
-/* Dernière rangée : pas de border-bottom */
-.pc2-section:nth-last-child(-n+2) {
-  border-bottom: none;
-}
-/* Section pleine largeur (ordres) */
 .pc2-section-full {
   grid-column: 1 / -1;
   border-right: none;
-}
-/* Section pleine largeur en bas : pas de border-bottom */
-.pc2-section-full:last-child {
-  border-bottom: none;
+  border-top: 1px solid var(--border);
 }
 
 .pc2-section-label {
   font-family: 'Space Mono', monospace;
   font-size: .46rem;
   font-weight: 600;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   color: var(--muted);
   text-transform: uppercase;
-  margin-bottom: 9px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 6px;
+}
+.pc2-section-label + .pc2-section-label {
+  margin-top: 16px;
 }
 
 /* ── Séparateur ────────────────────────────────────────────────────────── */
 .pc2-sep {
   border: none;
   border-top: 1px solid var(--border);
-  margin: 8px 0;
+  margin: 12px 0;
 }
 
-/* ── Grilles KPI internes ──────────────────────────────────────────────── */
+/* ── Grilles KPI ───────────────────────────────────────────────────────── */
 .pc2-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: 8px;
 }
 .pc2-grid-3 {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* ── KpiBox ────────────────────────────────────────────────────────────── */
 .kpi-box {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 10px;
+  padding: 11px 13px;
   position: relative;
   overflow: visible;
 }
@@ -184,54 +198,54 @@
 
 .kpi-box-label {
   font-family: 'Space Mono', monospace;
-  font-size: .44rem;
+  font-size: .46rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: .09em;
   color: var(--muted);
-  margin-bottom: 5px;
+  margin-bottom: 7px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 .kpi-box-value {
   font-family: 'Space Mono', monospace;
   font-weight: 700;
-  font-size: .82rem;
+  font-size: .9rem;
   color: var(--text);
   line-height: 1.2;
 }
 .kpi-box-sublabel {
   font-family: 'Space Mono', monospace;
-  font-size: .46rem;
+  font-size: .48rem;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .kpi-val-pos { color: var(--green) !important; }
 .kpi-val-neg { color: var(--red)   !important; }
 .kpi-val-neu { color: var(--muted) !important; }
 
-/* ── Groupe prix actuel ────────────────────────────────────────────────── */
+/* ── Bloc prix actuel ──────────────────────────────────────────────────── */
 .pc2-current-sep {
   border-top: 1px solid var(--border);
-  margin: 5px 0;
+  margin: 8px 0 6px;
 }
 .pc2-delta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-family: 'Space Mono', monospace;
-  font-size: .5rem;
-  margin-top: 3px;
-  gap: 6px;
+  font-size: .52rem;
+  margin-top: 5px;
+  gap: 8px;
 }
 .pc2-delta-label { color: var(--muted); flex-shrink: 0; }
 .pc2-delta-val   { font-weight: 600; text-align: right; }
 .pc2-delta-pos   { color: var(--green); }
 .pc2-delta-neg   { color: var(--red); }
 .pc2-delta-neu   { color: var(--muted); }
-.pc2-delta-na    { color: var(--muted); font-style: italic; }
+.pc2-delta-na    { color: var(--muted); font-style: italic; font-weight: 400; }
 
 /* ── Tooltip ───────────────────────────────────────────────────────────── */
 .kpi-tooltip-wrap {
@@ -239,6 +253,7 @@
   display: inline-flex;
   align-items: center;
 }
+
 .kpi-info-icon {
   width: 13px;
   height: 13px;
@@ -262,26 +277,26 @@
   border-color: var(--text2);
   color: var(--text2);
 }
+
+/* Bulle en position fixe — jamais coupée */
 .kpi-tooltip-bubble {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
+  position: fixed;
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 9px;
   padding: 10px 12px;
   font-family: 'Space Mono', monospace;
   font-size: .57rem;
-  line-height: 1.5;
+  line-height: 1.55;
   min-width: 210px;
   max-width: 280px;
-  z-index: 30;
-  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  z-index: 9999;
+  box-shadow: 0 8px 32px rgba(0,0,0,.6);
   animation: fadeUp .15s ease;
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 .kpi-tooltip-title {
   font-size: .6rem;
@@ -289,30 +304,39 @@
   color: var(--text);
   letter-spacing: .04em;
 }
-.kpi-tooltip-desc  { color: var(--text2); font-size: .57rem; }
+.kpi-tooltip-desc {
+  color: var(--text2);
+  font-size: .57rem;
+}
 .kpi-tooltip-formula {
   font-family: 'Space Mono', monospace;
   font-size: .52rem;
   background: var(--bg3);
-  padding: 3px 7px;
+  padding: 4px 8px;
   border-radius: 5px;
   color: var(--gold);
   line-height: 1.6;
   white-space: pre-line;
 }
 
+/* ── Section PnL label ─────────────────────────────────────────────────── */
+.pc2-pnl-label-sep {
+  border-top: 1px solid var(--border);
+  margin: 16px 0 14px;
+}
+
 /* ── Chips ordres ──────────────────────────────────────────────────────── */
 .pc2-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 .pc2-chip {
-  background: var(--bg3);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 2px 9px;
+  padding: 3px 10px;
   font-family: 'Space Mono', monospace;
   font-size: .5rem;
   color: var(--text2);
@@ -326,7 +350,7 @@
   font-family: 'Space Mono', monospace;
   font-size: .52rem;
   color: var(--text2);
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 .pc2-bar-track {
   width: 100%;
@@ -338,21 +362,6 @@
 }
 .pc2-bar-buy  { height: 100%; background: var(--green); transition: width .4s ease; }
 .pc2-bar-sell { height: 100%; background: var(--red);   transition: width .4s ease; }
-
-/* ── Excluded banner ───────────────────────────────────────────────────── */
-.pc2-excluded-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(212,90,80,.07);
-  border-top: 1px solid rgba(212,90,80,.2);
-  padding: 5px 16px;
-  font-family: 'Space Mono', monospace;
-  font-size: .55rem;
-  color: var(--red);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
 
 /* ── Flag btn ──────────────────────────────────────────────────────────── */
 .flag-btn {
@@ -374,19 +383,17 @@
 .flag-btn.flagged { background: rgba(212,90,80,.1); border-color: rgba(212,90,80,.4); }
 
 /* ── Dépôt ─────────────────────────────────────────────────────────────── */
-.depot-body  { display: flex; align-items: center; gap: 24px; padding: 4px 0; flex-wrap: wrap; }
-.depot-stat  { display: flex; flex-direction: column; gap: 2px; }
-.depot-val   { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--text); }
+.depot-body  { display: flex; align-items: center; gap: 28px; padding: 4px 0; flex-wrap: wrap; }
+.depot-stat  { display: flex; flex-direction: column; gap: 3px; }
+.depot-val   { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.15rem; color: var(--text); }
 .depot-val.o { color: var(--gold); }
 .depot-unit  { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-.depot-note  { font-size: .52rem; color: var(--muted); font-style: italic; margin-top: 4px; }
+.depot-note  { font-size: .52rem; color: var(--muted); font-style: italic; margin-top: 6px; }
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .pairs-grid { grid-template-columns: 1fr; }
   .pc2-body   { grid-template-columns: 1fr; }
-  .pc2-section { border-right: none; }
-  .pc2-section:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
-  .pc2-section:last-child,
-  .pc2-section-full:last-child { border-bottom: none; }
+  .pc2-section { border-right: none; border-top: 1px solid var(--border); }
+  .pc2-section:first-child { border-top: none; }
 }

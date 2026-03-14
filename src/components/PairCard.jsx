@@ -1,5 +1,5 @@
 /**
- * PairCard.jsx — v2 (ticket #29)
+ * PairCard.jsx — v2 aérée
  */
 import { useState } from 'react'
 import KpiBox from './KpiBox.jsx'
@@ -43,13 +43,12 @@ const colorOf = v => {
   return +v > 0 ? 'pos' : 'neg'
 }
 
-// ── Composant ────────────────────────────────────────────────────────────────
 export default function PairCard({ p, excluded, onToggle, index }) {
   const [openTooltip, setOpenTooltip] = useState(null)
   const isExcl = excluded.has(p.name)
   const sym    = p.name.split('/')[0]
 
-  const coursLive = p.cours_live       != null ? p.cours_live       : null
+  const coursLive = p.cours_live != null ? p.cours_live : null
   const hasLive   = coursLive != null
 
   const pnlRL   = hasLive ? (p.pnl_realise_live ?? p.pnl_realise) : p.pnl_realise
@@ -61,19 +60,17 @@ export default function PairCard({ p, excluded, onToggle, index }) {
 
   const currentPrice = coursLive ?? p.last_prix_achat ?? 0
 
-  // Deltas — calculés à la volée si pas encore enrichis (pas de live)
-  const dAvgBuy     = hasLive ? p.deltaVsAvgBuy     : (p.avgBuyPrice  > 0 && currentPrice > 0 ? currentPrice - p.avgBuyPrice  : null)
-  const dAvgBuyPct  = hasLive ? p.deltaVsAvgBuyPct  : (p.avgBuyPrice  > 0 && currentPrice > 0 ? dAvgBuy / p.avgBuyPrice * 100  : null)
+  const dAvgBuy     = hasLive ? p.deltaVsAvgBuy    : (p.avgBuyPrice > 0 && currentPrice > 0 ? currentPrice - p.avgBuyPrice : null)
+  const dAvgBuyPct  = hasLive ? p.deltaVsAvgBuyPct : (p.avgBuyPrice > 0 && currentPrice > 0 ? dAvgBuy / p.avgBuyPrice * 100 : null)
   const dAvgSell    = hasLive ? p.deltaVsAvgSell    : null
   const dAvgSellPct = hasLive ? p.deltaVsAvgSellPct : null
   const dBePct      = hasLive ? p.deltaVsBreakevenPct : null
 
-  // Barre ordres
   const totalBar = (p.buyOrders || 0) + (p.sellOrders || 0)
   const buyBarW  = totalBar > 0 ? (p.buyOrders  / totalBar * 100) : 100
   const sellBarW = totalBar > 0 ? (p.sellOrders / totalBar * 100) : 0
 
-  // ── Dépôts ─────────────────────────────────────────────────────────────────
+  // ── Dépôt ──────────────────────────────────────────────────────────────────
   if (p.is_depot) {
     return (
       <div className={`pc${isExcl ? ' excluded' : ''}`}
@@ -131,7 +128,7 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             {currentPrice > 0 && (
               <span className="pc2-current-price">{fmtPrice(currentPrice)} USDT</span>
             )}
-            {hasLive && <span className="live-dot live-dot-sm"></span>}
+            {hasLive && <span className="live-dot live-dot-sm" style={{flexShrink:0}}></span>}
             {dBePct != null && (
               <span className={`pc2-delta-be ${colorOf(dBePct)}`}>
                 {fmtPct(dBePct)} vs breakeven
@@ -153,14 +150,14 @@ export default function PairCard({ p, excluded, onToggle, index }) {
 
       {isExcl && <div className="pc2-excluded-banner">🚩 Paire exclue des calculs globaux</div>}
 
-      {/* ═══ CORPS : 2 colonnes ═══ */}
+      {/* ═══ CORPS 2 colonnes ═══ */}
       <div className="pc2-body">
 
-        {/* COL GAUCHE — Position ouverte */}
+        {/* ── COL GAUCHE : Position ouverte ── */}
         <div className="pc2-section">
           <div className="pc2-section-label">POSITION OUVERTE</div>
 
-          {/* Groupe 1 */}
+          {/* Groupe 1 — ce qu'on détient */}
           <div className="pc2-grid-2">
             <KpiBox
               label="Position nette"
@@ -184,7 +181,7 @@ export default function PairCard({ p, excluded, onToggle, index }) {
 
           <div className="pc2-sep" />
 
-          {/* Groupe 2 */}
+          {/* Groupe 2 — prix de référence */}
           <div className="pc2-grid-3">
             <KpiBox
               label="Moy. achat"
@@ -226,8 +223,8 @@ export default function PairCard({ p, excluded, onToggle, index }) {
 
           <div className="pc2-sep" />
 
-          {/* Groupe 3 — prix actuel */}
-          <div className="kpi-box kpi-box-full pc2-current-box">
+          {/* Groupe 3 — prix actuel + deltas */}
+          <div className="kpi-box kpi-box-full">
             <div className="kpi-box-label">
               Prix actuel
               <KpiTooltip
@@ -245,24 +242,23 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             <div className="pc2-delta-row">
               <span className="pc2-delta-label">vs moy. achat</span>
               <span className={`pc2-delta-val pc2-delta-${colorOf(dAvgBuy)}`}>
-                {dAvgBuy != null
-                  ? `${fmtDelta(dAvgBuy)} USDT (${fmtPct(dAvgBuyPct)})`
-                  : '—'}
+                {dAvgBuy != null ? `${fmtDelta(dAvgBuy)} USDT (${fmtPct(dAvgBuyPct)})` : '—'}
               </span>
             </div>
             <div className="pc2-delta-row">
               <span className="pc2-delta-label">vs moy. vente</span>
-              <span className={`pc2-delta-val pc2-delta-${colorOf(dAvgSell)}`}>
-                {dAvgSell != null
-                  ? `${fmtDelta(dAvgSell)} USDT (${fmtPct(dAvgSellPct)})`
-                  : <span className="pc2-delta-na">— (pas de vente)</span>}
-              </span>
+              {dAvgSell != null
+                ? <span className={`pc2-delta-val pc2-delta-${colorOf(dAvgSell)}`}>{fmtDelta(dAvgSell)} USDT ({fmtPct(dAvgSellPct)})</span>
+                : <span className="pc2-delta-na">— (pas de vente)</span>
+              }
             </div>
           </div>
         </div>
 
-        {/* COL DROITE — PnL */}
+        {/* ── COL DROITE : PnL + Ordres ── */}
         <div className="pc2-section">
+
+          {/* PnL */}
           <div className="pc2-section-label">
             <span className="live-dot live-dot-sm"></span>
             PNL (COURS ACTUEL)
@@ -276,7 +272,7 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               tooltipId={`${p.name}-pnlr`}
               tooltipTitle="PnL réalisé"
               tooltipDesc="Gains/pertes sur ventes clôturées."
-              tooltipFormula="Recettes ventes − Coût au prix moy."
+              tooltipFormula="Recettes − Coût au prix moy."
               openId={openTooltip} setOpenId={setOpenTooltip}
             />
             <KpiBox
@@ -287,7 +283,7 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               tooltipId={`${p.name}-pnll`}
               tooltipTitle="PnL latent"
               tooltipDesc="Gain/perte non réalisé sur position ouverte."
-              tooltipFormula="(Prix actuel − Breakeven) × Position"
+              tooltipFormula="(Prix − Breakeven) × Position"
               openId={openTooltip} setOpenId={setOpenTooltip}
             />
             <KpiBox
@@ -303,10 +299,9 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             />
           </div>
 
-          <div className="pc2-sep" />
-
-          {/* Ordres — dans la colonne droite */}
-          <div className="pc2-section-label" style={{marginTop:2}}>ORDRES</div>
+          {/* Ordres */}
+          <div className="pc2-pnl-label-sep" />
+          <div className="pc2-section-label">ORDRES</div>
           <div className="pc2-chips">
             <span className="pc2-chip"><b>{p.totalOrders ?? p.nb_total}</b> au total</span>
             <span className="pc2-chip"><b>{p.executedOrders ?? p.nb_exec}</b> exécutés</span>
@@ -320,8 +315,8 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             <div className="pc2-bar-buy"  style={{ width:`${buyBarW}%` }} />
             <div className="pc2-bar-sell" style={{ width:`${sellBarW}%` }} />
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   )
