@@ -95,7 +95,7 @@
 .ios-guide-close:hover { color: var(--text); }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   KPI ROW
+   KPI ROW (ancienne version — conservé pour compatibilité PairCards etc.)
    ══════════════════════════════════════════════════════════════════════════ */
 .kpi-row {
   display: grid;
@@ -297,7 +297,7 @@
 .tc.rate .tn { color: var(--text2); font-size: .75rem; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SUMMARY TABLE
+   SUMMARY TABLE (ancienne version — conservé pour compatibilité)
    ══════════════════════════════════════════════════════════════════════════ */
 .tbl-wrap {
   background: var(--bg2);
@@ -339,11 +339,10 @@ tr.excluded-row td:first-child { text-decoration: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   KPI SECTION (wrapper journal + live)
+   KPI SECTION (wrapper journal + live) — ancienne version
    ══════════════════════════════════════════════════════════════════════════ */
 .kpi-section { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
 
-/* Tag source (journal / live) dans le label KPI */
 .kpi-source-tag {
   display: inline-block;
   font-size: .42rem;
@@ -362,10 +361,8 @@ tr.excluded-row td:first-child { text-decoration: none; }
   color: var(--green);
 }
 
-/* Valeur en attente (prix pas encore chargés) */
 .kpi-v-pending { color: var(--muted) !important; font-size: 1.1rem !important; }
 
-/* ── Barre live ─────────────────────────────────────────────────────────── */
 .kpi-live-bar {
   background: rgba(0,214,143,.03);
   border: 1px solid rgba(0,214,143,.15);
@@ -415,7 +412,6 @@ tr.excluded-row td:first-child { text-decoration: none; }
   gap: 12px;
 }
 
-/* KPI live : légèrement distinct */
 .kpi.kpi-live {
   border-color: rgba(0,214,143,.1);
 }
@@ -426,7 +422,6 @@ tr.excluded-row td:first-child { text-decoration: none; }
 .kpi.kpi-live.g::before { background: linear-gradient(90deg, var(--green), transparent); opacity: .7; }
 .kpi.kpi-live.r::before { background: linear-gradient(90deg, var(--red), transparent); opacity: .7; }
 
-/* Live dot variants */
 .live-dot-loading {
   animation: blink-fast .5s ease-in-out infinite !important;
   background: var(--gold) !important;
@@ -442,7 +437,6 @@ tr.excluded-row td:first-child { text-decoration: none; }
   flex-shrink: 0;
 }
 
-/* ── PnL sections dans PairCard ─────────────────────────────────────────── */
 .pnl-section-label {
   display: flex;
   align-items: center;
@@ -468,15 +462,12 @@ tr.excluded-row td:first-child { text-decoration: none; }
   border: 1px solid rgba(0,214,143,.2);
 }
 
-/* PnL box live : bordure verte subtile */
 .pnl-box-live { border-color: rgba(0,214,143,.12) !important; }
 .pnl-box-live.g { border-color: rgba(0,214,143,.25) !important; background: rgba(0,214,143,.05) !important; }
 .pnl-box-live.r { border-color: rgba(245,71,106,.25) !important; background: rgba(245,71,106,.05) !important; }
 
-/* Valeur pending dans pnl-box */
 .pnl-val-pending { color: var(--muted) !important; }
 
-/* Prix live sous le nom dans le header de la carte */
 .pc-price-live {
   display: flex;
   align-items: center;
@@ -487,7 +478,6 @@ tr.excluded-row td:first-child { text-decoration: none; }
   margin-top: 3px;
 }
 
-/* Badge source "live" dans le header de la carte */
 .pc-pnl-source {
   font-size: .45rem;
   font-weight: 600;
@@ -513,4 +503,422 @@ tr.excluded-row td:first-child { text-decoration: none; }
 @keyframes pulse-blue {
   0%,100% { box-shadow: 0 0 0 0 rgba(64,150,247,0); }
   50%      { box-shadow: 0 0 0 4px rgba(64,150,247,.15); }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DASHBOARD v5 — Filtre période, KPIs, Tableau récap
+   Préfixe : v5- pour isolation complète des anciens styles
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Filtre période ──────────────────────────────────────────────────────── */
+.period-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.period-tabs {
+  display: flex;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.ptab {
+  font-size: .65rem;
+  font-weight: 500;
+  font-family: 'Space Mono', monospace;
+  padding: 7px 18px;
+  cursor: pointer;
+  color: var(--text2);
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  transition: background .12s, color .12s;
+  letter-spacing: .04em;
+}
+.ptab:last-child { border-right: none; }
+.ptab:hover { background: var(--bg2); color: var(--text); }
+.ptab.active {
+  background: var(--bg2);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1.5px var(--gold);
+  color: var(--gold);
+}
+
+.period-notice {
+  font-size: .58rem;
+  color: var(--muted);
+  padding: 5px 10px;
+  background: var(--bg3);
+  border-radius: 6px;
+  border: 0.5px solid var(--border);
+  font-family: 'Space Mono', monospace;
+  letter-spacing: .02em;
+}
+
+/* ── v5 Sections ─────────────────────────────────────────────────────────── */
+.v5-kpi-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.v5-section {
+  margin-bottom: 1.5rem;
+}
+
+.v5-section-title {
+  font-size: .58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text2);
+  margin-bottom: .75rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── v5 KPI Grilles ──────────────────────────────────────────────────────── */
+.v5-kpi-grid {
+  display: grid;
+  gap: 10px;
+}
+.v5-g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.v5-g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.v5-g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 900px) {
+  .v5-g4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .v5-g4 { grid-template-columns: 1fr 1fr; }
+  .v5-g3 { grid-template-columns: 1fr; }
+  .v5-g2 { grid-template-columns: 1fr; }
+}
+
+/* ── v5 KPI Card ──────────────────────────────────────────────────────────── */
+.v5-kpi {
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.v5-kpi-label {
+  font-size: .52rem;
+  font-weight: 500;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.v5-kpi-val {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1.15;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.v5-kpi-unit {
+  font-family: 'Space Mono', monospace;
+  font-size: .55rem;
+  font-weight: 400;
+  color: var(--text2);
+}
+
+.v5-kpi-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: .6rem;
+  margin-top: 5px;
+  font-weight: 500;
+}
+.v5-kpi-sub.pos { color: var(--green); }
+.v5-kpi-sub.neg { color: var(--red); }
+.v5-kpi-sub.neu { color: var(--muted); }
+
+/* KPI total : bordure dynamique */
+.v5-kpi--total {
+  transition: border-color .3s, box-shadow .3s;
+}
+
+/* Couleurs valeurs PnL */
+.v5-kpi-val .pos { color: var(--green); }
+.v5-kpi-val .neg { color: var(--red); }
+.v5-kpi-val .neu { color: var(--muted); }
+
+/* ── Tooltip v5 ──────────────────────────────────────────────────────────── */
+.v5-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.v5-info-btn {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  user-select: none;
+  transition: border-color .15s, color .15s;
+  padding: 0;
+}
+.v5-info-btn:hover {
+  border-color: var(--text2);
+  color: var(--text2);
+}
+
+.v5-tooltip {
+  position: absolute;
+  z-index: 20;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 210px;
+  max-width: 280px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  animation: fadeUp .15s ease;
+}
+.v5-tooltip strong {
+  font-size: .6rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .04em;
+}
+.v5-tooltip span {
+  font-size: .57rem;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.v5-tooltip code {
+  font-family: 'Space Mono', monospace;
+  font-size: .52rem;
+  background: var(--bg3);
+  padding: 3px 7px;
+  border-radius: 5px;
+  display: block;
+  margin-top: 2px;
+  color: var(--gold);
+  line-height: 1.6;
+}
+
+/* ── Performance section — indicateur live ────────────────────────────────── */
+.v5-live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(0,214,143,.5);
+  animation: blink 2s ease-in-out infinite;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.v5-live-dot--loading {
+  background: var(--gold) !important;
+  box-shadow: 0 0 6px rgba(232,184,75,.5) !important;
+  animation: blink-fast .5s ease-in-out infinite !important;
+}
+
+.v5-perf-source {
+  font-family: 'Space Mono', monospace;
+  font-size: .5rem;
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: auto;
+}
+
+.v5-refresh-btn {
+  background: none;
+  border: 1px solid rgba(0,214,143,.25);
+  color: var(--green);
+  border-radius: 6px;
+  width: 22px; height: 22px;
+  font-size: .75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.v5-refresh-btn:hover { background: rgba(0,214,143,.1); }
+
+/* ── Ordres ──────────────────────────────────────────────────────────────── */
+.v5-orders-synthese .v5-kpi-label { margin-bottom: 10px; }
+
+.v5-orders-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.v5-order-stat {
+  flex: 1;
+  min-width: 60px;
+}
+
+.v5-order-lbl {
+  font-size: .52rem;
+  color: var(--text2);
+  margin-bottom: 3px;
+  letter-spacing: .04em;
+}
+
+.v5-order-val {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1.1;
+  color: var(--text);
+}
+.v5-order-val.neg { color: var(--red); }
+.v5-order-val.pos { color: var(--green); }
+.v5-order-rate.pos { color: var(--green); }
+.v5-order-rate.neg { color: var(--red); }
+.v5-order-rate.neu { color: var(--muted); }
+
+.v5-orders-bar-card .v5-kpi-label { margin-bottom: 6px; }
+
+.v5-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: .57rem;
+  color: var(--text2);
+  margin-bottom: 5px;
+}
+.v5-bar-labels strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.v5-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg3);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+}
+.v5-bar-buy  { height: 100%; background: var(--green); transition: width .4s ease; }
+.v5-bar-sell { height: 100%; background: var(--red);   transition: width .4s ease; }
+
+/* ── Summary Table v5 ────────────────────────────────────────────────────── */
+.v5-tbl-wrap {
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  overflow: auto;
+  margin-bottom: 12px;
+}
+
+.v5-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.v5-thead-tr {
+  background: var(--bg3);
+  border-bottom: 0.5px solid var(--border);
+}
+
+.v5-th {
+  font-size: .5rem;
+  font-weight: 500;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  padding: 9px 12px;
+}
+.v5-th-l { text-align: left; }
+.v5-th-r { text-align: right; }
+
+.v5-tr {
+  border-bottom: 0.5px solid rgba(28,36,51,.8);
+  transition: background .12s;
+}
+.v5-tr:last-child { border-bottom: none; }
+.v5-tr:hover .v5-td { background: rgba(232,184,75,.02); }
+
+.v5-td {
+  padding: 9px 12px;
+  font-size: .7rem;
+  line-height: 1.3;
+}
+.v5-td-r   { text-align: right; }
+.v5-td-pair {
+  font-weight: 600;
+  font-size: .72rem;
+  text-align: left;
+  color: var(--text);
+}
+
+.v5-tbl-pct {
+  font-family: 'Space Mono', monospace;
+  font-size: .55rem;
+  margin-top: 2px;
+  font-weight: 500;
+}
+.v5-tbl-pct.v5-pos { color: var(--green); }
+.v5-tbl-pct.v5-neg { color: var(--red); }
+.v5-tbl-pct.v5-neu { color: var(--muted); }
+
+/* Couleurs PnL dans le tableau */
+.v5-pos { color: var(--green); }
+.v5-neg { color: var(--red); }
+.v5-neu { color: var(--muted); }
+
+/* Row total */
+.v5-tr--total {
+  background: var(--bg3);
+}
+.v5-tr--total .v5-td { font-weight: 500; }
+.v5-td-total-lbl {
+  font-size: .6rem;
+  color: var(--text2);
+  font-weight: 400;
+}
+
+.v5-tbl-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: .65rem;
+  color: var(--muted);
+  font-style: italic;
 }
