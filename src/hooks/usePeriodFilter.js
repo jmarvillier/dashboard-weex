@@ -1,86 +1,154 @@
 /**
  * usePeriodFilter.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Hook qui filtre les données du store selon la période sélectionnée.
- *
- * Retourne des agrégats pré-calculés pour le Dashboard v5 :
- *   capital, PnL réalisé/latent/total, ordres, et rows par paire.
- *
- * Les données de `pairList` (issues de process.js / useTrading) contiennent
- * toutes les paires depuis le début. Pour simuler le filtre temporel sur des
- * données sans timestamps natifs, on utilise les champs disponibles :
- *   - usdt_investi, vol_achete, vol_vendu, pnl_realise, pnl_latent
- *   - pnl_latent_live, pnl_realise_live (si prix chargés)
- *   - nb_total, nb_exec, nb_annule, nb_achat, nb_vente
- *
- * NOTE : le vrai filtre temporel ligne par ligne nécessite que process.js
- * expose les rows brutes avec timestamps. Ce hook est architecturé pour
- * recevoir rawRows en paramètre optionnel et calculer sur la fenêtre filtrée.
- * En l'absence de rawRows, il opère sur les agrégats pairList (mode dégradé).
+ * Hook qui filtre les rawRows (lignes brutes avec dates) selon la période
+ * et recalcule tous les agrégats : capital, PnL, ordres, rows par paire.
  */
 
 import { useState, useMemo } from 'react'
 import { periodStart } from '../components/PeriodFilter.jsx'
 
-const fmt2  = (v, d = 2) => isNaN(+v) ? 0 : +v
-const pct   = (val, ref) => ref > 0 ? (val / ref) * 100 : 0
+const parseFloat2 = v => isNaN(+v) ? 0 : +v
+const pctOf = (val, ref) => ref > 0 ? (val / ref) * 100 : 0
 
-/**
- * Filtre les rawRows (tableau de lignes brutes issues de parser) selon la période.
- * Chaque ligne est un objet { date: Date, ... }
- */
-function filterRows(rawRows, period) {
-  if (!rawRows || rawRows.length === 0) return []
+/* ── Filtre des rawRows sur la fenêtre temporelle ────────────────────────── */
+function filterByPeriod(rawRows, period) {
   const start = periodStart(period)
-  if (!start) return rawRows
+  if (!start) return rawRows                          // "tout" → pas de filtre
   return rawRows.filter(r => r.date && r.date >= start)
 }
 
-/**
- * Agrège les paires à partir de rawRows filtrés.
- * Si rawRows est null → fallback sur pairList.
- */
-function aggregate(pairList, rawRows, period, prices) {
-  const trading = pairList.filter(p => !p.is_depot)
-  const depots  = pairList.filter(p => p.is_depot)
+/* ── Agrège rawRows filtrés en rows par paire + KPIs globaux ─────────────── */
+function computeFromRaw(rawRows, period, pairList, prices) {
+  // ── Capital déposé : cumulatif global (non filtré par période) ───────────
+  const capitalDepose = pairList
+    .filter(p => p.is_depot)
+    .reduce((s, p) => s + parseFloat2(p.capital_depose), 0)
 
-  // ── Capital déposé (cumulatif, non filtré par période) ──────────────────
-  const capitalDepose = depots.reduce((s, p) => s + fmt2(p.capital_depose), 0)
+  // ── Vérification : est-ce que les rawRows ont des dates exploitables ?
+  const hasDates = rawRows.length > 0 &&
+    rawRows.some(r => r.date instanceof Date && !isNaN(r.date.getTime()))
 
-  // ── Agrégats trading ─────────────────────────────────────────────────────
-  // Pour la période "tout" ou en l'absence de rawRows, on utilise pairList tel quel.
-  // Avec rawRows, on recalcule sur la fenêtre temporelle.
-
-  let rows = []
-
-  if (rawRows && rawRows.length > 0) {
-    // Vrai filtre temporel
-    const filtered = filterRows(rawRows, period)
-    rows = buildRowsFromRaw(filtered, prices)
-  } else {
-    // Mode dégradé : utilise les agrégats complets (équivalent "Tout")
-    rows = trading.map(p => ({
-      name:        p.name,
-      investi:     fmt2(p.usdt_investi),
-      position:    fmt2(p.position ?? (p.vol_achete - p.vol_vendu)),
-      breakeven:   fmt2(p.prix_moy),
-      pnlRealise:  fmt2(p.pnl_realise_live ?? p.pnl_realise),
-      pnlLatent:   fmt2(p.pnl_latent_live  ?? p.pnl_latent),
-      valActuelle: prices && prices[p.name]
-        ? fmt2(p.position ?? (p.vol_achete - p.vol_vendu)) * prices[p.name]
-        : fmt2(p.usdt_investi) + fmt2(p.pnl_latent_live ?? p.pnl_latent),
-      nbTotal:  fmt2(p.nb_total),
-      nbExec:   fmt2(p.nb_exec),
-      nbAnnule: fmt2(p.nb_annule),
-      nbAchat:  fmt2(p.nb_achat),
-      nbVente:  fmt2(p.nb_vente),
-    }))
+  if (!hasDates) {
+    // Mode dégradé : utilise pairList tel quel (équivalent "tout")
+    return computeFromPairList(pairList, capitalDepose, prices)
   }
 
-  // ── KPIs globaux ──────────────────────────────────────────────────────────
-  const capitalInvesti = rows.reduce((s, r) => s + r.investi, 0)
+  // ── Filtre sur la fenêtre temporelle ─────────────────────────────────────
+  const filtered = filterByPeriod(rawRows, period)
+
+  // ── Agrégation par paire sur les lignes filtrées ──────────────────────────
+  const map = {}
+
+  filtered.forEach(r => {
+    if (!r.pair) return
+    // Exclure les dépôts du calcul de trading
+    if (r.sens === 'Dépôt' || r.sens === 'Depot' ||
+        r.sens.toLowerCase().includes('dép') ||
+        r.sens.toLowerCase().includes('dep')) return
+
+    if (!map[r.pair]) map[r.pair] = {
+      name:      r.pair,
+      investi:   0,
+      volAchete: 0,
+      volVendu:  0,
+      usdtRecu:  0,
+      nbTotal:   0,
+      nbExec:    0,
+      nbAnnule:  0,
+      nbAchat:   0,
+      nbVente:   0,
+    }
+    const p = map[r.pair]
+    p.nbTotal++
+    if (r.sens === 'Achat') p.nbAchat++
+    if (r.sens === 'Vente') p.nbVente++
+    if (r.annule) { p.nbAnnule++; return }
+    if (!r.exec)  return
+    p.nbExec++
+    if (r.sens === 'Achat') { p.investi   += r.usdt || 0; p.volAchete += r.vol || 0 }
+    if (r.sens === 'Vente') { p.usdtRecu  += r.usdt || 0; p.volVendu  += r.vol || 0 }
+  })
+
+  // ── Calcul des métriques par paire ────────────────────────────────────────
+  const rows = Object.values(map).map(p => {
+    const position  = p.volAchete - p.volVendu
+    const prixMoy   = p.volAchete > 0 ? p.investi / p.volAchete : 0
+    const breakeven = position > 0 && prixMoy > 0 ? prixMoy : 0
+
+    // PnL réalisé : recettes vente − coût de revient des volumes vendus
+    const coutVendu  = prixMoy * p.volVendu
+    const pnlRealise = p.volVendu > 0 && prixMoy > 0
+      ? p.usdtRecu - coutVendu
+      : p.usdtRecu
+
+    // PnL latent : utilise le cours live s'il est dispo, sinon le breakeven
+    const coursLive = prices?.[p.name] ?? null
+    const pnlLatent = position > 0 && breakeven > 0 && coursLive != null
+      ? (coursLive - breakeven) * position
+      : 0
+
+    // Valeur actuelle
+    const valActuelle = coursLive != null && position > 0
+      ? position * coursLive
+      : p.investi + pnlLatent
+
+    return {
+      name:       p.name,
+      investi:    p.investi,
+      position,
+      breakeven,
+      pnlRealise,
+      pnlLatent,
+      valActuelle,
+      nbTotal:  p.nbTotal,
+      nbExec:   p.nbExec,
+      nbAnnule: p.nbAnnule,
+      nbAchat:  p.nbAchat,
+      nbVente:  p.nbVente,
+    }
+  })
+
+  return buildKpis(rows, capitalDepose)
+}
+
+/* ── Mode dégradé : construit depuis pairList (sans filtrage temporel) ───── */
+function computeFromPairList(pairList, capitalDepose, prices) {
+  const trading = pairList.filter(p => !p.is_depot)
+
+  const rows = trading.map(p => {
+    const coursLive   = prices?.[p.name] ?? null
+    const pnlRealise  = parseFloat2(p.pnl_realise_live ?? p.pnl_realise)
+    const pnlLatent   = parseFloat2(p.pnl_latent_live  ?? p.pnl_latent)
+    const position    = parseFloat2(p.position ?? (p.vol_achete - p.vol_vendu))
+    const valActuelle = coursLive != null && position > 0
+      ? position * coursLive
+      : parseFloat2(p.usdt_investi) + pnlLatent
+
+    return {
+      name:        p.name,
+      investi:     parseFloat2(p.usdt_investi),
+      position,
+      breakeven:   parseFloat2(p.prix_moy),
+      pnlRealise,
+      pnlLatent,
+      valActuelle,
+      nbTotal:  parseFloat2(p.nb_total),
+      nbExec:   parseFloat2(p.nb_exec),
+      nbAnnule: parseFloat2(p.nb_annule),
+      nbAchat:  parseFloat2(p.nb_achat),
+      nbVente:  parseFloat2(p.nb_vente),
+    }
+  })
+
+  return buildKpis(rows, capitalDepose)
+}
+
+/* ── Construit les KPIs globaux depuis les rows agrégées ─────────────────── */
+function buildKpis(rows, capitalDepose) {
+  const capitalInvesti  = rows.reduce((s, r) => s + r.investi,     0)
   const valPortefeuille = rows.reduce((s, r) => s + r.valActuelle, 0)
-  const capitalDispo   = capitalDepose - capitalInvesti
+  const capitalDispo    = capitalDepose - capitalInvesti
 
   const pnlRealise = rows.reduce((s, r) => s + r.pnlRealise, 0)
   const pnlLatent  = rows.reduce((s, r) => s + r.pnlLatent,  0)
@@ -101,91 +169,43 @@ function aggregate(pairList, rawRows, period, prices) {
     capitalDepose,
     capitalInvesti,
     valPortefeuille,
-    valPortefeuillePct: pct(valPortefeuille - capitalInvesti, capitalInvesti),
+    valPortefeuillePct: pctOf(valPortefeuille - capitalInvesti, capitalInvesti),
     capitalDispo,
-    capitalDispoPct:    pct(capitalDispo, capitalDepose),
+    capitalDispoPct:    pctOf(capitalDispo, capitalDepose),
 
     // PnL
     pnlRealise,
-    pnlRealisePct: pct(pnlRealise, capitalInvesti),
+    pnlRealisePct: pctOf(pnlRealise, capitalInvesti),
     pnlLatent,
-    pnlLatentPct:  pct(pnlLatent,  capitalInvesti),
+    pnlLatentPct:  pctOf(pnlLatent,  capitalInvesti),
     pnlTotal,
-    pnlTotalPct:   pct(pnlTotal,   capitalInvesti),
+    pnlTotalPct:   pctOf(pnlTotal,   capitalInvesti),
 
     // Ordres
     nbTotal, nbExec, nbAnnule, tauxExec,
     nbAchat, nbVente, buyW, sellW,
 
-    // Rows par paire (pour le tableau récap)
+    // Rows pour le tableau récapitulatif
     rows,
   }
 }
 
 /**
- * Reconstruit des rows agrégées depuis des rawRows filtrés.
- * rawRows doit être au format { pair, sens, statut, prix, usdt, vol, date }
- */
-function buildRowsFromRaw(filtered, prices) {
-  const map = {}
-
-  filtered.forEach(r => {
-    if (!r.pair) return
-    if (!map[r.pair]) map[r.pair] = {
-      name: r.pair, investi: 0, volAchete: 0, volVendu: 0,
-      usdtRecu: 0, nbTotal: 0, nbExec: 0, nbAnnule: 0, nbAchat: 0, nbVente: 0,
-    }
-    const p = map[r.pair]
-    p.nbTotal++
-    if (r.sens === 'Achat')  p.nbAchat++
-    if (r.sens === 'Vente')  p.nbVente++
-    if (r.annule) { p.nbAnnule++; return }
-    if (!r.exec)  return
-    p.nbExec++
-    if (r.sens === 'Achat') { p.investi   += r.usdt || 0; p.volAchete += r.vol || 0 }
-    if (r.sens === 'Vente') { p.usdtRecu  += r.usdt || 0; p.volVendu  += r.vol || 0 }
-  })
-
-  return Object.values(map).map(p => {
-    const position   = p.volAchete - p.volVendu
-    const breakeven  = position > 0 ? (p.investi - p.usdtRecu) / position : 0
-    const pnlRealise = p.usdtRecu - (p.investi * (p.volVendu / (p.volAchete || 1)))
-    const prix       = prices?.[p.name] ?? 0
-    const valAct     = position * prix
-    const pnlLatent  = position > 0 && prix > 0 ? (prix - breakeven) * position : 0
-
-    return {
-      name:        p.name,
-      investi:     p.investi,
-      position,
-      breakeven,
-      pnlRealise,
-      pnlLatent,
-      valActuelle: valAct || p.investi + pnlLatent,
-      nbTotal:  p.nbTotal,
-      nbExec:   p.nbExec,
-      nbAnnule: p.nbAnnule,
-      nbAchat:  p.nbAchat,
-      nbVente:  p.nbVente,
-    }
-  })
-}
-
-/**
  * Hook usePeriodFilter
  *
- * @param {Array}  pairList  — liste des paires (depuis useTrading)
- * @param {Object} prices    — prix live (depuis usePrices), optionnel
- * @param {Array}  rawRows   — lignes brutes avec timestamps, optionnel
+ * @param {Array}  pairList  — liste agrégée des paires (depuis useTrading)
+ * @param {Array}  rawRows   — lignes brutes avec dates (depuis useTrading)
+ * @param {Object} prices    — prix live { 'BTC/USDT': 83000, ... } (optionnel)
  *
  * @returns {{ period, setPeriod, data }}
  */
-export function usePeriodFilter(pairList = [], prices = null, rawRows = null) {
+export function usePeriodFilter(pairList = [], rawRows = [], prices = null) {
   const [period, setPeriod] = useState('1j')
 
   const data = useMemo(
-    () => aggregate(pairList, rawRows, period, prices),
-    [pairList, rawRows, period, prices]
+    () => computeFromRaw(rawRows, period, pairList, prices),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawRows, period, pairList, prices]
   )
 
   return { period, setPeriod, data }

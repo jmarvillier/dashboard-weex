@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { parseCSV, isUsdPair } from '../lib/parser.js'
-import { process, buildPairList, enrichWithPrices } from '../lib/process.js'
+import { process, buildPairList, enrichWithPrices, extractRawRows } from '../lib/process.js'
 import { saveSnapshot, loadSnapshot, hasSnapshot, clearSnapshot } from '../lib/repository.js'
 import { usePrices } from './usePrices.js'
 
@@ -38,6 +38,7 @@ export function useTrading() {
   const [fileName, setFileName]       = useState('')
   const [loadedAt, setLoadedAt]       = useState('')
   const [pairList, setPairList]       = useState([])
+  const [rawRows, setRawRows]         = useState([])   // ← lignes brutes avec dates
   const [excluded, setExcluded]       = useState(new Set())
   const [driveErr, setDriveErr]       = useState(null)
   const [repoAvailable, setRepoAvailable] = useState(false)
@@ -68,8 +69,10 @@ export function useTrading() {
   function ingest(rows, name, isoDate = null) {
     const P    = process(rows)
     const list = buildPairList(P)
+    const raw  = extractRawRows(rows)          // ← extraction des rawRows avec dates
     const autoExcl = new Set(list.filter(p => isUsdPair(p.name)).map(p => p.name))
     setPairList(list)
+    setRawRows(raw)
     setExcluded(autoExcl)
     setFileName(name)
     setLoadedAt(
@@ -190,13 +193,14 @@ export function useTrading() {
     setView('landing')
     setZone(null)
     setPairList([])
+    setRawRows([])
     setExcluded(new Set())
     setDriveErr(null)
   }, [])
 
   return {
     view, zone, loading, loadingTxt,
-    fileName, loadedAt, pairList, excluded, driveErr,
+    fileName, loadedAt, pairList, rawRows, excluded, driveErr,
     repoAvailable,
     // Prix live
     prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
