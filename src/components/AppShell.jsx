@@ -1,14 +1,19 @@
 /**
- * AppShell.jsx
+ * AppShell.jsx — v5
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Shell principal avec sidebar fixe + topbar.
+ * PageDashboard intègre PeriodFilter + KpiRow v5 + SummaryTable v5.
  */
 
 import { useState, useRef, useEffect } from 'react'
-import Logo         from './Logo.jsx'
-import KpiRow       from './KpiRow.jsx'
-import SummaryTable from './SummaryTable.jsx'
-import PairesView   from './PairesView.jsx'
-import DataPanel    from './DataPanel.jsx'
-import { auth, signOut } from '../lib/firebase.js'
+import Logo          from './Logo.jsx'
+import KpiRow        from './KpiRow.jsx'
+import SummaryTable  from './SummaryTable.jsx'
+import PairesView    from './PairesView.jsx'
+import DataPanel     from './DataPanel.jsx'
+import PeriodFilter  from './PeriodFilter.jsx'
+import { usePeriodFilter } from '../hooks/usePeriodFilter.js'
+import { auth, signOut }   from '../lib/firebase.js'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '🚀', label: 'Dashboard',  sublabel: 'Vue globale'      },
@@ -16,6 +21,7 @@ const NAV_ITEMS = [
   { id: 'donnees',   icon: '🗃️', label: 'Données',    sublabel: 'Gérer le journal' },
 ]
 
+/* ── Topbar ──────────────────────────────────────────────────────────────── */
 function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   const pageItem = NAV_ITEMS.find(i => i.id === activePage)
 
@@ -138,6 +144,7 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   )
 }
 
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
 function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }) {
   function navigate(page) {
     setActivePage(page)
@@ -184,34 +191,44 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
   )
 }
 
-function SectionHeader({ icon, title, subtitle }) {
-  return (
-    <div className="page-section-header">
-      <div className="page-section-title"><span>{icon}</span> {title}</div>
-      {subtitle && <div className="page-section-sub">{subtitle}</div>}
-    </div>
-  )
-}
+/* ── PageDashboard v5 ────────────────────────────────────────────────────── */
+function PageDashboard({
+  pairList,
+  rawRows,
+  prices,
+  pricesLoading,
+  pricesError,
+  lastPriceUpdate,
+  refreshPrices,
+}) {
+  const { period, setPeriod, data } = usePeriodFilter(pairList, rawRows, prices)
 
-function PageDashboard({ pairList, excluded, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices }) {
   return (
     <div className="page-content">
-      <SectionHeader icon="📊" title="Performance Globale" subtitle="Vue consolidée de tous vos investissements" />
+
+      {/* Filtre période */}
+      <PeriodFilter period={period} onChange={setPeriod} />
+
+      {/* KPIs Capital + Performance + Ordres */}
       <KpiRow
-        pairList={pairList}
-        excluded={excluded}
+        data={data}
         pricesLoading={pricesLoading}
         pricesError={pricesError}
-        priceSource={priceSource}
         lastPriceUpdate={lastPriceUpdate}
         refreshPrices={refreshPrices}
       />
-      <SectionHeader icon="📋" title="Tableau Récapitulatif" subtitle="Détail par paire de trading" />
-      <SummaryTable pairList={pairList} excluded={excluded} />
+
+      {/* Tableau récapitulatif */}
+      <section className="v5-section">
+        <h2 className="v5-section-title">Récapitulatif par paire</h2>
+        <SummaryTable rows={data.rows} period={period} />
+      </section>
+
     </div>
   )
 }
 
+/* ── PagePaires ──────────────────────────────────────────────────────────── */
 function PagePaires({ pairList, excluded, toggleFlag }) {
   return (
     <div className="page-content">
@@ -225,12 +242,15 @@ function PagePaires({ pairList, excluded, toggleFlag }) {
   )
 }
 
+/* ── AppShell export ─────────────────────────────────────────────────────── */
 export default function AppShell({
   activePage,
   setActivePage,
   loadedAt,
   excluded,
   pairList,
+  rawRows,
+  prices,
   repoAvailable,
   backToLanding,
   toggleFlag,
@@ -266,10 +286,10 @@ export default function AppShell({
           {activePage === 'dashboard' && (
             <PageDashboard
               pairList={pairList}
-              excluded={excluded}
+              rawRows={rawRows}
+              prices={prices}
               pricesLoading={pricesLoading}
               pricesError={pricesError}
-              priceSource={priceSource}
               lastPriceUpdate={lastPriceUpdate}
               refreshPrices={refreshPrices}
             />

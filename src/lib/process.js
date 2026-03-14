@@ -1,5 +1,39 @@
 import { normPair, parseN, isExec, isAnnul, isUsdPair } from './parser.js'
 
+/**
+ * Parse une date depuis une cellule du journal.
+ * Gère les formats : DD/MM/YYYY, YYYY-MM-DD, timestamps JS, et les dates Excel (nombre de jours).
+ */
+function parseDate(raw) {
+  if (!raw) return null
+
+  // Nombre Excel (jours depuis 1900-01-01)
+  const n = Number(raw)
+  if (!isNaN(n) && n > 40000 && n < 60000) {
+    const ms = (n - 25569) * 86400 * 1000
+    return new Date(ms)
+  }
+
+  const s = String(raw).trim()
+  if (!s) return null
+
+  // Format DD/MM/YYYY ou DD/MM/YYYY HH:MM
+  const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/)
+  if (dmy) {
+    return new Date(`${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`)
+  }
+
+  // Format ISO YYYY-MM-DD
+  const iso = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/)
+  if (iso) {
+    return new Date(`${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`)
+  }
+
+  // Tentative native (last resort)
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? null : d
+}
+
 export function process(rows) {
   let start = 1
   for (let i = 0; i < Math.min(5, rows.length); i++) {
@@ -106,6 +140,54 @@ export function process(rows) {
   })
 
   return P
+}
+
+/**
+ * Extrait les lignes brutes normalisées depuis les rows CSV/XLSX brutes.
+ * Chaque ligne retournée a la forme :
+ *   { date, pair, sens, statut, prix, usdt, vol, exec, annule }
+ *
+ * Utilisé par usePeriodFilter pour le filtrage temporel.
+ */
+export function extractRawRows(rows) {
+  let start = 1
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    if (rows[i].some(c => String(c).toUpperCase().includes('PAIRE'))) { start = i + 1; break }
+  }
+
+  const result = []
+
+  rows.slice(start).forEach(r => {
+    if (!r[1]) return
+
+    const pair = normPair(r[1])
+    if (!pair) return
+
+    const dash    = r[12]
+    const dashStr = String(dash).trim().toLowerCase()
+    if (dash === false || dashStr === 'false' || dashStr === '0') return
+
+    const sens   = String(r[2] || '').trim()
+    const stat   = String(r[3] || '').trim()
+    const prix   = parseN(r[4])
+    const usdt   = parseN(r[5]) || parseN(r[6]) || parseN(r[7])
+    const vol    = parseN(r[10])
+    const date   = parseDate(r[0])
+
+    result.push({
+      date,
+      pair,
+      sens,
+      statut: stat,
+      prix,
+      usdt,
+      vol,
+      exec:   isExec(stat),
+      annule: isAnnul(stat),
+    })
+  })
+
+  return result
 }
 
 export function enrichWithPrices(pairList, prices) {
