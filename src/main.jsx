@@ -7,6 +7,7 @@ import './styles/dashboard.css'
 import './styles/data-panel.css'
 import './styles/entry-form.css'
 import './styles/data-menu.css'
+import './styles/pair-card.css'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import App from './App.jsx'
 
