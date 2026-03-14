@@ -133,7 +133,7 @@ export default function PairCard({ p, excluded, onToggle, index }) {
         </div>
       </div>
 
-      {isExcl && <div className="excluded-banner">🚩 Paire exclue des calculs globaux</div>}
+      {isExcl && <div className="pc2-excluded-banner">🚩 Paire exclue des calculs globaux</div>}
 
       {/* ═══ POSITION OUVERTE ═══ */}
       <div className="pc2-section">
