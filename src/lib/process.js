@@ -60,11 +60,8 @@ export function process(rows) {
       nb_achat:        0,
       nb_vente:        0,
       nb_depot:        0,
-      // Accumulateurs pour moyennes pondérées
-      _sum_prix_vol_achat: 0,
-      _sum_prix_vol_vente: 0,
-      _nb_achat_exec:      0,
-      _nb_vente_exec:      0,
+      _nb_achat_exec:  0,
+      _nb_vente_exec:  0,
     }
 
     const p = P[pair]
@@ -92,65 +89,66 @@ export function process(rows) {
     const montant = usdt || usdc || eur || 0
 
     if (sens === 'Achat') {
-      p.usdt_investi       += montant
-      p.vol_achete         += vol
+      p.usdt_investi  += montant
+      p.vol_achete    += vol
       if (prixDs > 0) {
-        p.last_prix_achat    = prixDs
-        p._sum_prix_vol_achat += prixDs * vol
+        p.last_prix_achat = prixDs
         p._nb_achat_exec++
       }
     } else if (sens === 'Vente') {
       p.usdt_recu += montant
       p.vol_vendu += vol
       if (prixDs > 0) {
-        p.last_prix_vente    = prixDs
-        p._sum_prix_vol_vente += prixDs * vol
+        p.last_prix_vente = prixDs
         p._nb_vente_exec++
       }
     }
   })
 
   Object.values(P).forEach(p => {
-    // Moyennes pondérées par volume
+    // ── Position nette ──────────────────────────────────────
+    p.position    = p.vol_achete - p.vol_vendu
+    p.netPosition = p.position
+
+    // ── Moyennes pondérées par volume ───────────────────────
     p.avgBuyPrice  = p.vol_achete > 0 ? p.usdt_investi / p.vol_achete : 0
     p.avgSellPrice = p.vol_vendu  > 0 ? p.usdt_recu    / p.vol_vendu  : null
 
-    // Compat legacy
+    // compat legacy
     p.prix_moy       = p.avgBuyPrice
     p.prix_moy_vente = p.avgSellPrice || 0
 
-    // Position nette
-    p.position   = p.vol_achete - p.vol_vendu
-    p.netPosition = p.position
-
-    // Montant investi en cours (hors coût des ventes)
+    // ── Coût des ventes au prix moyen d'achat ───────────────
     const cout_vendu   = p.avgBuyPrice * p.vol_vendu
     p.investi_en_cours = Math.max(0, p.usdt_investi - cout_vendu)
     p.amountInvested   = p.usdt_investi
 
-    // Breakeven = (investi − PnL réalisé) / position nette
+    // ── PnL réalisé ─────────────────────────────────────────
+    // = ce qu'on a reçu en vendant − ce que ça nous avait coûté (au prix moy. achat)
     p.pnl_realise = p.vol_vendu > 0 && p.avgBuyPrice > 0
       ? p.usdt_recu - cout_vendu
-      : p.usdt_recu
-
-    p.breakeven = p.netPosition > 0
-      ? (p.usdt_investi - p.pnl_realise) / p.netPosition
       : 0
 
-    // PnL latent (basé sur breakeven, pas prix moyen simple)
+    // ── Breakeven ────────────────────────────────────────────
+    // = capital encore engagé / position nette restante
+    p.breakeven = p.netPosition > 0
+      ? p.investi_en_cours / p.netPosition
+      : 0
+
+    // ── PnL latent (journal — basé sur dernier prix saisi) ───
     p.pnl_latent = p.netPosition > 0 && p.breakeven > 0 && p.last_prix_achat > 0
       ? p.netPosition * (p.last_prix_achat - p.breakeven)
       : 0
 
     p.pnl_total = p.pnl_realise + p.pnl_latent
 
-    // Pourcentages PnL (base = amountInvested)
+    // ── Pourcentages PnL ─────────────────────────────────────
     const base = p.amountInvested || 1
     p.pnlRealizedPct = p.pnl_realise / base * 100
     p.pnlLatentPct   = p.pnl_latent  / base * 100
     p.pnlTotalPct    = p.pnl_total   / base * 100
 
-    // Statistiques ordres
+    // ── Compteurs ordres ─────────────────────────────────────
     p.totalOrders     = p.nb_total
     p.executedOrders  = p.nb_exec
     p.cancelledOrders = p.nb_annule
@@ -159,7 +157,7 @@ export function process(rows) {
     p.buyOrdersCount  = p._nb_achat_exec
     p.sellOrdersCount = p._nb_vente_exec
 
-    // Champs live — initialisés à null
+    // ── Champs live — initialisés à null ─────────────────────
     p.cours_live        = null
     p.pnl_realise_live  = null
     p.pnl_latent_live   = null
@@ -204,38 +202,40 @@ export function enrichWithPrices(pairList, prices) {
       return Object.assign({}, p, { cours_live: coursLive != null ? coursLive : null })
     }
 
+    // PnL réalisé ne change pas avec le cours live
     const pnlRealiseLive = p.pnl_realise
-    // PnL latent live basé sur breakeven
-    const pnlLatentLive  = p.netPosition > 0 && p.breakeven > 0
+
+    // PnL latent live = (cours actuel − breakeven) × position nette
+    const pnlLatentLive = p.netPosition > 0 && p.breakeven > 0
       ? p.netPosition * (coursLive - p.breakeven)
       : 0
-    const pnlTotalLive   = pnlRealiseLive + pnlLatentLive
 
-    // Valeur actuelle de la position
-    const currentValue = p.netPosition * coursLive
+    const pnlTotalLive = pnlRealiseLive + pnlLatentLive
 
-    // Deltas prix
-    const deltaVsAvgBuy     = coursLive - p.avgBuyPrice
-    const deltaVsAvgBuyPct  = p.avgBuyPrice > 0 ? deltaVsAvgBuy / p.avgBuyPrice * 100 : null
-    const deltaVsAvgSell    = p.avgSellPrice != null ? coursLive - p.avgSellPrice : null
-    const deltaVsAvgSellPct = p.avgSellPrice != null && p.avgSellPrice > 0
-      ? deltaVsAvgSell / p.avgSellPrice * 100 : null
-    const deltaVsBreakeven    = p.breakeven > 0 ? coursLive - p.breakeven : null
-    const deltaVsBreakevenPct = p.breakeven > 0 ? deltaVsBreakeven / p.breakeven * 100 : null
-
-    // Pourcentages PnL live
     const base = p.amountInvested || 1
     const pnlRealizedPctLive = pnlRealiseLive / base * 100
     const pnlLatentPctLive   = pnlLatentLive  / base * 100
     const pnlTotalPctLive    = pnlTotalLive   / base * 100
 
+    // Valeur actuelle de la position
+    const currentValue = p.netPosition * coursLive
+
+    // Deltas prix vs références
+    const deltaVsAvgBuy      = coursLive - p.avgBuyPrice
+    const deltaVsAvgBuyPct   = p.avgBuyPrice > 0 ? deltaVsAvgBuy / p.avgBuyPrice * 100 : null
+    const deltaVsAvgSell     = p.avgSellPrice != null ? coursLive - p.avgSellPrice : null
+    const deltaVsAvgSellPct  = p.avgSellPrice != null && p.avgSellPrice > 0
+      ? deltaVsAvgSell / p.avgSellPrice * 100 : null
+    const deltaVsBreakeven    = p.breakeven > 0 ? coursLive - p.breakeven : null
+    const deltaVsBreakevenPct = p.breakeven > 0 ? deltaVsBreakeven / p.breakeven * 100 : null
+
     return Object.assign({}, p, {
-      cours_live:       coursLive,
-      currentPrice:     coursLive,
+      cours_live:           coursLive,
+      currentPrice:         coursLive,
       currentValue,
-      pnl_realise_live: pnlRealiseLive,
-      pnl_latent_live:  pnlLatentLive,
-      pnl_total_live:   pnlTotalLive,
+      pnl_realise_live:     pnlRealiseLive,
+      pnl_latent_live:      pnlLatentLive,
+      pnl_total_live:       pnlTotalLive,
       pnlRealizedPctLive,
       pnlLatentPctLive,
       pnlTotalPctLive,

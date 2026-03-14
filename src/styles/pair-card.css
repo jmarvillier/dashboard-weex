@@ -1,7 +1,15 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   pair-card.css — PairCard v2 (ticket #29)
-   Charte v5 : bleu nuit crépusculaire · Space Mono · tokens CSS
+   pair-card.css — PairCard v2
+   Charte v5 : bleu nuit · Space Mono · layout horizontal compact
    ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Grille des cards ──────────────────────────────────────────────────── */
+.pairs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
 
 /* ── Carte wrapper ─────────────────────────────────────────────────────── */
 .pc-v2 {
@@ -13,9 +21,9 @@
   animation: fadeUp .4s ease both;
 }
 .pc-v2:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: rgba(200,160,32,.3);
-  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
 }
 .pc-v2.excluded {
   opacity: .38;
@@ -27,17 +35,16 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 14px 18px;
+  padding: 12px 16px;
   background: var(--bg3);
   border-bottom: 1px solid var(--border);
   gap: 10px;
 }
-.pc2-header-left { flex: 1; min-width: 0; }
+.pc2-header-left  { flex: 1; min-width: 0; }
 .pc2-header-right {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -49,17 +56,16 @@
   color: var(--text);
   line-height: 1;
 }
-
 .pc2-price-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 5px;
+  gap: 8px;
+  margin-top: 4px;
 }
 .pc2-current-price {
   font-family: 'Space Mono', monospace;
-  font-size: .72rem;
+  font-size: .68rem;
   font-weight: 500;
   color: var(--text2);
 }
@@ -83,18 +89,10 @@
   font-weight: 700;
   white-space: nowrap;
 }
-.pc2-badge-pos {
-  background: rgba(61,191,144,.1);
-  border: 1px solid rgba(61,191,144,.28);
-}
-.pc2-badge-neg {
-  background: rgba(212,90,80,.1);
-  border: 1px solid rgba(212,90,80,.28);
-}
-.pc2-badge-neu {
-  background: rgba(255,255,255,.04);
-  border: 1px solid var(--border);
-}
+.pc2-badge-pos { background: rgba(61,191,144,.1);  border: 1px solid rgba(61,191,144,.28); }
+.pc2-badge-neg { background: rgba(212,90,80,.1);   border: 1px solid rgba(212,90,80,.28); }
+.pc2-badge-neu { background: rgba(255,255,255,.04); border: 1px solid var(--border); }
+
 .pc2-badge-usdt {
   font-family: 'Space Mono', monospace;
   font-size: .65rem;
@@ -111,51 +109,74 @@
 .pc2-badge-neu .pc2-badge-usdt,
 .pc2-badge-neu .pc2-badge-pct { color: var(--text2); }
 
+/* ── Corps de la carte : layout 2 colonnes ─────────────────────────────── */
+.pc2-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+}
+
 /* ── Sections ──────────────────────────────────────────────────────────── */
 .pc2-section {
-  padding: 14px 18px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }
-.pc2-section:last-child { border-bottom: none; }
+.pc2-section:nth-child(2n) {
+  border-right: none;
+}
+/* Dernière rangée : pas de border-bottom */
+.pc2-section:nth-last-child(-n+2) {
+  border-bottom: none;
+}
+/* Section pleine largeur (ordres) */
+.pc2-section-full {
+  grid-column: 1 / -1;
+  border-right: none;
+}
+/* Section pleine largeur en bas : pas de border-bottom */
+.pc2-section-full:last-child {
+  border-bottom: none;
+}
 
 .pc2-section-label {
   font-family: 'Space Mono', monospace;
-  font-size: .48rem;
+  font-size: .46rem;
   font-weight: 600;
   letter-spacing: .1em;
   color: var(--muted);
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 9px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-/* ── Séparateur léger ──────────────────────────────────────────────────── */
+/* ── Séparateur ────────────────────────────────────────────────────────── */
 .pc2-sep {
   border: none;
   border-top: 1px solid var(--border);
-  margin: 10px 0;
+  margin: 8px 0;
 }
 
-/* ── Grilles KPI ───────────────────────────────────────────────────────── */
+/* ── Grilles KPI internes ──────────────────────────────────────────────── */
 .pc2-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 .pc2-grid-3 {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* ── KpiBox ────────────────────────────────────────────────────────────── */
 .kpi-box {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 8px 10px;
   position: relative;
   overflow: visible;
 }
@@ -163,12 +184,12 @@
 
 .kpi-box-label {
   font-family: 'Space Mono', monospace;
-  font-size: .48rem;
+  font-size: .44rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: .09em;
   color: var(--muted);
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -176,42 +197,37 @@
 .kpi-box-value {
   font-family: 'Space Mono', monospace;
   font-weight: 700;
-  font-size: .85rem;
+  font-size: .82rem;
   color: var(--text);
   line-height: 1.2;
 }
 .kpi-box-sublabel {
   font-family: 'Space Mono', monospace;
-  font-size: .5rem;
+  font-size: .46rem;
   color: var(--muted);
-  margin-top: 3px;
+  margin-top: 2px;
 }
 
-/* Couleurs valeurs KPI */
 .kpi-val-pos { color: var(--green) !important; }
 .kpi-val-neg { color: var(--red)   !important; }
 .kpi-val-neu { color: var(--muted) !important; }
 
-/* ── Groupe 3 — prix actuel ────────────────────────────────────────────── */
-.pc2-current-box .kpi-box-value {
-  font-family: 'Space Mono', monospace;
-  font-size: .88rem;
-  font-weight: 700;
-}
+/* ── Groupe prix actuel ────────────────────────────────────────────────── */
 .pc2-current-sep {
   border-top: 1px solid var(--border);
-  margin: 7px 0;
+  margin: 5px 0;
 }
 .pc2-delta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-family: 'Space Mono', monospace;
-  font-size: .52rem;
-  margin-top: 4px;
+  font-size: .5rem;
+  margin-top: 3px;
+  gap: 6px;
 }
-.pc2-delta-label { color: var(--muted); }
-.pc2-delta-val   { font-weight: 600; }
+.pc2-delta-label { color: var(--muted); flex-shrink: 0; }
+.pc2-delta-val   { font-weight: 600; text-align: right; }
 .pc2-delta-pos   { color: var(--green); }
 .pc2-delta-neg   { color: var(--red); }
 .pc2-delta-neu   { color: var(--muted); }
@@ -273,59 +289,44 @@
   color: var(--text);
   letter-spacing: .04em;
 }
-.kpi-tooltip-desc {
-  color: var(--text2);
-  font-size: .57rem;
-}
+.kpi-tooltip-desc  { color: var(--text2); font-size: .57rem; }
 .kpi-tooltip-formula {
   font-family: 'Space Mono', monospace;
   font-size: .52rem;
   background: var(--bg3);
   padding: 3px 7px;
   border-radius: 5px;
-  display: block;
-  margin-top: 2px;
   color: var(--gold);
   line-height: 1.6;
   white-space: pre-line;
-}
-
-/* ── Section PnL — live dot intégré ───────────────────────────────────── */
-.pc2-section .pc2-section-label .live-dot {
-  width: 6px;
-  height: 6px;
 }
 
 /* ── Chips ordres ──────────────────────────────────────────────────────── */
 .pc2-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 5px;
+  margin-bottom: 8px;
 }
 .pc2-chip {
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 3px 10px;
+  padding: 2px 9px;
   font-family: 'Space Mono', monospace;
-  font-size: .52rem;
+  font-size: .5rem;
   color: var(--text2);
-  letter-spacing: .02em;
 }
-.pc2-chip b {
-  color: var(--text);
-  font-weight: 700;
-}
+.pc2-chip b { color: var(--text); font-weight: 700; }
 
 /* ── Barre achats/ventes ───────────────────────────────────────────────── */
 .pc2-bar-labels {
   display: flex;
   justify-content: space-between;
   font-family: 'Space Mono', monospace;
-  font-size: .55rem;
+  font-size: .52rem;
   color: var(--text2);
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 .pc2-bar-track {
   width: 100%;
@@ -345,10 +346,47 @@
   gap: 8px;
   background: rgba(212,90,80,.07);
   border-top: 1px solid rgba(212,90,80,.2);
-  padding: 6px 18px;
+  padding: 5px 16px;
   font-family: 'Space Mono', monospace;
-  font-size: .6rem;
+  font-size: .55rem;
   color: var(--red);
   letter-spacing: .08em;
   text-transform: uppercase;
+}
+
+/* ── Flag btn ──────────────────────────────────────────────────────────── */
+.flag-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text2);
+  font-size: .8rem;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.flag-btn:hover   { border-color: var(--red); }
+.flag-btn.flagged { background: rgba(212,90,80,.1); border-color: rgba(212,90,80,.4); }
+
+/* ── Dépôt ─────────────────────────────────────────────────────────────── */
+.depot-body  { display: flex; align-items: center; gap: 24px; padding: 4px 0; flex-wrap: wrap; }
+.depot-stat  { display: flex; flex-direction: column; gap: 2px; }
+.depot-val   { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--text); }
+.depot-val.o { color: var(--gold); }
+.depot-unit  { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.depot-note  { font-size: .52rem; color: var(--muted); font-style: italic; margin-top: 4px; }
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .pairs-grid { grid-template-columns: 1fr; }
+  .pc2-body   { grid-template-columns: 1fr; }
+  .pc2-section { border-right: none; }
+  .pc2-section:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
+  .pc2-section:last-child,
+  .pc2-section-full:last-child { border-bottom: none; }
 }
