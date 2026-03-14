@@ -43,12 +43,11 @@ export default function PairCard({ p, excluded, onToggle, index }) {
   const [tip, setTip] = useState(null)
   const isExcl = excluded.has(p.name)
   const sym    = p.name.split('/')[0]
-  const id     = p.name // raccourci
+  const id     = p.name
 
   const hasLive = p.cours_live != null
   const price   = p.cours_live ?? p.last_prix_achat ?? 0
 
-  // PnL — live si dispo, sinon journal
   const pnlR    = hasLive ? (p.pnl_realise_live ?? p.pnl_realise) : p.pnl_realise
   const pnlL    = hasLive ? (p.pnl_latent_live  ?? p.pnl_latent)  : p.pnl_latent
   const pnlT    = hasLive ? (p.pnl_total_live   ?? p.pnl_total)   : p.pnl_total
@@ -56,17 +55,15 @@ export default function PairCard({ p, excluded, onToggle, index }) {
   const pnlLPct = hasLive ? (p.pnlLatentPctLive   ?? p.pnlLatentPct)   : p.pnlLatentPct
   const pnlTPct = hasLive ? (p.pnlTotalPctLive    ?? p.pnlTotalPct)    : p.pnlTotalPct
 
-  // Deltas
-  const dBuy    = hasLive ? p.deltaVsAvgBuy    : (p.avgBuyPrice > 0 && price > 0 ? price - p.avgBuyPrice : null)
-  const dBuyPct = hasLive ? p.deltaVsAvgBuyPct : (dBuy != null ? dBuy / p.avgBuyPrice * 100 : null)
+  const dBuy     = hasLive ? p.deltaVsAvgBuy     : (p.avgBuyPrice > 0 && price > 0 ? price - p.avgBuyPrice : null)
+  const dBuyPct  = hasLive ? p.deltaVsAvgBuyPct  : (dBuy != null ? dBuy / p.avgBuyPrice * 100 : null)
   const dSell    = p.deltaVsAvgSell    ?? null
   const dSellPct = p.deltaVsAvgSellPct ?? null
   const dBePct   = p.deltaVsBreakevenPct ?? null
 
-  // Barre ordres
-  const tot    = (p.buyOrders || 0) + (p.sellOrders || 0)
-  const buyW   = tot > 0 ? p.buyOrders  / tot * 100 : 100
-  const sellW  = tot > 0 ? p.sellOrders / tot * 100 : 0
+  const tot   = (p.buyOrders || 0) + (p.sellOrders || 0)
+  const buyW  = tot > 0 ? p.buyOrders  / tot * 100 : 100
+  const sellW = tot > 0 ? p.sellOrders / tot * 100 : 0
 
   // ── Dépôt ────────────────────────────────────────────────────────────────
   if (p.is_depot) {
@@ -85,7 +82,8 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             <div className="pc2-badge neu">
               <span className="pc2-badge-val">💰 {fmt(p.capital_depose)} USDT</span>
             </div>
-            <button className={`pc2-flag${isExcl?' on':''}`} onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
+            <button className={`pc2-flag${isExcl?' on':''}`}
+                    onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
               {isExcl?'🚩':'🏳'}
             </button>
           </div>
@@ -126,6 +124,24 @@ export default function PairCard({ p, excluded, onToggle, index }) {
               <span className={`pc2-be ${cc(dBePct)}`}>{fmtPct(dBePct)} vs breakeven</span>
             )}
           </div>
+          {/* Deltas prix — déplacés ici depuis la section position */}
+          {(dBuy != null || p.avgSellPrice != null) && (
+            <div className="pc2-deltas">
+              <div className="pc2-delta">
+                <span className="pc2-delta-lbl">vs moy. achat</span>
+                <span className={`pc2-delta-val ${cc(dBuy)}`}>
+                  {dBuy != null ? `${fmtSign(dBuy)} USDT (${fmtPct(dBuyPct)})` : '—'}
+                </span>
+              </div>
+              <div className="pc2-delta">
+                <span className="pc2-delta-lbl">vs moy. vente</span>
+                {dSell != null
+                  ? <span className={`pc2-delta-val ${cc(dSell)}`}>{fmtSign(dSell)} USDT ({fmtPct(dSellPct)})</span>
+                  : <span className="pc2-delta-val neu">— (pas de vente)</span>
+                }
+              </div>
+            </div>
+          )}
         </div>
         <div className="pc2-head-right">
           <div className={`pc2-badge ${cc(pnlT)}`}>
@@ -145,7 +161,6 @@ export default function PairCard({ p, excluded, onToggle, index }) {
       <div className="pc2-section">
         <div className="pc2-slabel">POSITION OUVERTE</div>
 
-        {/* Groupe 1 : position + investi */}
         <div className="pc2-g2">
           <KpiBox label="Position nette" value={`${fmtQty(p.netPosition ?? p.position)} ${sym}`}
             tooltipId={`${id}-np`} tooltipTitle="Position nette"
@@ -161,7 +176,6 @@ export default function PairCard({ p, excluded, onToggle, index }) {
 
         <div className="pc2-sep" />
 
-        {/* Groupe 2 : moy. achat / moy. vente / breakeven */}
         <div className="pc2-g3">
           <KpiBox label="Moy. achat"
             value={p.avgBuyPrice > 0 ? fmtPrice(p.avgBuyPrice) : '—'}
@@ -172,8 +186,15 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             openId={tip} setOpenId={setTip} />
           <KpiBox label="Moy. vente"
             value={p.avgSellPrice != null ? fmtPrice(p.avgSellPrice) : '—'}
-            sublabel={p.avgSellPrice != null ? `${p.sellOrdersCount ?? p.nb_vente} ordres` : '0 ordres'}
-            valueColor={p.avgSellPrice == null ? 'neu' : p.avgSellPrice > p.avgBuyPrice ? 'pos' : p.avgSellPrice < p.avgBuyPrice ? 'neg' : 'neu'}
+            sublabel={p.avgSellPrice != null
+              ? `${p.sellOrdersCount ?? p.nb_vente} ordres`
+              : '0 ordres'}
+            valueColor={
+              p.avgSellPrice == null ? 'neu'
+              : p.avgSellPrice > p.avgBuyPrice ? 'pos'
+              : p.avgSellPrice < p.avgBuyPrice ? 'neg'
+              : 'neu'
+            }
             tooltipId={`${id}-av`} tooltipTitle="Prix moyen de vente"
             tooltipDesc="Moyenne pondérée de toutes les ventes."
             tooltipFormula="Σ (prix × qté) / Σ qté vendue"
@@ -186,34 +207,6 @@ export default function PairCard({ p, excluded, onToggle, index }) {
             tooltipFormula="Investi en cours / Position nette"
             openId={tip} setOpenId={setTip} />
         </div>
-
-        <div className="pc2-sep" />
-
-        {/* Groupe 3 : prix actuel + deltas */}
-        <div className="pc2-prix-box">
-          <div className="kb-label">
-            Prix actuel
-            <KpiTooltip id={`${id}-px`} title="Prix actuel"
-              description="Écarts entre le cours actuel et vos prix de référence."
-              formula={"vs moy. achat : Prix − Moy. achat\nvs moy. vente : Prix − Moy. vente"}
-              openId={tip} setOpenId={setTip} />
-          </div>
-          <div className="pc2-prix-val">{price > 0 ? `${fmtPrice(price)} USDT` : '—'}</div>
-          <div className="pc2-prix-sep" />
-          <div className="pc2-delta">
-            <span className="pc2-delta-lbl">vs moy. achat</span>
-            <span className={`pc2-delta-val ${cc(dBuy)}`}>
-              {dBuy != null ? `${fmtSign(dBuy)} USDT (${fmtPct(dBuyPct)})` : '—'}
-            </span>
-          </div>
-          <div className="pc2-delta">
-            <span className="pc2-delta-lbl">vs moy. vente</span>
-            {dSell != null
-              ? <span className={`pc2-delta-val ${cc(dSell)}`}>{fmtSign(dSell)} USDT ({fmtPct(dSellPct)})</span>
-              : <span className="pc2-delta-val neu">— (pas de vente)</span>
-            }
-          </div>
-        </div>
       </div>
 
       {/* ── PNL ── */}
@@ -223,19 +216,25 @@ export default function PairCard({ p, excluded, onToggle, index }) {
           PNL (COURS ACTUEL)
         </div>
         <div className="pc2-g3">
-          <KpiBox label="Réalisé" value={`${fmtSign(pnlR)} USDT`} sublabel={fmtPct(pnlRPct) ?? '0,0 %'}
+          <KpiBox label="Réalisé"
+            value={`${fmtSign(pnlR)} USDT`}
+            sublabel={fmtPct(pnlRPct) ?? '0,0 %'}
             valueColor={cc(pnlR)}
             tooltipId={`${id}-pr`} tooltipTitle="PnL réalisé"
             tooltipDesc="Gains/pertes sur ventes clôturées."
             tooltipFormula="Recettes − Coût au prix moy."
             openId={tip} setOpenId={setTip} />
-          <KpiBox label="Latent" value={`${fmtSign(pnlL)} USDT`} sublabel={fmtPct(pnlLPct) ?? '0,0 %'}
+          <KpiBox label="Latent"
+            value={`${fmtSign(pnlL)} USDT`}
+            sublabel={fmtPct(pnlLPct) ?? '0,0 %'}
             valueColor={cc(pnlL)}
             tooltipId={`${id}-pl`} tooltipTitle="PnL latent"
             tooltipDesc="Gain/perte non réalisé sur position ouverte."
             tooltipFormula="(Prix − Breakeven) × Position"
             openId={tip} setOpenId={setTip} />
-          <KpiBox label="Total" value={`${fmtSign(pnlT)} USDT`} sublabel={fmtPct(pnlTPct) ?? '0,0 %'}
+          <KpiBox label="Total"
+            value={`${fmtSign(pnlT)} USDT`}
+            sublabel={fmtPct(pnlTPct) ?? '0,0 %'}
             valueColor={cc(pnlT)}
             tooltipId={`${id}-pt`} tooltipTitle="PnL total"
             tooltipDesc="Vision complète de la performance."
