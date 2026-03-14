@@ -64,9 +64,14 @@
 }
 
 .sidebar-logo-wrap {
-  padding: 16px 14px 14px;
+  height: var(--topbar-h);
+  min-height: var(--topbar-h);
+  max-height: var(--topbar-h);
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .sidebar-nav {
