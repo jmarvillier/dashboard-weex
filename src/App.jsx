@@ -78,21 +78,23 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
     navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload())
   }, [])
 
-  async function handleBtn() {
-    if (btnMode === 'ios') { setShowIos(v => !v); return }
-    if (btnMode === 'android' && deferredPrompt.current) {
-      deferredPrompt.current.prompt()
-      const { outcome } = await deferredPrompt.current.userChoice
-      deferredPrompt.current = null
-      if (outcome === 'accepted') { setBtnMode(null); localStorage.setItem('ydash-install-dismissed', '1') }
-      return
-    }
-    if (btnMode === 'update') {
-      const sw = pendingSW.current
-      if (sw) sw.postMessage({ type: 'SKIP_WAITING' })
-      else window.location.reload()
-    }
-  }
+  const {
+    view, zone, loading, loadingTxt,
+    fileName, loadedAt, pairList, rawRows, excluded, driveErr,
+    repoAvailable,
+    // Prix live
+    prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
+    setZone, setDriveErr,
+    openFromRepository,
+    loadFromFile,
+    loadFromDrive,
+    clearRepository,
+    refreshRepoAvailable,
+    toggleFlag,
+    backToLanding,
+  } = useTrading()
+
+  const [activePage, setActivePage] = useState('dashboard')
 
   function dismissBtn() {
     if (btnMode === 'update') localStorage.setItem('ydash-update-dismissed-sha', newSWsha.current ?? '')
@@ -280,7 +282,24 @@ export default function AppShell({
         <Topbar
           activePage={activePage}
           loadedAt={loadedAt}
-          setSidebarOpen={setSidebarOpen}
+          excluded={excluded}
+          pairList={pairList}
+          rawRows={rawRows}
+          prices={prices}
+          repoAvailable={repoAvailable}
+          clearRepository={clearRepository}
+          backToLanding={handleBackToLanding}
+          toggleFlag={toggleFlag}
+          loadFromFile={loadFromFile}
+          loadFromDrive={loadFromDrive}
+          driveErr={driveErr}
+          setDriveErr={setDriveErr}
+          onRepoUpdated={refreshRepoAvailable}
+          pricesLoading={pricesLoading}
+          pricesError={pricesError}
+          priceSource={priceSource}
+          lastPriceUpdate={lastPriceUpdate}
+          refreshPrices={refreshPrices}
         />
         <main className="shell-content">
           {activePage === 'dashboard' && (
