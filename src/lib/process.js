@@ -1,35 +1,18 @@
 import { normPair, parseN, isExec, isAnnul, isUsdPair } from './parser.js'
 
-/**
- * Parse une date depuis une cellule du journal.
- * Gère les formats : DD/MM/YYYY, YYYY-MM-DD, timestamps JS, et les dates Excel (nombre de jours).
- */
 function parseDate(raw) {
   if (!raw) return null
-
-  // Nombre Excel (jours depuis 1900-01-01)
   const n = Number(raw)
   if (!isNaN(n) && n > 40000 && n < 60000) {
     const ms = (n - 25569) * 86400 * 1000
     return new Date(ms)
   }
-
   const s = String(raw).trim()
   if (!s) return null
-
-  // Format DD/MM/YYYY ou DD/MM/YYYY HH:MM
   const dmy = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/)
-  if (dmy) {
-    return new Date(`${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`)
-  }
-
-  // Format ISO YYYY-MM-DD
+  if (dmy) return new Date(`${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`)
   const iso = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/)
-  if (iso) {
-    return new Date(`${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`)
-  }
-
-  // Tentative native (last resort)
+  if (iso) return new Date(`${iso[1]}-${iso[2].padStart(2,'0')}-${iso[3].padStart(2,'0')}`)
   const d = new Date(s)
   return isNaN(d.getTime()) ? null : d
 }
@@ -77,6 +60,11 @@ export function process(rows) {
       nb_achat:        0,
       nb_vente:        0,
       nb_depot:        0,
+      // Accumulateurs pour moyennes pondérées
+      _sum_prix_vol_achat: 0,
+      _sum_prix_vol_vente: 0,
+      _nb_achat_exec:      0,
+      _nb_vente_exec:      0,
     }
 
     const p = P[pair]
@@ -104,33 +92,72 @@ export function process(rows) {
     const montant = usdt || usdc || eur || 0
 
     if (sens === 'Achat') {
-      p.usdt_investi += montant
-      p.vol_achete   += vol
-      if (prixDs > 0) p.last_prix_achat = prixDs
+      p.usdt_investi       += montant
+      p.vol_achete         += vol
+      if (prixDs > 0) {
+        p.last_prix_achat    = prixDs
+        p._sum_prix_vol_achat += prixDs * vol
+        p._nb_achat_exec++
+      }
     } else if (sens === 'Vente') {
       p.usdt_recu += montant
       p.vol_vendu += vol
-      if (prixDs > 0) p.last_prix_vente = prixDs
+      if (prixDs > 0) {
+        p.last_prix_vente    = prixDs
+        p._sum_prix_vol_vente += prixDs * vol
+        p._nb_vente_exec++
+      }
     }
   })
 
   Object.values(P).forEach(p => {
-    p.position       = p.vol_achete - p.vol_vendu
-    p.prix_moy       = p.vol_achete > 0 ? p.usdt_investi / p.vol_achete : 0
-    p.prix_moy_vente = p.vol_vendu  > 0 ? p.usdt_recu    / p.vol_vendu  : 0
+    // Moyennes pondérées par volume
+    p.avgBuyPrice  = p.vol_achete > 0 ? p.usdt_investi / p.vol_achete : 0
+    p.avgSellPrice = p.vol_vendu  > 0 ? p.usdt_recu    / p.vol_vendu  : null
 
-    const cout_vendu   = p.prix_moy * p.vol_vendu
+    // Compat legacy
+    p.prix_moy       = p.avgBuyPrice
+    p.prix_moy_vente = p.avgSellPrice || 0
+
+    // Position nette
+    p.position   = p.vol_achete - p.vol_vendu
+    p.netPosition = p.position
+
+    // Montant investi en cours (hors coût des ventes)
+    const cout_vendu   = p.avgBuyPrice * p.vol_vendu
     p.investi_en_cours = Math.max(0, p.usdt_investi - cout_vendu)
+    p.amountInvested   = p.usdt_investi
 
-    p.pnl_realise = p.vol_vendu > 0 && p.prix_moy > 0
+    // Breakeven = (investi − PnL réalisé) / position nette
+    p.pnl_realise = p.vol_vendu > 0 && p.avgBuyPrice > 0
       ? p.usdt_recu - cout_vendu
       : p.usdt_recu
 
-    p.pnl_latent = p.position > 0 && p.prix_moy > 0 && p.last_prix_achat > 0
-      ? p.position * (p.last_prix_achat - p.prix_moy)
+    p.breakeven = p.netPosition > 0
+      ? (p.usdt_investi - p.pnl_realise) / p.netPosition
+      : 0
+
+    // PnL latent (basé sur breakeven, pas prix moyen simple)
+    p.pnl_latent = p.netPosition > 0 && p.breakeven > 0 && p.last_prix_achat > 0
+      ? p.netPosition * (p.last_prix_achat - p.breakeven)
       : 0
 
     p.pnl_total = p.pnl_realise + p.pnl_latent
+
+    // Pourcentages PnL (base = amountInvested)
+    const base = p.amountInvested || 1
+    p.pnlRealizedPct = p.pnl_realise / base * 100
+    p.pnlLatentPct   = p.pnl_latent  / base * 100
+    p.pnlTotalPct    = p.pnl_total   / base * 100
+
+    // Statistiques ordres
+    p.totalOrders     = p.nb_total
+    p.executedOrders  = p.nb_exec
+    p.cancelledOrders = p.nb_annule
+    p.buyOrders       = p.nb_achat
+    p.sellOrders      = p.nb_vente
+    p.buyOrdersCount  = p._nb_achat_exec
+    p.sellOrdersCount = p._nb_vente_exec
 
     // Champs live — initialisés à null
     p.cours_live        = null
@@ -142,13 +169,6 @@ export function process(rows) {
   return P
 }
 
-/**
- * Extrait les lignes brutes normalisées depuis les rows CSV/XLSX brutes.
- * Chaque ligne retournée a la forme :
- *   { date, pair, sens, statut, prix, usdt, vol, exec, annule }
- *
- * Utilisé par usePeriodFilter pour le filtrage temporel.
- */
 export function extractRawRows(rows) {
   let start = 1
   for (let i = 0; i < Math.min(5, rows.length); i++) {
@@ -159,32 +179,18 @@ export function extractRawRows(rows) {
 
   rows.slice(start).forEach(r => {
     if (!r[1]) return
-
     const pair = normPair(r[1])
     if (!pair) return
-
     const dash    = r[12]
     const dashStr = String(dash).trim().toLowerCase()
     if (dash === false || dashStr === 'false' || dashStr === '0') return
-
     const sens   = String(r[2] || '').trim()
     const stat   = String(r[3] || '').trim()
     const prix   = parseN(r[4])
     const usdt   = parseN(r[5]) || parseN(r[6]) || parseN(r[7])
     const vol    = parseN(r[10])
     const date   = parseDate(r[0])
-
-    result.push({
-      date,
-      pair,
-      sens,
-      statut: stat,
-      prix,
-      usdt,
-      vol,
-      exec:   isExec(stat),
-      annule: isAnnul(stat),
-    })
+    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat) })
   })
 
   return result
@@ -192,21 +198,53 @@ export function extractRawRows(rows) {
 
 export function enrichWithPrices(pairList, prices) {
   return pairList.map(function(p) {
-    var coursLive = prices[p.name]
+    const coursLive = prices[p.name]
 
-    if (coursLive == null || p.is_depot || p.prix_moy <= 0) {
+    if (coursLive == null || p.is_depot || p.avgBuyPrice <= 0) {
       return Object.assign({}, p, { cours_live: coursLive != null ? coursLive : null })
     }
 
-    var pnlRealiseLive = p.pnl_realise
-    var pnlLatentLive  = p.position > 0 ? p.position * (coursLive - p.prix_moy) : 0
-    var pnlTotalLive   = pnlRealiseLive + pnlLatentLive
+    const pnlRealiseLive = p.pnl_realise
+    // PnL latent live basé sur breakeven
+    const pnlLatentLive  = p.netPosition > 0 && p.breakeven > 0
+      ? p.netPosition * (coursLive - p.breakeven)
+      : 0
+    const pnlTotalLive   = pnlRealiseLive + pnlLatentLive
+
+    // Valeur actuelle de la position
+    const currentValue = p.netPosition * coursLive
+
+    // Deltas prix
+    const deltaVsAvgBuy     = coursLive - p.avgBuyPrice
+    const deltaVsAvgBuyPct  = p.avgBuyPrice > 0 ? deltaVsAvgBuy / p.avgBuyPrice * 100 : null
+    const deltaVsAvgSell    = p.avgSellPrice != null ? coursLive - p.avgSellPrice : null
+    const deltaVsAvgSellPct = p.avgSellPrice != null && p.avgSellPrice > 0
+      ? deltaVsAvgSell / p.avgSellPrice * 100 : null
+    const deltaVsBreakeven    = p.breakeven > 0 ? coursLive - p.breakeven : null
+    const deltaVsBreakevenPct = p.breakeven > 0 ? deltaVsBreakeven / p.breakeven * 100 : null
+
+    // Pourcentages PnL live
+    const base = p.amountInvested || 1
+    const pnlRealizedPctLive = pnlRealiseLive / base * 100
+    const pnlLatentPctLive   = pnlLatentLive  / base * 100
+    const pnlTotalPctLive    = pnlTotalLive   / base * 100
 
     return Object.assign({}, p, {
       cours_live:       coursLive,
+      currentPrice:     coursLive,
+      currentValue,
       pnl_realise_live: pnlRealiseLive,
       pnl_latent_live:  pnlLatentLive,
       pnl_total_live:   pnlTotalLive,
+      pnlRealizedPctLive,
+      pnlLatentPctLive,
+      pnlTotalPctLive,
+      deltaVsAvgBuy,
+      deltaVsAvgBuyPct,
+      deltaVsAvgSell,
+      deltaVsAvgSellPct,
+      deltaVsBreakeven,
+      deltaVsBreakevenPct,
     })
   })
 }
