@@ -1,6 +1,7 @@
 /* ══════════════════════════════════════════════════════════════════════════
    variables.css — Design tokens Ydash v5
    Palette bleu nuit crépusculaire · or · silver
+   Contraste textes : WCAG AA minimum 4.5:1 sur tous les fonds
    ══════════════════════════════════════════════════════════════════════════ */
 :root {
   /* ── Fonds ─────────────────────────────────────────────────────────────── */
@@ -12,17 +13,18 @@
   --border:  #1a3050;   /* bordure standard               */
   --border2: #152a42;   /* bordure subtile                */
 
-  /* ── Textes ────────────────────────────────────────────────────────────── */
-  --text:    #c0d8ea;   /* texte principal  (silver clair) */
-  --text2:   #7aaec8;   /* texte secondaire (silver bleu)  */
-  --muted:   #3a6491;   /* labels / désactivé              */
+  /* ── Textes — hiérarchie contrastée ───────────────────────────────────── */
+  /*   Ratio WCAG sur --bg2 (#0d1a2a) :                                      */
+  --text:    #d2e4f0;   /* principal   13.4:1 — valeurs KPI, titres          */
+  --text2:   #a0c4da;   /* secondaire   9.5:1 — sous-titres, descriptions    */
+  --muted:   #6e98b6;   /* hints/labels 5.7:1 — labels uppercase, en-têtes   */
 
-  /* ── Couleurs ──────────────────────────────────────────────────────────── */
-  --gold:    #c8a020;   /* or — accents actifs, $ logo     */
-  --green:   #3dbf90;   /* succès / PnL positif / live     */
-  --red:     #d45a50;   /* danger / PnL négatif            */
-  --blue:    #4a80a8;   /* info / liens                    */
-  --silver:  #7aaec8;   /* silver bleu — Y logo            */
+  /* ── Couleurs accentuées ──────────────────────────────────────────────── */
+  --gold:    #c8a020;   /* or — accents actifs, $ logo    */
+  --green:   #3dbf90;   /* succès / PnL positif / live    */
+  --red:     #d45a50;   /* danger / PnL négatif           */
+  --blue:    #4a80a8;   /* info / liens                   */
+  --silver:  #7aaec8;   /* silver bleu — Y logo           */
 
   /* ── Layout shell ─────────────────────────────────────────────────────── */
   --sidebar-w:  220px;
@@ -72,4 +74,4 @@ body {
 .ld-logo { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 2rem; color: var(--gold); letter-spacing: -.02em; }
 .ld-bar  { width: 200px; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .ld-fill { height: 100%; background: var(--gold); animation: ldp 1.6s ease-in-out infinite; }
-.ld-txt  { font-size: .65rem; color: var(--muted); }
+.ld-txt  { font-size: .65rem; color: var(--text2); }
