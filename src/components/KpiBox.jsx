@@ -1,32 +1,16 @@
-/**
- * KpiBox.jsx
- * Case métrique réutilisable avec tooltip optionnel
- */
 import KpiTooltip from './KpiTooltip.jsx'
 
 export default function KpiBox({
-  label,
-  value,
-  sublabel,
-  tooltipTitle,
-  tooltipDesc,
-  tooltipFormula,
-  valueColor = 'default', // 'default' | 'pos' | 'neg' | 'neu'
-  openId,
-  setOpenId,
-  tooltipId,
-  fullWidth = false,
+  label, value, sublabel,
+  valueColor = 'default',
+  tooltipId, tooltipTitle, tooltipDesc, tooltipFormula,
+  openId, setOpenId,
 }) {
-  const colorClass = {
-    pos: 'kpi-val-pos',
-    neg: 'kpi-val-neg',
-    neu: 'kpi-val-neu',
-    default: '',
-  }[valueColor] || ''
+  const vc = { pos: 'pos', neg: 'neg', neu: 'neu', default: '' }[valueColor] || ''
 
   return (
-    <div className={`kpi-box${fullWidth ? ' kpi-box-full' : ''}`}>
-      <div className="kpi-box-label">
+    <div className="kb">
+      <div className="kb-label">
         {label}
         {tooltipId && (
           <KpiTooltip
@@ -39,8 +23,8 @@ export default function KpiBox({
           />
         )}
       </div>
-      <div className={`kpi-box-value ${colorClass}`}>{value}</div>
-      {sublabel && <div className="kpi-box-sublabel">{sublabel}</div>}
+      <div className={`kb-val${vc ? ' ' + vc : ''}`}>{value}</div>
+      {sublabel && <div className="kb-sub">{sublabel}</div>}
     </div>
   )
 }
