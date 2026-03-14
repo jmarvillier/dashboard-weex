@@ -1,310 +1,184 @@
 /**
- * KpiRow.jsx — Dashboard v5
- * ─────────────────────────────────────────────────────────────────────────────
- * Structure :
- *   Section Capital   → 4 KPIs (déposé, investi, valeur portefeuille, disponible)
- *   Section Perf      → 3 KPIs (PnL réalisé, latent, total) avec indicateur live
- *   Section Ordres    → Synthèse + barre achats/ventes
- *
- * Reçoit les données pré-agrégées depuis usePeriodFilter (prop `data`).
- * Compatibilité ascendante : accepte aussi l'ancienne signature (pairList/excluded)
- * pour ne pas casser AppShell pendant la transition.
+ * KpiRow.jsx — Bande de KPIs globaux + barre live
  */
 
-import { useState } from 'react'
+const fmt  = (v, d = 2) => isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
+const fmtS = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + fmt(Math.abs(n)) }
+const cc   = v => v > 0 ? 'g' : v < 0 ? 'r' : ''
+const pct  = (val, ref) => ref > 0 ? ((val / ref) * 100) : null
 
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
-const fmtN = (v, d = 2) =>
-  isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
+export default function KpiRow({ pairList, excluded, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices }) {
+  const active  = pairList.filter(p => !excluded.has(p.name))
+  const trading = active.filter(p => !p.is_depot)
 
-const fmtS = v => {
-  const n = +v
-  if (isNaN(n)) return '—'
-  return (n >= 0 ? '+ ' : '− ') + fmtN(Math.abs(n))
-}
+  const sDepose = pairList.reduce((s, p) => s + p.capital_depose, 0)
+  const sInv    = trading.reduce((s, p) => s + p.usdt_investi, 0)
 
-const fmtPct = v => {
-  const n = +v
-  if (isNaN(n)) return '—'
-  return (n >= 0 ? '+ ' : '− ') + fmtN(Math.abs(n), 1) + ' %'
-}
+  // PnL journal
+  const sPnlR  = trading.reduce((s, p) => s + p.pnl_realise, 0)
+  const sPnlL  = trading.reduce((s, p) => s + p.pnl_latent, 0)
+  const sPnl   = sPnlR + sPnlL
 
-const cc = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu')
+  // PnL live
+  const hasLive = trading.some(p => p.pnl_latent_live != null)
+  const sPnlRL  = hasLive ? trading.reduce((s, p) => s + (p.pnl_realise_live ?? p.pnl_realise), 0) : null
+  const sPnlLL  = hasLive ? trading.reduce((s, p) => s + (p.pnl_latent_live  ?? 0), 0) : null
+  const sPnlTL  = (sPnlRL !== null && sPnlLL !== null) ? sPnlRL + sPnlLL : null
 
-/* ── Tooltip ─────────────────────────────────────────────────────────────── */
-function Tooltip({ id, title, desc, formula, openId, setOpenId }) {
-  const isOpen = openId === id
-  return (
-    <div className="v5-tooltip-wrap">
-      <button
-        className="v5-info-btn"
-        aria-label={`Info ${title}`}
-        onClick={e => { e.stopPropagation(); setOpenId(isOpen ? null : id) }}
-      >
-        i
-      </button>
-      {isOpen && (
-        <div className="v5-tooltip">
-          <strong>{title}</strong>
-          <span>{desc}</span>
-          {formula && <code>{formula}</code>}
-        </div>
-      )}
-    </div>
-  )
-}
+  const sTot   = active.reduce((s, p) => s + p.nb_total, 0)
+  const sExec  = active.reduce((s, p) => s + p.nb_exec, 0)
+  const sCanc  = active.reduce((s, p) => s + p.nb_annule, 0)
+  const ePct   = sTot > 0 ? sExec / sTot * 100 : 0
+  const nActif = trading.length
 
-/* ── KPI Card ────────────────────────────────────────────────────────────── */
-function KpiCard({ label, value, unit = 'USDT', sub, subClass, tipId, tipTitle, tipDesc, tipFormula, openId, setOpenId, borderColor, className = '' }) {
-  return (
-    <div className={`v5-kpi${className ? ' ' + className : ''}`} style={borderColor ? { borderColor } : undefined}>
-      <div className="v5-kpi-label">
-        <span>{label}</span>
-        {tipId && (
-          <Tooltip
-            id={tipId}
-            title={tipTitle}
-            desc={tipDesc}
-            formula={tipFormula}
-            openId={openId}
-            setOpenId={setOpenId}
-          />
-        )}
-      </div>
-      <div className="v5-kpi-val">
-        {value} <span className="v5-kpi-unit">{unit}</span>
-      </div>
-      {sub && <div className={`v5-kpi-sub${subClass ? ' ' + subClass : ''}`}>{sub}</div>}
-    </div>
-  )
-}
+  const pctPnlR  = pct(sPnlR, sInv)
+  const pctPnlL  = pct(sPnlL, sInv)
+  const pctPnl   = pct(sPnl,  sInv)
+  const pctPnlTL = sPnlTL !== null ? pct(sPnlTL, sInv) : null
 
-/* ── Composant principal ─────────────────────────────────────────────────── */
-export default function KpiRow({
-  // Nouvelle signature v5
-  data,
-  pricesLoading,
-  pricesError,
-  lastPriceUpdate,
-  refreshPrices,
-
-  // Ancienne signature (fallback si data absent)
-  pairList,
-  excluded,
-  priceSource,
-}) {
-  const [openTip, setOpenTip] = useState(null)
-
-  // ── Fermer les tooltips au clic extérieur ─────────────────────────────────
-  // (géré par le parent via click sur document, mais on fournit le setter)
-
-  // ── Mode fallback (ancienne API sans data agrégée) ────────────────────────
-  let d = data
-  if (!d && pairList) {
-    const trading = pairList.filter(p => !excluded?.has(p.name) && !p.is_depot)
-    const depots  = pairList.filter(p => p.is_depot)
-    const sDepose = depots.reduce((s, p) => s + (p.capital_depose || 0), 0)
-    const sInv    = trading.reduce((s, p) => s + (p.usdt_investi  || 0), 0)
-    const sPnlR   = trading.reduce((s, p) => s + (p.pnl_realise_live ?? p.pnl_realise ?? 0), 0)
-    const sPnlL   = trading.reduce((s, p) => s + (p.pnl_latent_live  ?? p.pnl_latent  ?? 0), 0)
-    const sTot    = pairList.reduce((s, p) => s + (p.nb_total  || 0), 0)
-    const sExec   = pairList.reduce((s, p) => s + (p.nb_exec   || 0), 0)
-    const sCanc   = pairList.reduce((s, p) => s + (p.nb_annule || 0), 0)
-    const sAchat  = pairList.reduce((s, p) => s + (p.nb_achat  || 0), 0)
-    const sVente  = pairList.reduce((s, p) => s + (p.nb_vente  || 0), 0)
-    const valPtf  = trading.reduce((s, p) => s + ((p.pnl_latent_live ?? p.pnl_latent ?? 0) + (p.usdt_investi || 0)), 0)
-    const bw      = sAchat + sVente > 0 ? (sAchat / (sAchat + sVente)) * 100 : 0
-    d = {
-      capitalDepose:     sDepose,
-      capitalInvesti:    sInv,
-      valPortefeuille:   valPtf,
-      valPortefeuillePct: sInv > 0 ? ((valPtf - sInv) / sInv) * 100 : 0,
-      capitalDispo:      sDepose - sInv,
-      capitalDispoPct:   sDepose > 0 ? ((sDepose - sInv) / sDepose) * 100 : 0,
-      pnlRealise:     sPnlR,
-      pnlRealisePct:  sInv > 0 ? (sPnlR / sInv) * 100 : 0,
-      pnlLatent:      sPnlL,
-      pnlLatentPct:   sInv > 0 ? (sPnlL / sInv) * 100 : 0,
-      pnlTotal:       sPnlR + sPnlL,
-      pnlTotalPct:    sInv > 0 ? ((sPnlR + sPnlL) / sInv) * 100 : 0,
-      nbTotal: sTot, nbExec: sExec, nbAnnule: sCanc, tauxExec: sTot > 0 ? (sExec / sTot) * 100 : 0,
-      nbAchat: sAchat, nbVente: sVente, buyW: bw, sellW: 100 - bw,
-    }
-  }
-
-  if (!d) return null
-
-  const {
-    capitalDepose, capitalInvesti, valPortefeuille, valPortefeuillePct,
-    capitalDispo, capitalDispoPct,
-    pnlRealise, pnlRealisePct, pnlLatent, pnlLatentPct, pnlTotal, pnlTotalPct,
-    nbTotal, nbExec, nbAnnule, tauxExec,
-    nbAchat, nbVente, buyW, sellW,
-  } = d
-
-  const totBorderColor = pnlTotal > 0
-    ? 'var(--color-border-success, rgba(0,214,143,.5))'
-    : pnlTotal < 0
-    ? 'var(--color-border-danger, rgba(245,71,106,.5))'
-    : undefined
-
+  // lastPriceUpdate est déjà une string 'HH:MM'
   const updateLabel = lastPriceUpdate ?? '—'
-  const sourceLabel = pricesError ? '⚠️ Erreur' : (pricesLoading ? 'chargement…' : 'live')
+
+  const sourceLabel = pricesError
+    ? '⚠️ Erreur'
+    : priceSource ?? 'chargement…'
 
   return (
-    <div className="v5-kpi-root" onClick={() => setOpenTip(null)}>
+    <div className="kpi-section">
 
-      {/* ══ CAPITAL ══════════════════════════════════════════════════════════ */}
-      <section className="v5-section">
-        <h2 className="v5-section-title">Capital</h2>
-        <div className="v5-kpi-grid v5-g4">
+      {/* ── Ligne 1 : KPIs statiques ── */}
+      <div className="kpi-row">
 
-          <KpiCard
-            label="Capital déposé"
-            value={fmtN(capitalDepose)}
-            tipId="tip-dep" tipTitle="Capital déposé"
-            tipDesc="Total cumulé de tous vos apports depuis le début. Ne diminue jamais."
-            tipFormula="Σ dépôts USDT"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
-          <KpiCard
-            label="Capital investi"
-            value={fmtN(capitalInvesti)}
-            tipId="tip-inv" tipTitle="Capital investi"
-            tipDesc="Somme actuellement engagée sur les paires actives dans la période."
-            tipFormula="Σ montant investi par paire"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
-          <KpiCard
-            label="Valeur du portefeuille"
-            value={fmtN(valPortefeuille)}
-            sub={fmtPct(valPortefeuillePct) + ' vs investi'}
-            subClass={cc(valPortefeuillePct)}
-            tipId="tip-ptf" tipTitle="Valeur du portefeuille"
-            tipDesc="Valeur actuelle de toutes les positions au cours du marché."
-            tipFormula="Σ (position nette × prix actuel)"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
-          <KpiCard
-            label="Capital disponible"
-            value={fmtN(capitalDispo)}
-            sub={fmtN(capitalDispoPct, 0) + ' % du capital déposé'}
-            subClass="neu"
-            tipId="tip-dispo" tipTitle="Capital disponible"
-            tipDesc="USDT non investi, prêt à être déployé."
-            tipFormula="Capital déposé − Capital investi"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
+        <div className="kpi kpi-capital">
+          <div className="kpi-icon">💰</div>
+          <div className="kpi-l">Capital Déposé</div>
+          <div className="kpi-v o">{fmt(sDepose)}<span className="kpi-unit">USDT</span></div>
+          <div className="kpi-s">Total des apports</div>
         </div>
-      </section>
 
-      {/* ══ PERFORMANCE ══════════════════════════════════════════════════════ */}
-      <section className="v5-section">
-        <h2 className="v5-section-title">
-          <span className={`v5-live-dot${pricesLoading ? ' v5-live-dot--loading' : ''}`} />
-          Performance (cours actuel)
-          <span className="v5-perf-source">
-            {sourceLabel}
-            {!pricesLoading && !pricesError && lastPriceUpdate && (
-              <> · {updateLabel}</>
-            )}
+        <div className="kpi">
+          <div className="kpi-icon">📈</div>
+          <div className="kpi-l">Capital Investi</div>
+          <div className="kpi-v o">{fmt(sInv)}<span className="kpi-unit">USDT</span></div>
+          <div className="kpi-s">{nActif} paire{nActif > 1 ? 's' : ''} active{nActif > 1 ? 's' : ''}</div>
+        </div>
+
+        <div className={`kpi kpi-pnl ${cc(sPnlR)}`}>
+          <div className="kpi-icon">{sPnlR >= 0 ? '✅' : '❌'}</div>
+          <div className="kpi-l">PnL Réalisé <span className="kpi-source-tag">journal</span></div>
+          <div className={`kpi-v ${cc(sPnlR)}`}>{fmtS(sPnlR)}<span className="kpi-unit">USDT</span></div>
+          {pctPnlR !== null && (
+            <div className={`kpi-pct ${cc(sPnlR)}`}>{sPnlR >= 0 ? '+' : '−'}{fmt(Math.abs(pctPnlR), 1)} %</div>
+          )}
+          <div className="kpi-s">Gains / pertes clôturés</div>
+        </div>
+
+        <div className={`kpi kpi-pnl ${cc(sPnlL)}`}>
+          <div className="kpi-icon">{sPnlL >= 0 ? '⏳' : '⚠️'}</div>
+          <div className="kpi-l">PnL Latent <span className="kpi-source-tag">journal</span></div>
+          <div className={`kpi-v ${cc(sPnlL)}`}>{fmtS(sPnlL)}<span className="kpi-unit">USDT</span></div>
+          {pctPnlL !== null && (
+            <div className={`kpi-pct ${cc(sPnlL)}`}>{sPnlL >= 0 ? '+' : '−'}{fmt(Math.abs(pctPnlL), 1)} %</div>
+          )}
+          <div className="kpi-s">Positions ouvertes</div>
+        </div>
+
+        <div className={`kpi kpi-pnl kpi-total ${cc(sPnl)}`}>
+          <div className="kpi-icon">{sPnl >= 0 ? '🚀' : '📉'}</div>
+          <div className="kpi-l">PnL Total <span className="kpi-source-tag">journal</span></div>
+          <div className={`kpi-v kpi-v-big ${cc(sPnl)}`}>{fmtS(sPnl)}<span className="kpi-unit">USDT</span></div>
+          {pctPnl !== null && (
+            <div className={`kpi-pct kpi-pct-big ${cc(sPnl)}`}>{sPnl >= 0 ? '+' : '−'}{fmt(Math.abs(pctPnl), 1)} %</div>
+          )}
+          <div className="kpi-s">Réalisé + Latent</div>
+        </div>
+
+        <div className="kpi">
+          <div className="kpi-icon">📋</div>
+          <div className="kpi-l">Ordres</div>
+          <div className="kpi-v">{sTot}<span className="kpi-unit">total</span></div>
+          <div className="kpi-s">{sExec} exec · {sCanc} annulés</div>
+        </div>
+
+        <div className="kpi">
+          <div className="kpi-icon">🎯</div>
+          <div className="kpi-l">Taux Exécution</div>
+          <div className="kpi-v g">{fmt(ePct, 1)}<span className="kpi-unit">%</span></div>
+          <div className="kpi-s">Exécutés / total</div>
+        </div>
+
+      </div>
+
+      {/* ── Ligne 2 : KPIs live ── */}
+      <div className="kpi-live-bar">
+        <div className="kpi-live-header">
+          <span className={`live-dot${pricesLoading ? ' live-dot-loading' : ''}`}></span>
+          <span className="kpi-live-label">COURS TEMPS RÉEL — {sourceLabel}</span>
+          <span className="kpi-live-update">
+            {pricesLoading
+              ? 'Mise à jour…'
+              : pricesError
+                ? pricesError
+                : `Mis à jour à ${updateLabel}`
+            }
           </span>
           {refreshPrices && (
-            <button className="v5-refresh-btn" onClick={e => { e.stopPropagation(); refreshPrices() }} title="Rafraîchir les prix">
-              ↺
-            </button>
+            <button className="kpi-live-refresh" onClick={refreshPrices} title="Rafraîchir les prix">↺</button>
           )}
-        </h2>
-        <div className="v5-kpi-grid v5-g3">
-
-          <KpiCard
-            label="PnL réalisé"
-            value={<span className={cc(pnlRealise)}>{fmtS(pnlRealise)}</span>}
-            sub={fmtPct(pnlRealisePct)}
-            subClass={cc(pnlRealisePct)}
-            tipId="tip-real" tipTitle="PnL réalisé"
-            tipDesc="Gains/pertes sur les ventes clôturées dans la période sélectionnée."
-            tipFormula="Σ PnL réalisé par paire"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
-          <KpiCard
-            label="PnL latent"
-            value={<span className={cc(pnlLatent)}>{fmtS(pnlLatent)}</span>}
-            sub={fmtPct(pnlLatentPct)}
-            subClass={cc(pnlLatentPct)}
-            tipId="tip-lat" tipTitle="PnL latent"
-            tipDesc="Variation de valeur des positions encore ouvertes."
-            tipFormula="Σ (prix actuel − breakeven) × position nette"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
-          <KpiCard
-            label="PnL total"
-            value={<span className={cc(pnlTotal)}>{fmtS(pnlTotal)}</span>}
-            sub={fmtPct(pnlTotalPct)}
-            subClass={cc(pnlTotalPct)}
-            borderColor={totBorderColor}
-            className="v5-kpi--total"
-            tipId="tip-tot" tipTitle="PnL total"
-            tipDesc="Performance complète sur la période."
-            tipFormula="PnL réalisé + PnL latent"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
         </div>
-      </section>
 
-      {/* ══ ORDRES ═══════════════════════════════════════════════════════════ */}
-      <section className="v5-section">
-        <h2 className="v5-section-title">Ordres</h2>
-        <div className="v5-kpi-grid v5-g2">
+        <div className="kpi-live-row">
 
-          {/* Synthèse */}
-          <div className="v5-kpi v5-orders-synthese">
-            <div className="v5-kpi-label">Synthèse</div>
-            <div className="v5-orders-row">
-              <div className="v5-order-stat">
-                <div className="v5-order-lbl">Total</div>
-                <div className="v5-order-val">{nbTotal}</div>
-              </div>
-              <div className="v5-order-stat">
-                <div className="v5-order-lbl">Exécutés</div>
-                <div className="v5-order-val">{nbExec}</div>
-              </div>
-              <div className="v5-order-stat">
-                <div className="v5-order-lbl">Annulés</div>
-                <div className="v5-order-val neg">{nbAnnule}</div>
-              </div>
-              <div className="v5-order-stat">
-                <div className="v5-order-lbl">Taux exec.</div>
-                <div className={`v5-order-val v5-order-rate ${cc(tauxExec - 50)}`}>
-                  {fmtN(tauxExec, 0)} %
-                </div>
-              </div>
-            </div>
+          <div className={`kpi kpi-pnl kpi-live ${sPnlRL !== null ? cc(sPnlRL) : ''}`}>
+            <div className="kpi-icon">{sPnlRL !== null ? (sPnlRL >= 0 ? '✅' : '❌') : '🔄'}</div>
+            <div className="kpi-l">PnL Réalisé <span className="kpi-source-tag live">live</span></div>
+            {sPnlRL !== null ? (
+              <>
+                <div className={`kpi-v ${cc(sPnlRL)}`}>{fmtS(sPnlRL)}<span className="kpi-unit">USDT</span></div>
+                {pct(sPnlRL, sInv) !== null && (
+                  <div className={`kpi-pct ${cc(sPnlRL)}`}>{sPnlRL >= 0 ? '+' : '−'}{fmt(Math.abs(pct(sPnlRL, sInv)), 1)} %</div>
+                )}
+              </>
+            ) : (
+              <div className="kpi-v kpi-v-pending">—</div>
+            )}
+            <div className="kpi-s">Basé sur cours actuel</div>
           </div>
 
-          {/* Achats vs ventes */}
-          <div className="v5-kpi v5-orders-bar-card">
-            <div className="v5-kpi-label">Achats vs ventes</div>
-            <div className="v5-bar-labels">
-              <span><strong>{nbAchat}</strong> achats</span>
-              <span><strong>{nbVente}</strong> ventes</span>
-            </div>
-            <div className="v5-bar-track">
-              <div className="v5-bar-buy"  style={{ width: buyW  + '%' }} />
-              <div className="v5-bar-sell" style={{ width: sellW + '%' }} />
-            </div>
+          <div className={`kpi kpi-pnl kpi-live ${sPnlLL !== null ? cc(sPnlLL) : ''}`}>
+            <div className="kpi-icon">{sPnlLL !== null ? (sPnlLL >= 0 ? '⏳' : '⚠️') : '🔄'}</div>
+            <div className="kpi-l">PnL Latent <span className="kpi-source-tag live">live</span></div>
+            {sPnlLL !== null ? (
+              <>
+                <div className={`kpi-v ${cc(sPnlLL)}`}>{fmtS(sPnlLL)}<span className="kpi-unit">USDT</span></div>
+                {pct(sPnlLL, sInv) !== null && (
+                  <div className={`kpi-pct ${cc(sPnlLL)}`}>{sPnlLL >= 0 ? '+' : '−'}{fmt(Math.abs(pct(sPnlLL, sInv)), 1)} %</div>
+                )}
+              </>
+            ) : (
+              <div className="kpi-v kpi-v-pending">—</div>
+            )}
+            <div className="kpi-s">Position × (cours live − PM)</div>
+          </div>
+
+          <div className={`kpi kpi-pnl kpi-total kpi-live ${sPnlTL !== null ? cc(sPnlTL) : ''}`}>
+            <div className="kpi-icon">{sPnlTL !== null ? (sPnlTL >= 0 ? '🚀' : '📉') : '🔄'}</div>
+            <div className="kpi-l">PnL Total <span className="kpi-source-tag live">live</span></div>
+            {sPnlTL !== null ? (
+              <>
+                <div className={`kpi-v kpi-v-big ${cc(sPnlTL)}`}>{fmtS(sPnlTL)}<span className="kpi-unit">USDT</span></div>
+                {pctPnlTL !== null && (
+                  <div className={`kpi-pct kpi-pct-big ${cc(sPnlTL)}`}>{sPnlTL >= 0 ? '+' : '−'}{fmt(Math.abs(pctPnlTL), 1)} %</div>
+                )}
+              </>
+            ) : (
+              <div className="kpi-v kpi-v-big kpi-v-pending">—</div>
+            )}
+            <div className="kpi-s">Réalisé + Latent live</div>
           </div>
 
         </div>
-      </section>
-
+      </div>
     </div>
   )
 }

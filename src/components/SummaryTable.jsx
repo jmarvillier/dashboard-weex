@@ -1,151 +1,65 @@
-/**
- * SummaryTable.jsx — Dashboard v5
- * ─────────────────────────────────────────────────────────────────────────────
- * Tableau récapitulatif par paire, filtré sur la période sélectionnée.
- * Colonnes : Paire · Investi · Valeur act. · Breakeven · PnL réalisé · PnL latent · PnL total
- *
- * Reçoit :
- *   rows      {Array}  — données pré-agrégées par usePeriodFilter
- *   pairList  {Array}  — fallback ancienne API
- *   excluded  {Set}    — fallback ancienne API
- */
-
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
-const fmtN = (v, d = 2) =>
-  isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
-
+const fmt  = (v, d = 2) => isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
 const fmtV = v => {
   if (isNaN(+v)) return '—'
-  const n = +v
-  if (n === 0) return '0'
+  const n = +v; if (n === 0) return '0'
   const dec = n >= 1 ? 4 : n >= 0.01 ? 6 : 8
   return n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: dec })
 }
+const fmtS = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+ ' : '- ') + fmt(Math.abs(n)) }
+const cc   = v => v > 0 ? 'cg' : v < 0 ? 'cr' : 'c2'
 
-const fmtS = v => {
-  const n = +v
-  if (isNaN(n)) return '—'
-  return (n >= 0 ? '+ ' : '− ') + fmtN(Math.abs(n))
-}
-
-const fmtPct = (val, ref) => {
-  if (!ref || isNaN(+val) || isNaN(+ref) || +ref === 0) return ''
-  const p = ((+val) / (+ref)) * 100
-  return (p >= 0 ? '+ ' : '− ') + fmtN(Math.abs(p), 1) + ' %'
-}
-
-const cc = v => (isNaN(+v) ? '' : +v > 0 ? 'v5-pos' : +v < 0 ? 'v5-neg' : 'v5-neu')
-
-/* ── Cellule PnL avec sous-label % ──────────────────────────────────────── */
-function PnlCell({ value, pct, dash = false }) {
-  if (dash || value == null || isNaN(+value)) {
-    return <td className="v5-td v5-td-r v5-neu">—</td>
-  }
-  const cls = cc(value)
+export default function SummaryTable({ pairList, excluded }) {
   return (
-    <td className={`v5-td v5-td-r ${cls}`}>
-      {fmtS(value)}
-      {pct !== '' && pct != null && (
-        <div className={`v5-tbl-pct ${cls}`}>{pct}</div>
-      )}
-    </td>
-  )
-}
-
-/* ── Row paire ───────────────────────────────────────────────────────────── */
-function PairRow({ row, period }) {
-  const { name, investi, valActuelle, breakeven, pnlRealise, pnlLatent } = row
-  const pnlTotal = (pnlRealise || 0) + (pnlLatent || 0)
-
-  // Sur période courte (1j), certaines colonnes peuvent être sans données
-  const noData = period === '1j' && investi === 0
-
-  return (
-    <tr className="v5-tr">
-      <td className="v5-td v5-td-pair">{name}</td>
-      <td className="v5-td v5-td-r">{fmtN(investi)}</td>
-      <td className="v5-td v5-td-r">{noData || !valActuelle ? '—' : fmtN(valActuelle)}</td>
-      <td className="v5-td v5-td-r">{noData || !breakeven ? '—' : fmtV(breakeven)}</td>
-      <PnlCell value={pnlRealise} pct={fmtPct(pnlRealise, investi)} dash={noData} />
-      <PnlCell value={pnlLatent}  pct={fmtPct(pnlLatent,  investi)} dash={noData} />
-      <PnlCell value={pnlTotal}   pct={fmtPct(pnlTotal,   investi)} dash={noData} />
-    </tr>
-  )
-}
-
-/* ── Row total ───────────────────────────────────────────────────────────── */
-function TotalRow({ rows }) {
-  const sInv  = rows.reduce((s, r) => s + (r.investi    || 0), 0)
-  const sVal  = rows.reduce((s, r) => s + (r.valActuelle || 0), 0)
-  const sReal = rows.reduce((s, r) => s + (r.pnlRealise  || 0), 0)
-  const sLat  = rows.reduce((s, r) => s + (r.pnlLatent   || 0), 0)
-  const sTot  = sReal + sLat
-
-  return (
-    <tr className="v5-tr v5-tr--total">
-      <td className="v5-td v5-td-pair v5-td-total-lbl">Total</td>
-      <td className="v5-td v5-td-r">{fmtN(sInv)}</td>
-      <td className="v5-td v5-td-r">{sVal ? fmtN(sVal) : '—'}</td>
-      <td className="v5-td v5-td-r v5-neu">—</td>
-      <PnlCell value={sReal} pct={fmtPct(sReal, sInv)} />
-      <PnlCell value={sLat}  pct={fmtPct(sLat,  sInv)} />
-      <PnlCell value={sTot}  pct={fmtPct(sTot,  sInv)} />
-    </tr>
-  )
-}
-
-/* ── Composant principal ─────────────────────────────────────────────────── */
-export default function SummaryTable({
-  // Nouvelle API v5
-  rows,
-  period = 'tout',
-
-  // Ancienne API (fallback)
-  pairList,
-  excluded,
-}) {
-  // Fallback : construit des rows depuis pairList
-  let tableRows = rows
-  if (!tableRows && pairList) {
-    tableRows = pairList
-      .filter(p => !p.is_depot && (!excluded || !excluded.has(p.name)))
-      .map(p => ({
-        name:        p.name,
-        investi:     p.usdt_investi || 0,
-        valActuelle: (p.usdt_investi || 0) + (p.pnl_latent_live ?? p.pnl_latent ?? 0),
-        breakeven:   p.prix_moy || 0,
-        pnlRealise:  p.pnl_realise_live ?? p.pnl_realise ?? 0,
-        pnlLatent:   p.pnl_latent_live  ?? p.pnl_latent  ?? 0,
-      }))
-  }
-
-  if (!tableRows || tableRows.length === 0) {
-    return (
-      <div className="v5-tbl-wrap">
-        <div className="v5-tbl-empty">Aucune donnée à afficher pour cette période.</div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="v5-tbl-wrap">
-      <table className="v5-tbl">
+    <div className="tbl-wrap">
+      <table>
         <thead>
-          <tr className="v5-thead-tr">
-            <th className="v5-th v5-th-l">Paire</th>
-            <th className="v5-th v5-th-r">Investi</th>
-            <th className="v5-th v5-th-r">Valeur act.</th>
-            <th className="v5-th v5-th-r">Breakeven</th>
-            <th className="v5-th v5-th-r">PnL réalisé</th>
-            <th className="v5-th v5-th-r">PnL latent</th>
-            <th className="v5-th v5-th-r">PnL total</th>
+          <tr>
+            <th>Paire</th>
+            <th>Investi (USDT)</th>
+            <th>Vol. Acheté</th>
+            <th>Vol. Vendu</th>
+            <th>Position</th>
+            <th>Prix Moy. Achat</th>
+            <th>Dernier Prix Achat</th>
+            <th>PnL Réalisé</th>
+            <th>PnL Latent</th>
+            <th>PnL Total</th>
+            <th>Trades</th>
+            <th>Exec.</th>
+            <th>Annulés</th>
           </tr>
         </thead>
         <tbody>
-          {tableRows.map(row => (
-            <PairRow key={row.name} row={row} period={period} />
-          ))}
-          {tableRows.length > 1 && <TotalRow rows={tableRows} />}
+          {pairList.map(p => {
+            const isExcl = excluded.has(p.name)
+            return (
+              <tr key={p.name} id={`tr-${p.name.replace(/\//g,'_')}`} className={isExcl ? 'excluded-row' : ''}>
+                <td>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {p.name}
+                    {isExcl && <span style={{ fontSize: '.65rem' }}>🚩</span>}
+                    {p.is_depot && (
+                      <span style={{ fontSize: '.55rem', background: 'rgba(232,184,75,.15)', color: 'var(--gold)', padding: '1px 5px', borderRadius: 3, letterSpacing: '.06em' }}>
+                        DÉPÔT
+                      </span>
+                    )}
+                  </span>
+                </td>
+                <td className="co bold">{fmt(p.usdt_investi)}</td>
+                <td className="cb">{fmtV(p.vol_achete)}</td>
+                <td className="c2">{fmtV(p.vol_vendu)}</td>
+                <td className={p.position > 0 ? 'cg' : p.position < 0 ? 'cr' : 'c2'}>{fmtV(p.position)}</td>
+                <td className="c2">{p.prix_moy > 0 ? fmt(p.prix_moy) : '—'}</td>
+                <td className="c2">{p.last_prix_achat > 0 ? fmt(p.last_prix_achat) : '—'}</td>
+                <td className={`${cc(p.pnl_realise)} bold`}>{fmtS(p.pnl_realise)}</td>
+                <td className={cc(p.pnl_latent)}>{fmtS(p.pnl_latent)}</td>
+                <td className={`${cc(p.pnl_total)} bold`}>{fmtS(p.pnl_total)}</td>
+                <td>{p.nb_total}</td>
+                <td className="cg">{p.nb_exec}</td>
+                <td className="c2">{p.nb_annule}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
