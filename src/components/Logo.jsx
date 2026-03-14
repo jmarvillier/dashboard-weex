@@ -1,10 +1,7 @@
 /**
  * Logo.jsx — Ydash v5
  * Icône SVG Y+$+€/¥ · bleu nuit / or
- *
- * Variantes :
- *   large (défaut) — landing, sidebar
- *   small          — topbar
+ * Variantes : large (landing, sidebar) · small (topbar)
  */
 
 const VERSION = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
@@ -19,7 +16,7 @@ function YdashIcon({ size = 40 }) {
       <line x1="32" y1="33" x2="51" y2="10" stroke="#7aaec8" strokeWidth="4.5" strokeLinecap="round"/>
       <line x1="32" y1="33" x2="32" y2="58" stroke="#7aaec8" strokeWidth="4.5" strokeLinecap="round"/>
       {/* Barre verticale $ */}
-      <line x1="32" y1="6"  x2="32" y2="58" stroke="#c8a020" strokeWidth="2"   strokeLinecap="round"/>
+      <line x1="32" y1="6"  x2="32" y2="58" stroke="#c8a020" strokeWidth="2" strokeLinecap="round"/>
       {/* Arc supérieur — demi-cercle bombé vers le haut */}
       <path d="M 25,41 A 7,7 0 0 1 39,41" stroke="#c8a020" strokeWidth="2.4" fill="none" strokeLinecap="round"/>
       {/* Arc inférieur — demi-cercle bombé vers le bas */}
@@ -49,11 +46,11 @@ export default function Logo({ small = false }) {
 
   return (
     <div className="logo-large">
-      <YdashIcon size={48} />
+      <YdashIcon size={56} />
       <div className="logo-large-text">
         <div className="logo-large-name">Ydash</div>
         <div className="logo-large-sub">journal</div>
-        <span className="logo-large-version">v{VERSION}</span>
+        <div className="logo-large-version">v{VERSION}</div>
       </div>
     </div>
   )

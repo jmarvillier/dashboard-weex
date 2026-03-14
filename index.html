@@ -7,7 +7,7 @@
 
     <!-- ── PWA ── -->
     <link rel="manifest" href="/dashboard-weex/manifest.json" />
-    <meta name="theme-color" content="#e8b84b" />
+    <meta name="theme-color" content="#06101c" />
     <meta name="mobile-web-app-capable" content="yes" />
 
     <!-- ── Apple / iOS PWA ── -->
@@ -18,7 +18,7 @@
     <meta name="apple-touch-fullscreen" content="yes" />
 
     <!-- ── Fonts & libs ── -->
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   </head>
   <body>
@@ -34,9 +34,6 @@
               '/dashboard-weex/sw.js',
               { scope: '/dashboard-weex/' }
             )
-            // Force la vérification d'une MAJ à chaque chargement.
-            // La gestion du bouton MAJ et du reload est déléguée
-            // à InstallPrompt.jsx / Topbar.jsx via les événements SW.
             reg.update()
             console.log('[SW] Registered:', reg.scope)
           } catch (err) {

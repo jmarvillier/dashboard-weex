@@ -24,7 +24,7 @@ export default function PairesView({ pairList, excluded, toggleFlag, onBack, emb
       {pairList.length === 0 ? (
         <div className="paires-empty">
           <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📭</div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, marginBottom: 6 }}>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontWeight: 700, marginBottom: 6 }}>
             Aucune paire chargée
           </div>
           <div style={{ fontSize: '.7rem', color: 'var(--text2)' }}>
