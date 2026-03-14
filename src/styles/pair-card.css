@@ -1,86 +1,128 @@
-/* ══════════════════════════════════════════════════════════
-    pair-card.css — PairCard v2 (ticket #29)
-   ══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   pair-card.css — PairCard v2 (ticket #29)
+   Charte v5 : bleu nuit crépusculaire · Space Mono · tokens CSS
+   ══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Carte wrapper ─────────────────────────────────────── */
-.pc {
+/* ── Carte wrapper ─────────────────────────────────────────────────────── */
+.pc-v2 {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 14px;
-  overflow: hidden;
-  animation: fadeUp .35s ease both;
-  transition: border-color .2s;
+  overflow: visible;
+  transition: transform .2s, border-color .2s, box-shadow .2s;
+  animation: fadeUp .4s ease both;
 }
-.pc:hover { border-color: var(--border2); }
-.pc.excluded { opacity: .55; }
+.pc-v2:hover {
+  transform: translateY(-3px);
+  border-color: rgba(200,160,32,.3);
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+}
+.pc-v2.excluded {
+  opacity: .38;
+  filter: grayscale(.7);
+}
 
-/* ── En-tête ───────────────────────────────────────────── */
+/* ── En-tête ───────────────────────────────────────────────────────────── */
 .pc2-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--border2);
+  padding: 14px 18px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
 }
-.pc2-pair-name {
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--text);
-  letter-spacing: -.01em;
-}
-.pc2-price-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-.pc2-current-price {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--blue);
-}
-.pc2-delta-be {
-  font-size: 12px;
-  font-weight: 500;
-}
+.pc2-header-left { flex: 1; min-width: 0; }
 .pc2-header-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+  flex-shrink: 0;
 }
-.pc2-pnl-badge {
-  text-align: right;
+
+.pc2-pair-name {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -.01em;
+  color: var(--text);
+  line-height: 1;
 }
-.pc2-badge-usdt {
-  display: block;
-  font-size: 15px;
+
+.pc2-price-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 5px;
+}
+.pc2-current-price {
+  font-family: 'Space Mono', monospace;
+  font-size: .72rem;
+  font-weight: 500;
+  color: var(--text2);
+}
+.pc2-delta-be {
+  font-family: 'Space Mono', monospace;
+  font-size: .6rem;
   font-weight: 600;
 }
+.pc2-delta-be.pos { color: var(--green); }
+.pc2-delta-be.neg { color: var(--red); }
+.pc2-delta-be.neu { color: var(--muted); }
+
+/* ── Badge PnL en-tête ─────────────────────────────────────────────────── */
+.pc2-pnl-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  padding: 5px 11px;
+  border-radius: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pc2-badge-pos {
+  background: rgba(61,191,144,.1);
+  border: 1px solid rgba(61,191,144,.28);
+}
+.pc2-badge-neg {
+  background: rgba(212,90,80,.1);
+  border: 1px solid rgba(212,90,80,.28);
+}
+.pc2-badge-neu {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--border);
+}
+.pc2-badge-usdt {
+  font-family: 'Space Mono', monospace;
+  font-size: .65rem;
+}
 .pc2-badge-pct {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
+  font-family: 'Space Mono', monospace;
+  font-size: .55rem;
+  opacity: .85;
 }
 .pc2-badge-pos .pc2-badge-usdt,
 .pc2-badge-pos .pc2-badge-pct { color: var(--green); }
 .pc2-badge-neg .pc2-badge-usdt,
 .pc2-badge-neg .pc2-badge-pct { color: var(--red); }
 .pc2-badge-neu .pc2-badge-usdt,
-.pc2-badge-neu .pc2-badge-pct { color: var(--muted); }
+.pc2-badge-neu .pc2-badge-pct { color: var(--text2); }
 
-/* ── Sections ──────────────────────────────────────────── */
+/* ── Sections ──────────────────────────────────────────────────────────── */
 .pc2-section {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border2);
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
 }
 .pc2-section:last-child { border-bottom: none; }
 
 .pc2-section-label {
-  font-size: 10px;
+  font-family: 'Space Mono', monospace;
+  font-size: .48rem;
   font-weight: 600;
-  letter-spacing: .08em;
+  letter-spacing: .1em;
   color: var(--muted);
   text-transform: uppercase;
   margin-bottom: 10px;
@@ -89,14 +131,14 @@
   gap: 6px;
 }
 
-/* ── Séparateur léger ──────────────────────────────────── */
+/* ── Séparateur léger ──────────────────────────────────────────────────── */
 .pc2-sep {
   border: none;
-  border-top: 0.5px solid var(--border2);
+  border-top: 1px solid var(--border);
   margin: 10px 0;
 }
 
-/* ── Grilles KPI ───────────────────────────────────────── */
+/* ── Grilles KPI ───────────────────────────────────────────────────────── */
 .pc2-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -108,33 +150,40 @@
   gap: 8px;
 }
 
-/* ── KpiBox ────────────────────────────────────────────── */
+/* ── KpiBox ────────────────────────────────────────────────────────────── */
 .kpi-box {
   background: var(--bg3);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   padding: 10px 12px;
   position: relative;
+  overflow: visible;
 }
-.kpi-box-full {
-  grid-column: 1 / -1;
-}
+.kpi-box-full { grid-column: 1 / -1; }
+
 .kpi-box-label {
-  font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  font-size: .48rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .09em;
   color: var(--muted);
-  margin-bottom: 5px;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   gap: 5px;
 }
 .kpi-box-value {
-  font-size: 14px;
-  font-weight: 500;
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: .85rem;
   color: var(--text);
+  line-height: 1.2;
 }
 .kpi-box-sublabel {
-  font-size: 10px;
-  color: var(--text2);
+  font-family: 'Space Mono', monospace;
+  font-size: .5rem;
+  color: var(--muted);
   margin-top: 3px;
 }
 
@@ -143,30 +192,32 @@
 .kpi-val-neg { color: var(--red)   !important; }
 .kpi-val-neu { color: var(--muted) !important; }
 
-/* ── Groupe 3 — prix actuel ────────────────────────────── */
+/* ── Groupe 3 — prix actuel ────────────────────────────────────────────── */
 .pc2-current-box .kpi-box-value {
-  font-size: 14px;
-  font-weight: 500;
+  font-family: 'Space Mono', monospace;
+  font-size: .88rem;
+  font-weight: 700;
 }
 .pc2-current-sep {
-  border-top: 0.5px solid var(--border2);
-  margin: 6px 0;
+  border-top: 1px solid var(--border);
+  margin: 7px 0;
 }
 .pc2-delta-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11px;
-  margin-top: 3px;
+  font-family: 'Space Mono', monospace;
+  font-size: .52rem;
+  margin-top: 4px;
 }
 .pc2-delta-label { color: var(--muted); }
-.pc2-delta-val   { font-weight: 500; }
+.pc2-delta-val   { font-weight: 600; }
 .pc2-delta-pos   { color: var(--green); }
 .pc2-delta-neg   { color: var(--red); }
 .pc2-delta-neu   { color: var(--muted); }
-.pc2-delta-na    { color: var(--muted); }
+.pc2-delta-na    { color: var(--muted); font-style: italic; }
 
-/* ── Tooltip ───────────────────────────────────────────── */
+/* ── Tooltip ───────────────────────────────────────────────────────────── */
 .kpi-tooltip-wrap {
   position: relative;
   display: inline-flex;
@@ -179,8 +230,8 @@
   border: 1px solid var(--border);
   background: transparent;
   color: var(--muted);
-  font-size: 9px;
   font-family: 'Space Mono', monospace;
+  font-size: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -189,48 +240,63 @@
   line-height: 1;
   flex-shrink: 0;
   transition: border-color .15s, color .15s;
+  user-select: none;
 }
 .kpi-info-icon:hover {
   border-color: var(--text2);
-  color: var(--text);
+  color: var(--text2);
 }
 .kpi-tooltip-bubble {
   position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg3);
-  border: 0.5px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 11px;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-family: 'Space Mono', monospace;
+  font-size: .57rem;
   line-height: 1.5;
-  min-width: 190px;
-  max-width: 260px;
-  z-index: 20;
-  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  min-width: 210px;
+  max-width: 280px;
+  z-index: 30;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  animation: fadeUp .15s ease;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .kpi-tooltip-title {
+  font-size: .6rem;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 3px;
+  letter-spacing: .04em;
 }
 .kpi-tooltip-desc {
   color: var(--text2);
-  margin-bottom: 5px;
+  font-size: .57rem;
 }
 .kpi-tooltip-formula {
-  background: var(--bg);
-  border-radius: 4px;
-  padding: 4px 7px;
   font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  color: var(--text2);
+  font-size: .52rem;
+  background: var(--bg3);
+  padding: 3px 7px;
+  border-radius: 5px;
+  display: block;
+  margin-top: 2px;
+  color: var(--gold);
+  line-height: 1.6;
   white-space: pre-line;
 }
 
-/* ── Chips ordres ──────────────────────────────────────── */
+/* ── Section PnL — live dot intégré ───────────────────────────────────── */
+.pc2-section .pc2-section-label .live-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* ── Chips ordres ──────────────────────────────────────────────────────── */
 .pc2-chips {
   display: flex;
   flex-wrap: wrap;
@@ -238,89 +304,51 @@
   margin-bottom: 10px;
 }
 .pc2-chip {
-  background: var(--bg);
-  border: 1px solid var(--border2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
   border-radius: 20px;
   padding: 3px 10px;
-  font-size: 11px;
+  font-family: 'Space Mono', monospace;
+  font-size: .52rem;
   color: var(--text2);
+  letter-spacing: .02em;
 }
-.pc2-chip b { color: var(--text); }
+.pc2-chip b {
+  color: var(--text);
+  font-weight: 700;
+}
 
-/* ── Barre achats/ventes ───────────────────────────────── */
+/* ── Barre achats/ventes ───────────────────────────────────────────────── */
 .pc2-bar-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  color: var(--muted);
-  margin-bottom: 4px;
+  font-family: 'Space Mono', monospace;
+  font-size: .55rem;
+  color: var(--text2);
+  margin-bottom: 5px;
 }
 .pc2-bar-track {
-  height: 7px;
-  border-radius: 4px;
+  width: 100%;
+  height: 5px;
+  background: var(--bg3);
+  border-radius: 3px;
   overflow: hidden;
-  background: var(--bg);
   display: flex;
 }
-.pc2-bar-buy  { background: rgba(61,191,144,.35); transition: width .4s; }
-.pc2-bar-sell { background: rgba(212,90,80,.35);  transition: width .4s; }
+.pc2-bar-buy  { height: 100%; background: var(--green); transition: width .4s ease; }
+.pc2-bar-sell { height: 100%; background: var(--red);   transition: width .4s ease; }
 
-/* ── Couleurs inline (delta vs breakeven en-tête) ──────── */
-.pc2-delta-be.pos { color: var(--green); }
-.pc2-delta-be.neg { color: var(--red); }
-.pc2-delta-be.neu { color: var(--muted); }
-
-/* ── Flag btn ──────────────────────────────────────────── */
-.flag-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px;
-  opacity: .5;
-  transition: opacity .15s;
-}
-.flag-btn:hover, .flag-btn.flagged { opacity: 1; }
-
-/* ── Excluded banner ───────────────────────────────────── */
-.excluded-banner {
-  background: rgba(212,90,80,.08);
+/* ── Excluded banner ───────────────────────────────────────────────────── */
+.pc2-excluded-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(212,90,80,.07);
   border-top: 1px solid rgba(212,90,80,.2);
-  border-bottom: 1px solid rgba(212,90,80,.2);
-  padding: 5px 16px;
-  font-size: 10px;
+  padding: 6px 18px;
+  font-family: 'Space Mono', monospace;
+  font-size: .6rem;
   color: var(--red);
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
-
-/* ── Live dot ──────────────────────────────────────────── */
-.live-dot {
-  display: inline-block;
-  border-radius: 50%;
-  background: var(--green);
-  animation: blink 1.6s ease-in-out infinite;
-}
-.live-dot-sm { width: 6px; height: 6px; }
-
-/* ── Dépôt ─────────────────────────────────────────────── */
-.depot-body   { display:flex; flex-direction:column; gap:8px; }
-.depot-stat   { display:flex; align-items:baseline; gap:8px; }
-.depot-val    { font-size:1.1rem; font-weight:600; color:var(--text); }
-.depot-val.o  { color:var(--gold); }
-.depot-unit   { font-size:.65rem; color:var(--muted); }
-.depot-note   { font-size:.62rem; color:var(--muted); margin-top:4px; }
-
-/* ── En-tête legacy (pour cartes non-v2) ──────────────── */
-.pc-head { display:flex; justify-content:space-between; align-items:flex-start; padding:12px 14px 10px; border-bottom:1px solid var(--border2); }
-.pc-head-left  { display:flex; flex-direction:column; gap:3px; }
-.pc-head-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
-.pc-name       { font-size:1rem; font-weight:600; color:var(--text); }
-.pc-sub        { font-size:.6rem; color:var(--muted); }
-.pc-price-live { display:flex; align-items:center; gap:5px; font-size:.7rem; color:var(--text2); margin-top:2px; }
-.pc-pnl-badge  { font-size:.72rem; font-weight:600; padding:3px 8px; border-radius:6px; display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
-.pc-pnl-badge.g { color:var(--green); }
-.pc-pnl-badge.r { color:var(--red); }
-.pc-pnl-badge.n { color:var(--muted); }
-.pc-pnl-usdt   { font-size:.8rem; }
-.pc-pnl-pct    { font-size:.65rem; opacity:.85; }
-.pc-pnl-source { font-size:.55rem; opacity:.6; }
-.pc-body       { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
