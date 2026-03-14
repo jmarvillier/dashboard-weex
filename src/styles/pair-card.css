@@ -36,7 +36,7 @@
   background: var(--bg3);
   border-bottom: 1px solid var(--border);
   border-radius: 14px 14px 0 0;
-  gap: 12px;
+  gap: 20px;
 }
 .pc2-head-left  { flex: 1; min-width: 0; }
 .pc2-head-right { display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0; }
@@ -78,6 +78,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: 100%;
 }
 .pc2-delta {
   display: flex;
@@ -85,7 +86,7 @@
   align-items: center;
   font-family: 'Space Mono', monospace;
   font-size: .54rem;
-  gap: 12px;
+  width: 100%;
 }
 .pc2-delta-lbl { color: var(--muted); flex-shrink: 0; }
 .pc2-delta-val { font-weight: 600; text-align: right; }
