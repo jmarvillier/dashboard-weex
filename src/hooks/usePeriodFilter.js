@@ -3,6 +3,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Hook qui filtre les rawRows (lignes brutes avec dates) selon la période
  * et recalcule tous les agrégats : capital, PnL, ordres, rows par paire.
+ *
+ * Formules capital :
+ *   Capital déposé  = Σ dépôts USDT (cumulatif, non filtré)
+ *   Capital investi = Σ achats USDT − Σ ventes USDT (sur la période)
+ *   Capital dispo   = Capital déposé − Capital investi
  */
 
 import { useState, useMemo } from 'react'
@@ -14,7 +19,7 @@ const pctOf = (val, ref) => ref > 0 ? (val / ref) * 100 : 0
 /* ── Filtre des rawRows sur la fenêtre temporelle ────────────────────────── */
 function filterByPeriod(rawRows, period) {
   const start = periodStart(period)
-  if (!start) return rawRows                          // "tout" → pas de filtre
+  if (!start) return rawRows
   return rawRows.filter(r => r.date && r.date >= start)
 }
 
@@ -25,39 +30,36 @@ function computeFromRaw(rawRows, period, pairList, prices) {
     .filter(p => p.is_depot)
     .reduce((s, p) => s + parseFloat2(p.capital_depose), 0)
 
-  // ── Vérification : est-ce que les rawRows ont des dates exploitables ?
+  // ── Vérification : dates exploitables dans les rawRows ?
   const hasDates = rawRows.length > 0 &&
     rawRows.some(r => r.date instanceof Date && !isNaN(r.date.getTime()))
 
   if (!hasDates) {
-    // Mode dégradé : utilise pairList tel quel (équivalent "tout")
     return computeFromPairList(pairList, capitalDepose, prices)
   }
 
-  // ── Filtre sur la fenêtre temporelle ─────────────────────────────────────
+  // ── Filtre temporel ───────────────────────────────────────────────────────
   const filtered = filterByPeriod(rawRows, period)
 
-  // ── Agrégation par paire sur les lignes filtrées ──────────────────────────
+  // ── Agrégation par paire ──────────────────────────────────────────────────
   const map = {}
 
   filtered.forEach(r => {
     if (!r.pair) return
-    // Exclure les dépôts du calcul de trading
-    if (r.sens === 'Dépôt' || r.sens === 'Depot' ||
-        r.sens.toLowerCase().includes('dép') ||
-        r.sens.toLowerCase().includes('dep')) return
+    const sensLow = r.sens.toLowerCase()
+    if (sensLow.includes('dép') || sensLow.includes('dep')) return
 
     if (!map[r.pair]) map[r.pair] = {
-      name:      r.pair,
-      investi:   0,
-      volAchete: 0,
-      volVendu:  0,
-      usdtRecu:  0,
-      nbTotal:   0,
-      nbExec:    0,
-      nbAnnule:  0,
-      nbAchat:   0,
-      nbVente:   0,
+      name:       r.pair,
+      usdtAchete: 0,   // Σ USDT dépensés en achats
+      usdtVendu:  0,   // Σ USDT reçus des ventes
+      volAchete:  0,
+      volVendu:   0,
+      nbTotal:    0,
+      nbExec:     0,
+      nbAnnule:   0,
+      nbAchat:    0,
+      nbVente:    0,
     }
     const p = map[r.pair]
     p.nbTotal++
@@ -66,41 +68,40 @@ function computeFromRaw(rawRows, period, pairList, prices) {
     if (r.annule) { p.nbAnnule++; return }
     if (!r.exec)  return
     p.nbExec++
-    if (r.sens === 'Achat') { p.investi   += r.usdt || 0; p.volAchete += r.vol || 0 }
-    if (r.sens === 'Vente') { p.usdtRecu  += r.usdt || 0; p.volVendu  += r.vol || 0 }
+    if (r.sens === 'Achat') { p.usdtAchete += r.usdt || 0; p.volAchete += r.vol || 0 }
+    if (r.sens === 'Vente') { p.usdtVendu  += r.usdt || 0; p.volVendu  += r.vol || 0 }
   })
 
-  // ── Calcul des métriques par paire ────────────────────────────────────────
+  // ── Métriques par paire ───────────────────────────────────────────────────
   const rows = Object.values(map).map(p => {
     const position  = p.volAchete - p.volVendu
-    const prixMoy   = p.volAchete > 0 ? p.investi / p.volAchete : 0
+    const prixMoy   = p.volAchete > 0 ? p.usdtAchete / p.volAchete : 0
     const breakeven = position > 0 && prixMoy > 0 ? prixMoy : 0
 
-    // PnL réalisé : recettes vente − coût de revient des volumes vendus
+    // Capital investi pour cette paire = achats − ventes
+    const capitalInvesti = p.usdtAchete - p.usdtVendu
+
+    // PnL réalisé
     const coutVendu  = prixMoy * p.volVendu
     const pnlRealise = p.volVendu > 0 && prixMoy > 0
-      ? p.usdtRecu - coutVendu
-      : p.usdtRecu
+      ? p.usdtVendu - coutVendu
+      : p.usdtVendu
 
-    // PnL latent : utilise le cours live s'il est dispo, sinon le breakeven
+    // PnL latent (avec prix live si dispo)
     const coursLive = prices?.[p.name] ?? null
     const pnlLatent = position > 0 && breakeven > 0 && coursLive != null
       ? (coursLive - breakeven) * position
       : 0
 
-    // Valeur actuelle
-    const valActuelle = coursLive != null && position > 0
-      ? position * coursLive
-      : p.investi + pnlLatent
-
     return {
-      name:       p.name,
-      investi:    p.investi,
+      name:            p.name,
+      capitalInvesti,  // achats − ventes
+      usdtAchete:      p.usdtAchete,
+      usdtVendu:       p.usdtVendu,
       position,
       breakeven,
       pnlRealise,
       pnlLatent,
-      valActuelle,
       nbTotal:  p.nbTotal,
       nbExec:   p.nbExec,
       nbAnnule: p.nbAnnule,
@@ -112,27 +113,26 @@ function computeFromRaw(rawRows, period, pairList, prices) {
   return buildKpis(rows, capitalDepose)
 }
 
-/* ── Mode dégradé : construit depuis pairList (sans filtrage temporel) ───── */
+/* ── Mode dégradé : depuis pairList agrégée (équivalent "tout") ──────────── */
 function computeFromPairList(pairList, capitalDepose, prices) {
   const trading = pairList.filter(p => !p.is_depot)
 
   const rows = trading.map(p => {
-    const coursLive   = prices?.[p.name] ?? null
-    const pnlRealise  = parseFloat2(p.pnl_realise_live ?? p.pnl_realise)
-    const pnlLatent   = parseFloat2(p.pnl_latent_live  ?? p.pnl_latent)
-    const position    = parseFloat2(p.position ?? (p.vol_achete - p.vol_vendu))
-    const valActuelle = coursLive != null && position > 0
-      ? position * coursLive
-      : parseFloat2(p.usdt_investi) + pnlLatent
+    const pnlRealise     = parseFloat2(p.pnl_realise_live ?? p.pnl_realise)
+    const pnlLatent      = parseFloat2(p.pnl_latent_live  ?? p.pnl_latent)
+    const position       = parseFloat2(p.position ?? (p.vol_achete - p.vol_vendu))
+    // Capital investi = achats − ventes
+    const capitalInvesti = parseFloat2(p.usdt_investi) - parseFloat2(p.usdt_recu)
 
     return {
-      name:        p.name,
-      investi:     parseFloat2(p.usdt_investi),
+      name:            p.name,
+      capitalInvesti,
+      usdtAchete:      parseFloat2(p.usdt_investi),
+      usdtVendu:       parseFloat2(p.usdt_recu),
       position,
-      breakeven:   parseFloat2(p.prix_moy),
+      breakeven:       parseFloat2(p.prix_moy),
       pnlRealise,
       pnlLatent,
-      valActuelle,
       nbTotal:  parseFloat2(p.nb_total),
       nbExec:   parseFloat2(p.nb_exec),
       nbAnnule: parseFloat2(p.nb_annule),
@@ -144,11 +144,11 @@ function computeFromPairList(pairList, capitalDepose, prices) {
   return buildKpis(rows, capitalDepose)
 }
 
-/* ── Construit les KPIs globaux depuis les rows agrégées ─────────────────── */
+/* ── KPIs globaux ────────────────────────────────────────────────────────── */
 function buildKpis(rows, capitalDepose) {
-  const capitalInvesti  = rows.reduce((s, r) => s + r.investi,     0)
-  const valPortefeuille = rows.reduce((s, r) => s + r.valActuelle, 0)
-  const capitalDispo    = capitalDepose - capitalInvesti
+  // Capital investi = Σ achats − Σ ventes
+  const capitalInvesti = rows.reduce((s, r) => s + r.capitalInvesti, 0)
+  const capitalDispo   = capitalDepose - capitalInvesti
 
   const pnlRealise = rows.reduce((s, r) => s + r.pnlRealise, 0)
   const pnlLatent  = rows.reduce((s, r) => s + r.pnlLatent,  0)
@@ -165,13 +165,11 @@ function buildKpis(rows, capitalDepose) {
   const sellW = 100 - buyW
 
   return {
-    // Capital
+    // Capital (3 KPIs — valeur portefeuille retirée)
     capitalDepose,
     capitalInvesti,
-    valPortefeuille,
-    valPortefeuillePct: pctOf(valPortefeuille - capitalInvesti, capitalInvesti),
     capitalDispo,
-    capitalDispoPct:    pctOf(capitalDispo, capitalDepose),
+    capitalDispoPct: pctOf(capitalDispo, capitalDepose),
 
     // PnL
     pnlRealise,
@@ -185,7 +183,7 @@ function buildKpis(rows, capitalDepose) {
     nbTotal, nbExec, nbAnnule, tauxExec,
     nbAchat, nbVente, buyW, sellW,
 
-    // Rows pour le tableau récapitulatif
+    // Rows tableau récap (expose aussi usdtAchete/usdtVendu pour le tableau)
     rows,
   }
 }
@@ -195,7 +193,7 @@ function buildKpis(rows, capitalDepose) {
  *
  * @param {Array}  pairList  — liste agrégée des paires (depuis useTrading)
  * @param {Array}  rawRows   — lignes brutes avec dates (depuis useTrading)
- * @param {Object} prices    — prix live { 'BTC/USDT': 83000, ... } (optionnel)
+ * @param {Object} prices    — prix live (optionnel)
  *
  * @returns {{ period, setPeriod, data }}
  */

@@ -1,14 +1,14 @@
 /**
  * KpiRow.jsx — Dashboard v5
  * ─────────────────────────────────────────────────────────────────────────────
- * Structure :
- *   Section Capital   → 4 KPIs (déposé, investi, valeur portefeuille, disponible)
- *   Section Perf      → 3 KPIs (PnL réalisé, latent, total) avec indicateur live
- *   Section Ordres    → Synthèse + barre achats/ventes
+ * Section Capital   → 3 KPIs : déposé · investi · disponible
+ * Section Perf      → 3 KPIs : PnL réalisé · latent · total
+ * Section Ordres    → Synthèse + barre achats/ventes
  *
- * Reçoit les données pré-agrégées depuis usePeriodFilter (prop `data`).
- * Compatibilité ascendante : accepte aussi l'ancienne signature (pairList/excluded)
- * pour ne pas casser AppShell pendant la transition.
+ * Formules :
+ *   Capital déposé  = Σ dépôts USDT (cumulatif)
+ *   Capital investi = Σ achats USDT − Σ ventes USDT
+ *   Capital dispo   = Capital déposé − Capital investi
  */
 
 import { useState } from 'react'
@@ -91,42 +91,38 @@ export default function KpiRow({
   // Ancienne signature (fallback si data absent)
   pairList,
   excluded,
-  priceSource,
 }) {
   const [openTip, setOpenTip] = useState(null)
-
-  // ── Fermer les tooltips au clic extérieur ─────────────────────────────────
-  // (géré par le parent via click sur document, mais on fournit le setter)
 
   // ── Mode fallback (ancienne API sans data agrégée) ────────────────────────
   let d = data
   if (!d && pairList) {
     const trading = pairList.filter(p => !excluded?.has(p.name) && !p.is_depot)
     const depots  = pairList.filter(p => p.is_depot)
-    const sDepose = depots.reduce((s, p) => s + (p.capital_depose || 0), 0)
-    const sInv    = trading.reduce((s, p) => s + (p.usdt_investi  || 0), 0)
-    const sPnlR   = trading.reduce((s, p) => s + (p.pnl_realise_live ?? p.pnl_realise ?? 0), 0)
-    const sPnlL   = trading.reduce((s, p) => s + (p.pnl_latent_live  ?? p.pnl_latent  ?? 0), 0)
-    const sTot    = pairList.reduce((s, p) => s + (p.nb_total  || 0), 0)
-    const sExec   = pairList.reduce((s, p) => s + (p.nb_exec   || 0), 0)
-    const sCanc   = pairList.reduce((s, p) => s + (p.nb_annule || 0), 0)
-    const sAchat  = pairList.reduce((s, p) => s + (p.nb_achat  || 0), 0)
-    const sVente  = pairList.reduce((s, p) => s + (p.nb_vente  || 0), 0)
-    const valPtf  = trading.reduce((s, p) => s + ((p.pnl_latent_live ?? p.pnl_latent ?? 0) + (p.usdt_investi || 0)), 0)
-    const bw      = sAchat + sVente > 0 ? (sAchat / (sAchat + sVente)) * 100 : 0
+    const sDepose  = depots.reduce((s, p) => s + (p.capital_depose || 0), 0)
+    // Capital investi = achats − ventes
+    const sAchete  = trading.reduce((s, p) => s + (p.usdt_investi || 0), 0)
+    const sVendu   = trading.reduce((s, p) => s + (p.usdt_recu    || 0), 0)
+    const sInvesti = sAchete - sVendu
+    const sPnlR    = trading.reduce((s, p) => s + (p.pnl_realise_live ?? p.pnl_realise ?? 0), 0)
+    const sPnlL    = trading.reduce((s, p) => s + (p.pnl_latent_live  ?? p.pnl_latent  ?? 0), 0)
+    const sTot     = pairList.reduce((s, p) => s + (p.nb_total  || 0), 0)
+    const sExec    = pairList.reduce((s, p) => s + (p.nb_exec   || 0), 0)
+    const sCanc    = pairList.reduce((s, p) => s + (p.nb_annule || 0), 0)
+    const sAchat   = pairList.reduce((s, p) => s + (p.nb_achat  || 0), 0)
+    const sVente   = pairList.reduce((s, p) => s + (p.nb_vente  || 0), 0)
+    const bw       = sAchat + sVente > 0 ? (sAchat / (sAchat + sVente)) * 100 : 0
     d = {
-      capitalDepose:     sDepose,
-      capitalInvesti:    sInv,
-      valPortefeuille:   valPtf,
-      valPortefeuillePct: sInv > 0 ? ((valPtf - sInv) / sInv) * 100 : 0,
-      capitalDispo:      sDepose - sInv,
-      capitalDispoPct:   sDepose > 0 ? ((sDepose - sInv) / sDepose) * 100 : 0,
+      capitalDepose:   sDepose,
+      capitalInvesti:  sInvesti,
+      capitalDispo:    sDepose - sInvesti,
+      capitalDispoPct: sDepose > 0 ? ((sDepose - sInvesti) / sDepose) * 100 : 0,
       pnlRealise:     sPnlR,
-      pnlRealisePct:  sInv > 0 ? (sPnlR / sInv) * 100 : 0,
+      pnlRealisePct:  sInvesti > 0 ? (sPnlR / sInvesti) * 100 : 0,
       pnlLatent:      sPnlL,
-      pnlLatentPct:   sInv > 0 ? (sPnlL / sInv) * 100 : 0,
+      pnlLatentPct:   sInvesti > 0 ? (sPnlL / sInvesti) * 100 : 0,
       pnlTotal:       sPnlR + sPnlL,
-      pnlTotalPct:    sInv > 0 ? ((sPnlR + sPnlL) / sInv) * 100 : 0,
+      pnlTotalPct:    sInvesti > 0 ? ((sPnlR + sPnlL) / sInvesti) * 100 : 0,
       nbTotal: sTot, nbExec: sExec, nbAnnule: sCanc, tauxExec: sTot > 0 ? (sExec / sTot) * 100 : 0,
       nbAchat: sAchat, nbVente: sVente, buyW: bw, sellW: 100 - bw,
     }
@@ -135,8 +131,7 @@ export default function KpiRow({
   if (!d) return null
 
   const {
-    capitalDepose, capitalInvesti, valPortefeuille, valPortefeuillePct,
-    capitalDispo, capitalDispoPct,
+    capitalDepose, capitalInvesti, capitalDispo, capitalDispoPct,
     pnlRealise, pnlRealisePct, pnlLatent, pnlLatentPct, pnlTotal, pnlTotalPct,
     nbTotal, nbExec, nbAnnule, tauxExec,
     nbAchat, nbVente, buyW, sellW,
@@ -157,7 +152,7 @@ export default function KpiRow({
       {/* ══ CAPITAL ══════════════════════════════════════════════════════════ */}
       <section className="v5-section">
         <h2 className="v5-section-title">Capital</h2>
-        <div className="v5-kpi-grid v5-g4">
+        <div className="v5-kpi-grid v5-g3">
 
           <KpiCard
             label="Capital déposé"
@@ -172,19 +167,8 @@ export default function KpiRow({
             label="Capital investi"
             value={fmtN(capitalInvesti)}
             tipId="tip-inv" tipTitle="Capital investi"
-            tipDesc="Somme actuellement engagée sur les paires actives dans la période."
-            tipFormula="Σ montant investi par paire"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
-          <KpiCard
-            label="Valeur du portefeuille"
-            value={fmtN(valPortefeuille)}
-            sub={fmtPct(valPortefeuillePct) + ' vs investi'}
-            subClass={cc(valPortefeuillePct)}
-            tipId="tip-ptf" tipTitle="Valeur du portefeuille"
-            tipDesc="Valeur actuelle de toutes les positions au cours du marché."
-            tipFormula="Σ (position nette × prix actuel)"
+            tipDesc="Capital actuellement engagé sur le marché — ce que vous avez acheté moins ce que vous avez vendu."
+            tipFormula="Σ achats USDT − Σ ventes USDT"
             openId={openTip} setOpenId={setOpenTip}
           />
 
@@ -214,7 +198,11 @@ export default function KpiRow({
             )}
           </span>
           {refreshPrices && (
-            <button className="v5-refresh-btn" onClick={e => { e.stopPropagation(); refreshPrices() }} title="Rafraîchir les prix">
+            <button
+              className="v5-refresh-btn"
+              onClick={e => { e.stopPropagation(); refreshPrices() }}
+              title="Rafraîchir les prix"
+            >
               ↺
             </button>
           )}
@@ -264,7 +252,6 @@ export default function KpiRow({
         <h2 className="v5-section-title">Ordres</h2>
         <div className="v5-kpi-grid v5-g2">
 
-          {/* Synthèse */}
           <div className="v5-kpi v5-orders-synthese">
             <div className="v5-kpi-label">Synthèse</div>
             <div className="v5-orders-row">
@@ -289,7 +276,6 @@ export default function KpiRow({
             </div>
           </div>
 
-          {/* Achats vs ventes */}
           <div className="v5-kpi v5-orders-bar-card">
             <div className="v5-kpi-label">Achats vs ventes</div>
             <div className="v5-bar-labels">
