@@ -1,4 +1,4 @@
-import { useState, useEffect }       from 'react'
+import { useState, useEffect }        from 'react'
 import { useTrading }                 from './hooks/useTrading.js'
 import LoadingOverlay                 from './components/LoadingOverlay.jsx'
 import Landing                        from './components/Landing.jsx'

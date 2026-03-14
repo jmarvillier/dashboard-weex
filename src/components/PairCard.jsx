@@ -1,234 +1,273 @@
-/**
- * PairCard.jsx
- */
+import { useState } from 'react'
+import KpiBox from './KpiBox.jsx'
+import KpiTooltip from './KpiTooltip.jsx'
 
-const fmt  = (v, d = 2) => isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
-const fmtV = v => {
-  if (isNaN(+v)) return '—'
+// ── Formatage ─────────────────────────────────────────────────────────────
+const fmt = (v, d = 2) =>
+  isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
+
+const fmtPrice = v => {
+  if (v == null || isNaN(+v) || +v === 0) return '—'
+  const n = +v
+  return n < 1
+    ? n.toLocaleString('fr-FR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+    : n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const fmtQty = v => {
+  if (v == null || isNaN(+v)) return '—'
   const n = +v
   if (n === 0) return '0'
-  const dec = n >= 1 ? 4 : n >= 0.01 ? 6 : 8
-  return n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: dec })
-}
-const fmtS    = v => { const n = +v; return isNaN(n) ? '—' : (n >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(n)) }
-const cc      = v => v > 0 ? 'g' : v < 0 ? 'r' : 'n'
-const pctSign = (val, ref) => {
-  if (!(ref > 0)) return null
-  const pp = val / ref * 100
-  return (pp >= 0 ? '+' : '−') + ' ' + fmt(Math.abs(pp), 1) + ' %'
+  return n.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 5 })
 }
 
+const fmtPct = v => {
+  if (v == null || isNaN(+v)) return null
+  const n = +v
+  return (n >= 0 ? '+ ' : '− ') + fmt(Math.abs(n), 1) + ' %'
+}
+
+const fmtSign = v => {
+  if (v == null || isNaN(+v)) return '—'
+  const n = +v
+  return (n >= 0 ? '+ ' : '− ') + fmt(Math.abs(n), 2)
+}
+
+const cc = v => {
+  if (v == null || isNaN(+v) || +v === 0) return 'neu'
+  return +v > 0 ? 'pos' : 'neg'
+}
+
+// ── Composant ─────────────────────────────────────────────────────────────
 export default function PairCard({ p, excluded, onToggle, index }) {
+  const [tip, setTip] = useState(null)
   const isExcl = excluded.has(p.name)
   const sym    = p.name.split('/')[0]
+  const id     = p.name
 
-  // Utilise cours_live (nouveau nom) — jamais de variable libre
-  const coursLive    = p.cours_live        != null ? p.cours_live        : null
-  const pnlRLive     = p.pnl_realise_live  != null ? p.pnl_realise_live  : null
-  const pnlLLive     = p.pnl_latent_live   != null ? p.pnl_latent_live   : null
-  const pnlTLive     = p.pnl_total_live    != null ? p.pnl_total_live    : null
-  const hasLive      = pnlTLive != null
+  const hasLive = p.cours_live != null
+  const price   = p.cours_live ?? p.last_prix_achat ?? 0
 
-  const badgePnl   = hasLive ? pnlTLive : p.pnl_total
-  const badgeRef   = p.usdt_investi
-  const badgeClass = p.is_depot ? 'n' : cc(badgePnl)
-  const execRate   = p.nb_total > 0 ? (p.nb_exec / p.nb_total * 100) : 0
+  const pnlR    = hasLive ? (p.pnl_realise_live ?? p.pnl_realise) : p.pnl_realise
+  const pnlL    = hasLive ? (p.pnl_latent_live  ?? p.pnl_latent)  : p.pnl_latent
+  const pnlT    = hasLive ? (p.pnl_total_live   ?? p.pnl_total)   : p.pnl_total
+  const pnlRPct = hasLive ? (p.pnlRealizedPctLive ?? p.pnlRealizedPct) : p.pnlRealizedPct
+  const pnlLPct = hasLive ? (p.pnlLatentPctLive   ?? p.pnlLatentPct)   : p.pnlLatentPct
+  const pnlTPct = hasLive ? (p.pnlTotalPctLive    ?? p.pnlTotalPct)    : p.pnlTotalPct
 
+  const dBuy     = hasLive ? p.deltaVsAvgBuy     : (p.avgBuyPrice > 0 && price > 0 ? price - p.avgBuyPrice : null)
+  const dBuyPct  = hasLive ? p.deltaVsAvgBuyPct  : (dBuy != null ? dBuy / p.avgBuyPrice * 100 : null)
+  const dSell    = p.deltaVsAvgSell    ?? null
+  const dSellPct = p.deltaVsAvgSellPct ?? null
+  const dBePct   = p.deltaVsBreakevenPct ?? null
+
+  const tot   = (p.buyOrders || 0) + (p.sellOrders || 0)
+  const buyW  = tot > 0 ? p.buyOrders  / tot * 100 : 100
+  const sellW = tot > 0 ? p.sellOrders / tot * 100 : 0
+
+  // ── Dépôt ────────────────────────────────────────────────────────────────
+  if (p.is_depot) {
+    return (
+      <div className={`pc2${isExcl ? ' excluded' : ''}`}
+           id={`pc-${id.replace(/\//g,'_')}`}
+           style={{ animationDelay:`${index*.08}s` }}>
+        <div className="pc2-head">
+          <div className="pc2-head-top">
+            <div className="pc2-head-left">
+              <div className="pc2-name">{p.name}</div>
+              <div className="pc2-sub">
+                <span className="pc2-price">{p.nb_depot} dépôt{p.nb_depot > 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            <div className="pc2-head-right">
+              <div className="pc2-badge neu">
+                <span className="pc2-badge-val">💰 {fmt(p.capital_depose)} USDT</span>
+              </div>
+              <button className={`pc2-flag${isExcl?' on':''}`}
+                      onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
+                {isExcl?'🚩':'🏳'}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="pc2-section">
+          <div className="pc2-depot">
+            <div className="pc2-depot-stat">
+              <span className="pc2-depot-val gold">{fmt(p.capital_depose)}</span>
+              <span className="pc2-depot-unit">USDT déposés</span>
+            </div>
+            <div className="pc2-depot-stat">
+              <span className="pc2-depot-val">{p.nb_depot}</span>
+              <span className="pc2-depot-unit">opération{p.nb_depot>1?'s':''}</span>
+            </div>
+          </div>
+          <div className="pc2-depot-note">Apport de capital — exclu des calculs PnL</div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Carte trading ─────────────────────────────────────────────────────────
   return (
     <div
-      className={`pc${isExcl ? ' excluded' : ''}`}
-      id={`pc-${p.name.replace(/\//g, '_')}`}
-      style={{ animationDelay: `${index * 0.08}s` }}
+      className={`pc2${isExcl ? ' excluded' : ''}`}
+      id={`pc-${id.replace(/\//g,'_')}`}
+      style={{ animationDelay:`${index*.08}s` }}
+      onClick={() => setTip(null)}
     >
-      {/* ── Header ── */}
-      <div className="pc-head">
-        <div className="pc-head-left">
-          <div className="pc-name">{p.name}</div>
-          <div className="pc-sub">
-            {p.is_depot
-              ? `${p.nb_depot} dépôt${p.nb_depot > 1 ? 's' : ''}`
-              : `${p.nb_exec} exéc · ${p.nb_annule} annulés`
-            }
-          </div>
-          {!p.is_depot && coursLive != null && (
-            <div className="pc-price-live">
-              <span className="live-dot live-dot-sm"></span>
-              <span>{fmt(coursLive)} USDT</span>
-            </div>
-          )}
-        </div>
-        <div className="pc-head-right">
-          {!p.is_depot && (
-            <div className={`pc-pnl-badge ${badgeClass}`}>
-              <span className="pc-pnl-usdt">{fmtS(badgePnl)} USDT</span>
-              {pctSign(badgePnl, badgeRef) && (
-                <span className="pc-pnl-pct">{pctSign(badgePnl, badgeRef)}</span>
-              )}
-              {hasLive && <span className="pc-pnl-source">live</span>}
-            </div>
-          )}
-          {p.is_depot && (
-            <div className="pc-pnl-badge n">💰 {fmt(p.capital_depose)} USDT</div>
-          )}
-          <button
-            className={`flag-btn${isExcl ? ' flagged' : ''}`}
-            onClick={() => onToggle(p.name)}
-          >
-            {isExcl ? '🚩' : '🏳'}
-          </button>
-        </div>
-      </div>
+      {/* ── EN-TÊTE ── */}
+      <div className="pc2-head">
 
-      {isExcl && <div className="excluded-banner">🚩 Paire exclue des calculs globaux</div>}
-
-      {/* ── Body ── */}
-      <div className="pc-body">
-        {p.is_depot ? (
-          <div className="depot-body">
-            <div className="depot-stat">
-              <span className="depot-val o">{fmt(p.capital_depose)}</span>
-              <span className="depot-unit">USDT déposés</span>
-            </div>
-            <div className="depot-stat">
-              <span className="depot-val">{p.nb_depot}</span>
-              <span className="depot-unit">opération{p.nb_depot > 1 ? 's' : ''}</span>
-            </div>
-            <div className="depot-note">Apport de capital — exclu des calculs PnL</div>
-          </div>
-        ) : (
-          <>
-            {/* ── Métriques ── */}
-            <div className="metrics-grid">
-              <div className="m-cell">
-                <div className="ml">Investi</div>
-                <div className="mv o">{fmt(p.investi_en_cours)}</div>
-                <div className="mv-sub">
-                  {p.investi_en_cours !== p.usdt_investi ? `/ ${fmt(p.usdt_investi)} total` : 'USDT'}
-                </div>
-              </div>
-              <div className="m-cell">
-                <div className="ml">Vol. Acheté</div>
-                <div className="mv b">{fmtV(p.vol_achete)}</div>
-                <div className="mv-sub">{sym}</div>
-              </div>
-              <div className="m-cell">
-                <div className="ml">Vol. Vendu</div>
-                <div className="mv">{fmtV(p.vol_vendu)}</div>
-                <div className="mv-sub">{sym}</div>
-              </div>
-
-              {p.position !== 0 && <>
-                <div className="m-cell">
-                  <div className="ml">Position</div>
-                  <div className={`mv ${p.position > 0 ? 'g' : 'r'}`}>{fmtV(p.position)}</div>
-                  <div className="mv-sub">{sym}</div>
-                </div>
-                <div className="m-cell">
-                  <div className="ml">Prix Moy. Achat</div>
-                  <div className="mv">{p.prix_moy > 0 ? fmt(p.prix_moy) : '—'}</div>
-                  <div className="mv-sub">USDT</div>
-                </div>
-                <div className="m-cell">
-                  <div className="ml">Dernier Prix</div>
-                  <div className="mv">{p.last_prix_achat > 0 ? fmt(p.last_prix_achat) : '—'}</div>
-                  <div className="mv-sub">achat USDT</div>
-                </div>
-              </>}
-
-              {p.vol_vendu > 0 && <>
-                <div className="m-cell">
-                  <div className="ml">Prix Moy. Vente</div>
-                  <div className={`mv ${p.prix_moy_vente > p.prix_moy ? 'g' : p.prix_moy_vente < p.prix_moy && p.prix_moy > 0 ? 'r' : ''}`}>
-                    {p.prix_moy_vente > 0 ? fmt(p.prix_moy_vente) : '—'}
-                  </div>
-                  <div className="mv-sub">USDT</div>
-                </div>
-                <div className="m-cell">
-                  <div className="ml">Dernier Prix</div>
-                  <div className={`mv ${p.last_prix_vente > p.prix_moy ? 'g' : p.last_prix_vente < p.prix_moy && p.prix_moy > 0 ? 'r' : ''}`}>
-                    {p.last_prix_vente > 0 ? fmt(p.last_prix_vente) : '—'}
-                  </div>
-                  <div className="mv-sub">vente USDT</div>
-                </div>
-              </>}
-            </div>
-
-            {/* ── PnL Journal ── */}
-            <div className="pnl-section-label">
-              📒 PnL Journal <span className="pnl-section-hint">(dernier prix saisi)</span>
-            </div>
-            <div className="pnl-row">
-              {[
-                { l: 'PnL Réalisé', v: p.pnl_realise, ref: p.usdt_investi },
-                { l: 'PnL Latent',  v: p.pnl_latent,  ref: p.investi_en_cours },
-                { l: 'PnL Total',   v: p.pnl_total,   ref: p.usdt_investi, big: true },
-              ].map(({ l, v, ref, big }) => (
-                <div key={l} className={`pnl-box ${cc(v)}`}>
-                  <div className="pnl-label">{l}</div>
-                  <div className={`pnl-val ${cc(v)}${big ? ' pnl-val-big' : ''}`}>
-                    {fmtS(v)} <span className="pnl-unit">USDT</span>
-                  </div>
-                  {pctSign(v, ref) && (
-                    <div className={`pnl-pct ${cc(v)}`}>{pctSign(v, ref)}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* ── PnL Live ── */}
-            <div className="pnl-section-label pnl-section-label-live">
-              <span className="live-dot live-dot-sm"></span>
-              PnL Live <span className="pnl-section-hint">(cours actuel)</span>
-              {coursLive != null && (
-                <span className="pnl-live-price">{fmt(coursLive)} USDT</span>
+        {/* Rangée 1 : nom + badge + flag */}
+        <div className="pc2-head-top">
+          <div className="pc2-head-left">
+            <div className="pc2-name">{p.name}</div>
+            <div className="pc2-sub">
+              {price > 0 && <span className="pc2-price">{fmtPrice(price)} USDT</span>}
+              {hasLive   && <span className="live-dot" style={{width:6,height:6,flexShrink:0}}></span>}
+              {dBePct != null && (
+                <span className={`pc2-be ${cc(dBePct)}`}>{fmtPct(dBePct)} vs breakeven</span>
               )}
             </div>
-            <div className="pnl-row">
-              {[
-                { l: 'PnL Réalisé', v: pnlRLive, ref: p.usdt_investi },
-                { l: 'PnL Latent',  v: pnlLLive, ref: p.investi_en_cours },
-                { l: 'PnL Total',   v: pnlTLive, ref: p.usdt_investi, big: true },
-              ].map(({ l, v, ref, big }) => (
-                <div key={l} className={`pnl-box pnl-box-live ${v != null ? cc(v) : 'n'}`}>
-                  <div className="pnl-label">{l}</div>
-                  {v != null ? (
-                    <>
-                      <div className={`pnl-val ${cc(v)}${big ? ' pnl-val-big' : ''}`}>
-                        {fmtS(v)} <span className="pnl-unit">USDT</span>
-                      </div>
-                      {pctSign(v, ref) && (
-                        <div className={`pnl-pct ${cc(v)}`}>{pctSign(v, ref)}</div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="pnl-val pnl-val-pending">—</div>
-                  )}
-                </div>
-              ))}
+          </div>
+          <div className="pc2-head-right">
+            <div className={`pc2-badge ${cc(pnlT)}`}>
+              <span className="pc2-badge-val">{fmtSign(pnlT)} USDT</span>
+              {fmtPct(pnlTPct) && <span className="pc2-badge-pct">{fmtPct(pnlTPct)}</span>}
             </div>
+            <button className={`pc2-flag${isExcl?' on':''}`}
+                    onClick={e=>{e.stopPropagation();onToggle(p.name)}}>
+              {isExcl?'🚩':'🏳'}
+            </button>
+          </div>
+        </div>
 
-            {/* ── Stats ── */}
-            <div className="tbar">
-              {[
-                { cls: 'tot', v: p.nb_total,  l: 'Total'   },
-                { cls: 'exc', v: p.nb_exec,   l: 'Exec.'   },
-                { cls: 'can', v: p.nb_annule, l: 'Annulés' },
-                { cls: 'buy', v: p.nb_achat,  l: 'Achats'  },
-                { cls: 'sel', v: p.nb_vente,  l: 'Ventes'  },
-              ].map(({ cls, v, l }) => (
-                <div key={l} className={`tc ${cls}`}>
-                  <span className="tn">{v}</span>
-                  <span className="tl">{l}</span>
-                </div>
-              ))}
-              <div className="tc rate">
-                <span className="tn">{fmt(execRate, 0)}%</span>
-                <span className="tl">Taux</span>
-              </div>
+        {/* Rangée 2 : deltas pleine largeur */}
+        {(dBuy != null || p.avgSellPrice != null) && (
+          <div className="pc2-deltas">
+            <div className="pc2-delta">
+              <span className="pc2-delta-lbl">vs moy. achat</span>
+              <span className={`pc2-delta-val ${cc(dBuy)}`}>
+                {dBuy != null ? `${fmtSign(dBuy)} USDT (${fmtPct(dBuyPct)})` : '—'}
+              </span>
             </div>
-          </>
+            <div className="pc2-delta">
+              <span className="pc2-delta-lbl">vs moy. vente</span>
+              {dSell != null
+                ? <span className={`pc2-delta-val ${cc(dSell)}`}>{fmtSign(dSell)} USDT ({fmtPct(dSellPct)})</span>
+                : <span className="pc2-delta-val neu">— (pas de vente)</span>
+              }
+            </div>
+          </div>
         )}
       </div>
+
+      {isExcl && <div className="pc2-excl">🚩 Paire exclue des calculs globaux</div>}
+
+      {/* ── POSITION OUVERTE ── */}
+      <div className="pc2-section">
+        <div className="pc2-slabel">POSITION OUVERTE</div>
+
+        <div className="pc2-g2">
+          <KpiBox label="Position nette" value={`${fmtQty(p.netPosition ?? p.position)} ${sym}`}
+            tooltipId={`${id}-np`} tooltipTitle="Position nette"
+            tooltipDesc="Quantité crypto encore détenue."
+            tooltipFormula="Σ achats − Σ ventes"
+            openId={tip} setOpenId={setTip} />
+          <KpiBox label="Montant investi" value={`${fmt(p.amountInvested ?? p.usdt_investi)} USDT`}
+            tooltipId={`${id}-inv`} tooltipTitle="Montant investi"
+            tooltipDesc="Somme de tous les achats exécutés."
+            tooltipFormula="Σ (quantité × prix)"
+            openId={tip} setOpenId={setTip} />
+        </div>
+
+        <div className="pc2-sep" />
+
+        <div className="pc2-g3">
+          <KpiBox label="Moy. achat"
+            value={p.avgBuyPrice > 0 ? fmtPrice(p.avgBuyPrice) : '—'}
+            sublabel={`${p.buyOrdersCount ?? p.nb_achat} ordres`}
+            tooltipId={`${id}-ab`} tooltipTitle="Prix moyen d'achat"
+            tooltipDesc="Moyenne pondérée de tous les achats."
+            tooltipFormula="Σ (prix × qté) / Σ qté"
+            openId={tip} setOpenId={setTip} />
+          <KpiBox label="Moy. vente"
+            value={p.avgSellPrice != null ? fmtPrice(p.avgSellPrice) : '—'}
+            sublabel={p.avgSellPrice != null
+              ? `${p.sellOrdersCount ?? p.nb_vente} ordres`
+              : '0 ordres'}
+            valueColor={
+              p.avgSellPrice == null ? 'neu'
+              : p.avgSellPrice > p.avgBuyPrice ? 'pos'
+              : p.avgSellPrice < p.avgBuyPrice ? 'neg'
+              : 'neu'
+            }
+            tooltipId={`${id}-av`} tooltipTitle="Prix moyen de vente"
+            tooltipDesc="Moyenne pondérée de toutes les ventes."
+            tooltipFormula="Σ (prix × qté) / Σ qté vendue"
+            openId={tip} setOpenId={setTip} />
+          <KpiBox label="Breakeven"
+            value={p.breakeven > 0 ? fmtPrice(p.breakeven) : '—'}
+            sublabel="seuil zéro"
+            tooltipId={`${id}-be`} tooltipTitle="Breakeven"
+            tooltipDesc="Prix d'équilibre de la position."
+            tooltipFormula="Investi en cours / Position nette"
+            openId={tip} setOpenId={setTip} />
+        </div>
+      </div>
+
+      {/* ── PNL ── */}
+      <div className="pc2-section">
+        <div className="pc2-slabel">
+          <span className="live-dot" style={{width:6,height:6,flexShrink:0}}></span>
+          PNL (COURS ACTUEL)
+        </div>
+        <div className="pc2-g3">
+          <KpiBox label="Réalisé"
+            value={`${fmtSign(pnlR)} USDT`}
+            sublabel={fmtPct(pnlRPct) ?? '0,0 %'}
+            valueColor={cc(pnlR)}
+            tooltipId={`${id}-pr`} tooltipTitle="PnL réalisé"
+            tooltipDesc="Gains/pertes sur ventes clôturées."
+            tooltipFormula="Recettes − Coût au prix moy."
+            openId={tip} setOpenId={setTip} />
+          <KpiBox label="Latent"
+            value={`${fmtSign(pnlL)} USDT`}
+            sublabel={fmtPct(pnlLPct) ?? '0,0 %'}
+            valueColor={cc(pnlL)}
+            tooltipId={`${id}-pl`} tooltipTitle="PnL latent"
+            tooltipDesc="Gain/perte non réalisé sur position ouverte."
+            tooltipFormula="(Prix − Breakeven) × Position"
+            openId={tip} setOpenId={setTip} />
+          <KpiBox label="Total"
+            value={`${fmtSign(pnlT)} USDT`}
+            sublabel={fmtPct(pnlTPct) ?? '0,0 %'}
+            valueColor={cc(pnlT)}
+            tooltipId={`${id}-pt`} tooltipTitle="PnL total"
+            tooltipDesc="Vision complète de la performance."
+            tooltipFormula="PnL réalisé + PnL latent"
+            openId={tip} setOpenId={setTip} />
+        </div>
+      </div>
+
+      {/* ── ORDRES ── */}
+      <div className="pc2-section">
+        <div className="pc2-slabel">ORDRES</div>
+        <div className="pc2-chips">
+          <span className="pc2-chip"><b>{p.totalOrders ?? p.nb_total}</b> au total</span>
+          <span className="pc2-chip"><b>{p.executedOrders ?? p.nb_exec}</b> exécutés</span>
+          <span className="pc2-chip"><b>{p.cancelledOrders ?? p.nb_annule}</b> annulés</span>
+        </div>
+        <div className="pc2-bar-lbls">
+          <span>{p.buyOrders ?? p.nb_achat} achats</span>
+          <span>{p.sellOrders ?? p.nb_vente} ventes</span>
+        </div>
+        <div className="pc2-bar">
+          <div className="pc2-bar-buy"  style={{width:`${buyW}%`}} />
+          <div className="pc2-bar-sell" style={{width:`${sellW}%`}} />
+        </div>
+      </div>
+
     </div>
   )
 }
