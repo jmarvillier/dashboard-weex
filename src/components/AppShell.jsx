@@ -114,7 +114,6 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
         <div className="topbar-right">
           <div className="topbar-live">
             <span className="live-dot" />
-            {loadedAt && <span className="topbar-time">Chargé {loadedAt}</span>}
           </div>
           {btnMode && (
             <div className="topbar-install-wrap">

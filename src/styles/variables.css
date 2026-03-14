@@ -1,30 +1,42 @@
-/* ── Design tokens & reset ── */
+/* ══════════════════════════════════════════════════════════════════════════
+   variables.css — Design tokens Ydash v5
+   Palette : bleu nuit crépusculaire + or + silver
+   ══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --bg:     #07090d;
-  --bg2:    #0d1017;
-  --bg3:    #131820;
-  --border: #1c2433;
-  --gold:   #e8b84b;
-  --green:  #00d68f;
-  --red:    #f5476a;
-  --blue:   #4096f7;
-  --muted:  #3a4a5e;
-  --text:   #dde6f0;
-  --text2:  #7a8fa8;
+  /* ── Fonds ── */
+  --bg:     #06101c;   /* page background          */
+  --bg2:    #0d1a2a;   /* cards, KPIs              */
+  --bg3:    #101828;   /* headers de table, topbar */
+
+  /* ── Bordures ── */
+  --border: #1a3050;   /* bordure standard         */
+  --border2: #152a42;  /* bordure subtile          */
+
+  /* ── Textes ── */
+  --text:   #c0d8ea;   /* texte principal (silver clair) */
+  --text2:  #7aaec8;   /* texte secondaire (silver bleu) */
+  --muted:  #3a6491;   /* texte désactivé / labels */
+
+  /* ── Couleurs accentuées ── */
+  --gold:   #c8a020;   /* or chaud — $ / accents actifs    */
+  --green:  #3dbf90;   /* succès / PnL positif / live dot  */
+  --red:    #d45a50;   /* danger / PnL négatif             */
+  --blue:   #4a80a8;   /* info / liens                     */
+  --silver: #7aaec8;   /* silver bleu — Y du logo          */
 }
 
+/* ── Reset & base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   height: 100%;
-  overflow: hidden;           /* ← empêche tout scroll parasite au niveau root */
+  overflow: hidden;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Space Mono', monospace;
-  /* ← min-height: 100vh supprimé : il entrait en conflit avec height:100% de shell.css */
 }
 
 /* ── Animations globales ── */
@@ -58,7 +70,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(7,9,13,.92);
+  background: rgba(6,16,28,.94);
   backdrop-filter: blur(10px);
   flex-direction: column;
   align-items: center;
@@ -66,7 +78,64 @@ body {
   gap: 20px;
 }
 #loadingOverlay.show { display: flex; }
-.ld-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 2.2rem; color: var(--gold); }
+.ld-logo { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 2rem; color: var(--gold); letter-spacing: -.02em; }
 .ld-bar  { width: 200px; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .ld-fill { height: 100%; background: var(--gold); animation: ldp 1.6s ease-in-out infinite; }
-.ld-txt  { font-size: .68rem; color: var(--text2); }
+.ld-txt  { font-size: .68rem; color: var(--muted); }
+
+/* ── Logo ── */
+.logo-large {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.logo-large-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.logo-large-name {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: -.02em;
+  color: var(--text);
+  line-height: 1;
+}
+.logo-large-sub {
+  font-size: .58rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.logo-large-version {
+  font-size: .52rem;
+  color: var(--border);
+  font-family: 'Space Mono', monospace;
+  letter-spacing: .06em;
+}
+
+.logo-small {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-small-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.logo-small-name {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -.01em;
+  color: var(--text);
+  line-height: 1;
+}
+.logo-small-version {
+  font-size: .48rem;
+  color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  letter-spacing: .06em;
+}
