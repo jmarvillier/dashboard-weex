@@ -194,15 +194,14 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
 /* ── PageDashboard v5 ────────────────────────────────────────────────────── */
 function PageDashboard({
   pairList,
-  excluded,
+  rawRows,
+  prices,
   pricesLoading,
   pricesError,
-  priceSource,
   lastPriceUpdate,
   refreshPrices,
 }) {
-  // Prices object pour usePeriodFilter (optionnel — enrichit valActuelle)
-  const { period, setPeriod, data } = usePeriodFilter(pairList, null, null)
+  const { period, setPeriod, data } = usePeriodFilter(pairList, rawRows, prices)
 
   return (
     <div className="page-content">
@@ -250,6 +249,8 @@ export default function AppShell({
   loadedAt,
   excluded,
   pairList,
+  rawRows,
+  prices,
   repoAvailable,
   backToLanding,
   toggleFlag,
@@ -285,10 +286,10 @@ export default function AppShell({
           {activePage === 'dashboard' && (
             <PageDashboard
               pairList={pairList}
-              excluded={excluded}
+              rawRows={rawRows}
+              prices={prices}
               pricesLoading={pricesLoading}
               pricesError={pricesError}
-              priceSource={priceSource}
               lastPriceUpdate={lastPriceUpdate}
               refreshPrices={refreshPrices}
             />
