@@ -1,0 +1,326 @@
+/* ══════════════════════════════════════════════════════════
+    pair-card.css — PairCard v2 (ticket #29)
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Carte wrapper ─────────────────────────────────────── */
+.pc {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  animation: fadeUp .35s ease both;
+  transition: border-color .2s;
+}
+.pc:hover { border-color: var(--border2); }
+.pc.excluded { opacity: .55; }
+
+/* ── En-tête ───────────────────────────────────────────── */
+.pc2-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border2);
+}
+.pc2-pair-name {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+.pc2-price-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.pc2-current-price {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue);
+}
+.pc2-delta-be {
+  font-size: 12px;
+  font-weight: 500;
+}
+.pc2-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.pc2-pnl-badge {
+  text-align: right;
+}
+.pc2-badge-usdt {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+.pc2-badge-pct {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+}
+.pc2-badge-pos .pc2-badge-usdt,
+.pc2-badge-pos .pc2-badge-pct { color: var(--green); }
+.pc2-badge-neg .pc2-badge-usdt,
+.pc2-badge-neg .pc2-badge-pct { color: var(--red); }
+.pc2-badge-neu .pc2-badge-usdt,
+.pc2-badge-neu .pc2-badge-pct { color: var(--muted); }
+
+/* ── Sections ──────────────────────────────────────────── */
+.pc2-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border2);
+}
+.pc2-section:last-child { border-bottom: none; }
+
+.pc2-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Séparateur léger ──────────────────────────────────── */
+.pc2-sep {
+  border: none;
+  border-top: 0.5px solid var(--border2);
+  margin: 10px 0;
+}
+
+/* ── Grilles KPI ───────────────────────────────────────── */
+.pc2-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.pc2-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+/* ── KpiBox ────────────────────────────────────────────── */
+.kpi-box {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  position: relative;
+}
+.kpi-box-full {
+  grid-column: 1 / -1;
+}
+.kpi-box-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.kpi-box-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.kpi-box-sublabel {
+  font-size: 10px;
+  color: var(--text2);
+  margin-top: 3px;
+}
+
+/* Couleurs valeurs KPI */
+.kpi-val-pos { color: var(--green) !important; }
+.kpi-val-neg { color: var(--red)   !important; }
+.kpi-val-neu { color: var(--muted) !important; }
+
+/* ── Groupe 3 — prix actuel ────────────────────────────── */
+.pc2-current-box .kpi-box-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+.pc2-current-sep {
+  border-top: 0.5px solid var(--border2);
+  margin: 6px 0;
+}
+.pc2-delta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.pc2-delta-label { color: var(--muted); }
+.pc2-delta-val   { font-weight: 500; }
+.pc2-delta-pos   { color: var(--green); }
+.pc2-delta-neg   { color: var(--red); }
+.pc2-delta-neu   { color: var(--muted); }
+.pc2-delta-na    { color: var(--muted); }
+
+/* ── Tooltip ───────────────────────────────────────────── */
+.kpi-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.kpi-info-icon {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 9px;
+  font-family: 'Space Mono', monospace;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: border-color .15s, color .15s;
+}
+.kpi-info-icon:hover {
+  border-color: var(--text2);
+  color: var(--text);
+}
+.kpi-tooltip-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg3);
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  min-width: 190px;
+  max-width: 260px;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  pointer-events: none;
+}
+.kpi-tooltip-title {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.kpi-tooltip-desc {
+  color: var(--text2);
+  margin-bottom: 5px;
+}
+.kpi-tooltip-formula {
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 4px 7px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--text2);
+  white-space: pre-line;
+}
+
+/* ── Chips ordres ──────────────────────────────────────── */
+.pc2-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.pc2-chip {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.pc2-chip b { color: var(--text); }
+
+/* ── Barre achats/ventes ───────────────────────────────── */
+.pc2-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.pc2-bar-track {
+  height: 7px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg);
+  display: flex;
+}
+.pc2-bar-buy  { background: rgba(61,191,144,.35); transition: width .4s; }
+.pc2-bar-sell { background: rgba(212,90,80,.35);  transition: width .4s; }
+
+/* ── Couleurs inline (delta vs breakeven en-tête) ──────── */
+.pc2-delta-be.pos { color: var(--green); }
+.pc2-delta-be.neg { color: var(--red); }
+.pc2-delta-be.neu { color: var(--muted); }
+
+/* ── Flag btn ──────────────────────────────────────────── */
+.flag-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px;
+  opacity: .5;
+  transition: opacity .15s;
+}
+.flag-btn:hover, .flag-btn.flagged { opacity: 1; }
+
+/* ── Excluded banner ───────────────────────────────────── */
+.excluded-banner {
+  background: rgba(212,90,80,.08);
+  border-top: 1px solid rgba(212,90,80,.2);
+  border-bottom: 1px solid rgba(212,90,80,.2);
+  padding: 5px 16px;
+  font-size: 10px;
+  color: var(--red);
+}
+
+/* ── Live dot ──────────────────────────────────────────── */
+.live-dot {
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--green);
+  animation: blink 1.6s ease-in-out infinite;
+}
+.live-dot-sm { width: 6px; height: 6px; }
+
+/* ── Dépôt ─────────────────────────────────────────────── */
+.depot-body   { display:flex; flex-direction:column; gap:8px; }
+.depot-stat   { display:flex; align-items:baseline; gap:8px; }
+.depot-val    { font-size:1.1rem; font-weight:600; color:var(--text); }
+.depot-val.o  { color:var(--gold); }
+.depot-unit   { font-size:.65rem; color:var(--muted); }
+.depot-note   { font-size:.62rem; color:var(--muted); margin-top:4px; }
+
+/* ── En-tête legacy (pour cartes non-v2) ──────────────── */
+.pc-head { display:flex; justify-content:space-between; align-items:flex-start; padding:12px 14px 10px; border-bottom:1px solid var(--border2); }
+.pc-head-left  { display:flex; flex-direction:column; gap:3px; }
+.pc-head-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.pc-name       { font-size:1rem; font-weight:600; color:var(--text); }
+.pc-sub        { font-size:.6rem; color:var(--muted); }
+.pc-price-live { display:flex; align-items:center; gap:5px; font-size:.7rem; color:var(--text2); margin-top:2px; }
+.pc-pnl-badge  { font-size:.72rem; font-weight:600; padding:3px 8px; border-radius:6px; display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+.pc-pnl-badge.g { color:var(--green); }
+.pc-pnl-badge.r { color:var(--red); }
+.pc-pnl-badge.n { color:var(--muted); }
+.pc-pnl-usdt   { font-size:.8rem; }
+.pc-pnl-pct    { font-size:.65rem; opacity:.85; }
+.pc-pnl-source { font-size:.55rem; opacity:.6; }
+.pc-body       { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
