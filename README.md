@@ -1,4 +1,4 @@
-# Dashboard Weex
+# Dashboard Ydash
 
 Welcome to the Ydash project!
 

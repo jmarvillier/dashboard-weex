@@ -21,10 +21,10 @@ export default function App() {
 
   const {
     view, zone, loading, loadingTxt,
-    fileName, loadedAt, pairList, excluded, driveErr,
+    fileName, loadedAt, pairList, rawRows, excluded, driveErr,
     repoAvailable,
     // Prix live
-    pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
+    prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
@@ -84,6 +84,8 @@ export default function App() {
           loadedAt={loadedAt}
           excluded={excluded}
           pairList={pairList}
+          rawRows={rawRows}
+          prices={prices}
           repoAvailable={repoAvailable}
           clearRepository={clearRepository}
           backToLanding={handleBackToLanding}

@@ -1,14 +1,16 @@
 /**
- * AppShell.jsx
+ * AppShell.jsx — v5
  */
 
 import { useState, useRef, useEffect } from 'react'
-import Logo         from './Logo.jsx'
-import KpiRow       from './KpiRow.jsx'
-import SummaryTable from './SummaryTable.jsx'
-import PairesView   from './PairesView.jsx'
-import DataPanel    from './DataPanel.jsx'
-import { auth, signOut } from '../lib/firebase.js'
+import Logo          from './Logo.jsx'
+import KpiRow        from './KpiRow.jsx'
+import SummaryTable  from './SummaryTable.jsx'
+import PairesView    from './PairesView.jsx'
+import DataPanel     from './DataPanel.jsx'
+import PeriodFilter  from './PeriodFilter.jsx'
+import { usePeriodFilter } from '../hooks/usePeriodFilter.js'
+import { auth, signOut }   from '../lib/firebase.js'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '🚀', label: 'Dashboard',  sublabel: 'Vue globale'      },
@@ -16,7 +18,8 @@ const NAV_ITEMS = [
   { id: 'donnees',   icon: '🗃️', label: 'Données',    sublabel: 'Gérer le journal' },
 ]
 
-function Topbar({ activePage, loadedAt, setSidebarOpen }) {
+/* ── Topbar — sans live dot ──────────────────────────────────────────────── */
+function Topbar({ activePage, setSidebarOpen }) {
   const pageItem = NAV_ITEMS.find(i => i.id === activePage)
 
   const [btnMode, setBtnMode]      = useState(null)
@@ -27,8 +30,7 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
 
   function isIosDevice() {
     const ua = navigator.userAgent
-    return /iphone|ipad|ipod/i.test(ua) ||
-      (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
+    return /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
   }
   function isIosSafari() {
     const ua = navigator.userAgent
@@ -106,10 +108,6 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
           <span className="topbar-breadcrumb-label">{pageItem?.label}</span>
         </div>
         <div className="topbar-right">
-          <div className="topbar-live">
-            <span className="live-dot" />
-            {loadedAt && <span className="topbar-time">Chargé {loadedAt}</span>}
-          </div>
           {btnMode && (
             <div className="topbar-install-wrap">
               <button
@@ -138,11 +136,9 @@ function Topbar({ activePage, loadedAt, setSidebarOpen }) {
   )
 }
 
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
 function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }) {
-  function navigate(page) {
-    setActivePage(page)
-    setIsOpen(false)
-  }
+  function navigate(page) { setActivePage(page); setIsOpen(false) }
 
   async function handleSignOut() {
     try { await signOut(auth) } catch (e) { console.error('Erreur déconnexion :', e) }
@@ -184,66 +180,44 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
   )
 }
 
-function SectionHeader({ icon, title, subtitle }) {
-  return (
-    <div className="page-section-header">
-      <div className="page-section-title"><span>{icon}</span> {title}</div>
-      {subtitle && <div className="page-section-sub">{subtitle}</div>}
-    </div>
-  )
-}
+/* ── PageDashboard v5 ────────────────────────────────────────────────────── */
+function PageDashboard({ pairList, rawRows, prices, pricesLoading, pricesError, lastPriceUpdate, refreshPrices }) {
+  const { period, setPeriod, data } = usePeriodFilter(pairList, rawRows, prices)
 
-function PageDashboard({ pairList, excluded, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices }) {
   return (
     <div className="page-content">
-      <SectionHeader icon="📊" title="Performance Globale" subtitle="Vue consolidée de tous vos investissements" />
+      <PeriodFilter period={period} onChange={setPeriod} />
       <KpiRow
-        pairList={pairList}
-        excluded={excluded}
+        data={data}
         pricesLoading={pricesLoading}
         pricesError={pricesError}
-        priceSource={priceSource}
         lastPriceUpdate={lastPriceUpdate}
         refreshPrices={refreshPrices}
       />
-      <SectionHeader icon="📋" title="Tableau Récapitulatif" subtitle="Détail par paire de trading" />
-      <SummaryTable pairList={pairList} excluded={excluded} />
+      <section className="v5-section">
+        <h2 className="v5-section-title">Récapitulatif par paire</h2>
+        <SummaryTable rows={data.rows} period={period} />
+      </section>
     </div>
   )
 }
 
+/* ── PagePaires ──────────────────────────────────────────────────────────── */
 function PagePaires({ pairList, excluded, toggleFlag }) {
   return (
     <div className="page-content">
-      <PairesView
-        pairList={pairList}
-        excluded={excluded}
-        toggleFlag={toggleFlag}
-        embedded={true}
-      />
+      <PairesView pairList={pairList} excluded={excluded} toggleFlag={toggleFlag} embedded={true} />
     </div>
   )
 }
 
+/* ── AppShell ────────────────────────────────────────────────────────────── */
 export default function AppShell({
-  activePage,
-  setActivePage,
-  loadedAt,
-  excluded,
-  pairList,
-  repoAvailable,
-  backToLanding,
-  toggleFlag,
-  loadFromFile,
-  loadFromDrive,
-  driveErr,
-  setDriveErr,
-  onRepoUpdated,
-  pricesLoading,
-  pricesError,
-  priceSource,
-  lastPriceUpdate,
-  refreshPrices,
+  activePage, setActivePage,
+  excluded, pairList, rawRows, prices,
+  repoAvailable, backToLanding, toggleFlag,
+  loadFromFile, loadFromDrive, driveErr, setDriveErr, onRepoUpdated,
+  pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -257,38 +231,23 @@ export default function AppShell({
         backToLanding={backToLanding}
       />
       <div className="shell-main">
-        <Topbar
-          activePage={activePage}
-          loadedAt={loadedAt}
-          setSidebarOpen={setSidebarOpen}
-        />
+        <Topbar activePage={activePage} setSidebarOpen={setSidebarOpen} />
         <main className="shell-content">
           {activePage === 'dashboard' && (
             <PageDashboard
-              pairList={pairList}
-              excluded={excluded}
-              pricesLoading={pricesLoading}
-              pricesError={pricesError}
-              priceSource={priceSource}
-              lastPriceUpdate={lastPriceUpdate}
-              refreshPrices={refreshPrices}
+              pairList={pairList} rawRows={rawRows} prices={prices}
+              pricesLoading={pricesLoading} pricesError={pricesError}
+              lastPriceUpdate={lastPriceUpdate} refreshPrices={refreshPrices}
             />
           )}
           {activePage === 'paires' && (
-            <PagePaires
-              pairList={pairList}
-              excluded={excluded}
-              toggleFlag={toggleFlag}
-            />
+            <PagePaires pairList={pairList} excluded={excluded} toggleFlag={toggleFlag} />
           )}
           {activePage === 'donnees' && (
             <DataPanel
               repoAvailable={repoAvailable}
-              loadFromFile={loadFromFile}
-              loadFromDrive={loadFromDrive}
-              driveErr={driveErr}
-              setDriveErr={setDriveErr}
-              onRepoUpdated={onRepoUpdated}
+              loadFromFile={loadFromFile} loadFromDrive={loadFromDrive}
+              driveErr={driveErr} setDriveErr={setDriveErr} onRepoUpdated={onRepoUpdated}
             />
           )}
         </main>

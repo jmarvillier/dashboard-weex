@@ -1,46 +1,58 @@
-/* ── Design tokens & reset ── */
+/* ══════════════════════════════════════════════════════════════════════════
+   variables.css — Design tokens Ydash v5
+   Palette bleu nuit crépusculaire · or · silver
+   Contraste textes : WCAG AA minimum 4.5:1 sur tous les fonds
+   ══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --bg:     #07090d;
-  --bg2:    #0d1017;
-  --bg3:    #131820;
-  --border: #1c2433;
-  --gold:   #e8b84b;
-  --green:  #00d68f;
-  --red:    #f5476a;
-  --blue:   #4096f7;
-  --muted:  #3a4a5e;
-  --text:   #dde6f0;
-  --text2:  #7a8fa8;
+  /* ── Fonds ─────────────────────────────────────────────────────────────── */
+  --bg:      #06101c;   /* page background                */
+  --bg2:     #0d1a2a;   /* cards, KPIs                    */
+  --bg3:     #101828;   /* headers table, topbar, sidebar */
+
+  /* ── Bordures ──────────────────────────────────────────────────────────── */
+  --border:  #1a3050;   /* bordure standard               */
+  --border2: #152a42;   /* bordure subtile                */
+
+  /* ── Textes — hiérarchie contrastée ───────────────────────────────────── */
+  /*   Ratio WCAG sur --bg2 (#0d1a2a) :                                      */
+  --text:    #d2e4f0;   /* principal   13.4:1 — valeurs KPI, titres          */
+  --text2:   #a0c4da;   /* secondaire   9.5:1 — sous-titres, descriptions    */
+  --muted:   #6e98b6;   /* hints/labels 5.7:1 — labels uppercase, en-têtes   */
+
+  /* ── Couleurs accentuées ──────────────────────────────────────────────── */
+  --gold:    #c8a020;   /* or — accents actifs, $ logo    */
+  --green:   #3dbf90;   /* succès / PnL positif / live    */
+  --red:     #d45a50;   /* danger / PnL négatif           */
+  --blue:    #4a80a8;   /* info / liens                   */
+  --silver:  #7aaec8;   /* silver bleu — Y logo           */
+
+  /* ── Layout shell ─────────────────────────────────────────────────────── */
+  --sidebar-w:  220px;
+  --topbar-h:   54px;
 }
 
+/* ── Reset ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
-  height: 100%;
-  overflow: hidden;           /* ← empêche tout scroll parasite au niveau root */
-}
+html, body { height: 100%; overflow: hidden; }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Space Mono', monospace;
-  /* ← min-height: 100vh supprimé : il entrait en conflit avec height:100% de shell.css */
 }
 
-/* ── Animations globales ── */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes rot   { to { transform: rotate(360deg); } }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
-@keyframes ldp   {
-  0%  { width: 0;   margin-left: 0; }
-  50% { width: 70%; }
-  100%{ width: 0;   margin-left: 100%; }
-}
+#root { height: 100%; overflow: hidden; }
 
-/* ── Spinner ── */
+/* ── Animations ────────────────────────────────────────────────────────── */
+@keyframes fadeUp  { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:none } }
+@keyframes rot     { to { transform: rotate(360deg) } }
+@keyframes blink   { 0%,100%{opacity:1} 50%{opacity:.25} }
+@keyframes ldp     { 0%{width:0;margin-left:0} 50%{width:70%} 100%{width:0;margin-left:100%} }
+@keyframes pulse-gold { 0%,100%{box-shadow:0 0 0 0 rgba(200,160,32,0)} 50%{box-shadow:0 0 0 4px rgba(200,160,32,.18)} }
+@keyframes pulse-blue { 0%,100%{box-shadow:0 0 0 0 rgba(74,128,168,0)} 50%{box-shadow:0 0 0 4px rgba(74,128,168,.18)} }
+
+/* ── Spinner ───────────────────────────────────────────────────────────── */
 .spin {
   display: inline-block;
   width: 13px; height: 13px;
@@ -52,21 +64,14 @@ body {
   margin-right: 6px;
 }
 
-/* ── Loading overlay ── */
+/* ── Loading overlay ───────────────────────────────────────────────────── */
 #loadingOverlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(7,9,13,.92);
-  backdrop-filter: blur(10px);
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  background: rgba(6,16,28,.94); backdrop-filter: blur(10px);
+  flex-direction: column; align-items: center; justify-content: center; gap: 20px;
 }
 #loadingOverlay.show { display: flex; }
-.ld-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 2.2rem; color: var(--gold); }
+.ld-logo { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 2rem; color: var(--gold); letter-spacing: -.02em; }
 .ld-bar  { width: 200px; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .ld-fill { height: 100%; background: var(--gold); animation: ldp 1.6s ease-in-out infinite; }
-.ld-txt  { font-size: .68rem; color: var(--text2); }
+.ld-txt  { font-size: .65rem; color: var(--text2); }
