@@ -1,8 +1,7 @@
 /**
  * PeriodFilter.jsx
- * ─────────────────────────────────────────────────────────────────────────────
- * Sélecteur de période réutilisable — 1j / 1s / 1m / 1a / Tout
- * Utilisé sur le Dashboard et prévu pour la vue Paires.
+ * Sélecteur de période — 1j / 1s / 1m / 1a / Tout
+ * Période par défaut dans usePeriodFilter : '1s'
  */
 
 export const PERIODS = [
@@ -13,36 +12,20 @@ export const PERIODS = [
   { key: 'tout', label: 'Tout' },
 ]
 
-/**
- * Retourne la date de début d'une période à partir d'aujourd'hui.
- * @param {'1j'|'1s'|'1m'|'1a'|'tout'} period
- * @returns {Date|null} null = pas de borne (tout)
- */
 export function periodStart(period) {
   const now = new Date()
   switch (period) {
     case '1j': {
-      const d = new Date(now)
-      d.setHours(0, 0, 0, 0)
-      return d
+      const d = new Date(now); d.setHours(0, 0, 0, 0); return d
     }
     case '1s': {
-      const d = new Date(now)
-      d.setDate(d.getDate() - 6)
-      d.setHours(0, 0, 0, 0)
-      return d
+      const d = new Date(now); d.setDate(d.getDate() - 6); d.setHours(0, 0, 0, 0); return d
     }
     case '1m': {
-      const d = new Date(now)
-      d.setDate(d.getDate() - 29)
-      d.setHours(0, 0, 0, 0)
-      return d
+      const d = new Date(now); d.setDate(d.getDate() - 29); d.setHours(0, 0, 0, 0); return d
     }
     case '1a': {
-      const d = new Date(now)
-      d.setFullYear(d.getFullYear() - 1)
-      d.setHours(0, 0, 0, 0)
-      return d
+      const d = new Date(now); d.setFullYear(d.getFullYear() - 1); d.setHours(0, 0, 0, 0); return d
     }
     case 'tout':
     default:
@@ -50,31 +33,24 @@ export function periodStart(period) {
   }
 }
 
-/**
- * Formate la notice de plage de dates selon la période.
- */
 export function periodNotice(period) {
-  const fmt = (d) =>
-    d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+  const fmt = d => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
   const today = new Date()
 
   switch (period) {
     case '1j':
-      return `Données du ${fmt(today)} — capital, PnL et ordres filtrés sur la période`
+      return `Données du ${fmt(today)} — capital investi et ordres filtrés sur la période`
     case '1s': {
-      const start = new Date(today)
-      start.setDate(start.getDate() - 6)
-      return `Du ${fmt(start)} au ${fmt(today)} — capital, PnL et ordres filtrés sur la période`
+      const start = new Date(today); start.setDate(start.getDate() - 6)
+      return `Du ${fmt(start)} au ${fmt(today)} — capital investi et ordres filtrés sur la période`
     }
     case '1m': {
-      const start = new Date(today)
-      start.setDate(start.getDate() - 29)
-      return `Du ${fmt(start)} au ${fmt(today)} — capital, PnL et ordres filtrés sur la période`
+      const start = new Date(today); start.setDate(start.getDate() - 29)
+      return `Du ${fmt(start)} au ${fmt(today)} — capital investi et ordres filtrés sur la période`
     }
     case '1a': {
-      const start = new Date(today)
-      start.setFullYear(start.getFullYear() - 1)
-      return `Du ${fmt(start)} au ${fmt(today)} — capital, PnL et ordres filtrés sur la période`
+      const start = new Date(today); start.setFullYear(start.getFullYear() - 1)
+      return `Du ${fmt(start)} au ${fmt(today)} — capital investi et ordres filtrés sur la période`
     }
     case 'tout':
       return 'Depuis le premier trade enregistré — toutes périodes confondues'
@@ -83,14 +59,7 @@ export function periodNotice(period) {
   }
 }
 
-/**
- * Composant PeriodFilter
- *
- * Props :
- *   period    {string}   — période active ('1j' par défaut)
- *   onChange  {Function} — (key: string) => void
- */
-export default function PeriodFilter({ period = '1j', onChange }) {
+export default function PeriodFilter({ period = '1s', onChange }) {
   return (
     <div className="period-bar">
       <div className="period-tabs" role="tablist">

@@ -1,19 +1,11 @@
 /**
  * KpiRow.jsx — Dashboard v5
- * ─────────────────────────────────────────────────────────────────────────────
- * Section Capital   → 3 KPIs : déposé · investi · disponible
- * Section Perf      → 3 KPIs : PnL réalisé · latent · total
- * Section Ordres    → Synthèse + barre achats/ventes
- *
- * Formules :
- *   Capital déposé  = Σ dépôts USDT (cumulatif)
- *   Capital investi = Σ achats USDT − Σ ventes USDT
- *   Capital dispo   = Capital déposé − Capital investi
+ * Ordre Capital : Déposé · Disponible · Investi
+ * Capital dispo = non filtré (all time)
  */
 
 import { useState } from 'react'
 
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
 const fmtN = (v, d = 2) =>
   isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
 
@@ -62,12 +54,8 @@ function KpiCard({ label, value, unit = 'USDT', sub, subClass, tipId, tipTitle, 
         <span>{label}</span>
         {tipId && (
           <Tooltip
-            id={tipId}
-            title={tipTitle}
-            desc={tipDesc}
-            formula={tipFormula}
-            openId={openId}
-            setOpenId={setOpenId}
+            id={tipId} title={tipTitle} desc={tipDesc} formula={tipFormula}
+            openId={openId} setOpenId={setOpenId}
           />
         )}
       </div>
@@ -81,28 +69,24 @@ function KpiCard({ label, value, unit = 'USDT', sub, subClass, tipId, tipTitle, 
 
 /* ── Composant principal ─────────────────────────────────────────────────── */
 export default function KpiRow({
-  // Nouvelle signature v5
   data,
   pricesLoading,
   pricesError,
   lastPriceUpdate,
   refreshPrices,
-
-  // Ancienne signature (fallback si data absent)
+  // Fallback ancienne API
   pairList,
   excluded,
 }) {
   const [openTip, setOpenTip] = useState(null)
 
-  // ── Mode fallback (ancienne API sans data agrégée) ────────────────────────
   let d = data
   if (!d && pairList) {
-    const trading = pairList.filter(p => !excluded?.has(p.name) && !p.is_depot)
-    const depots  = pairList.filter(p => p.is_depot)
+    const trading  = pairList.filter(p => !excluded?.has(p.name) && !p.is_depot)
+    const depots   = pairList.filter(p => p.is_depot)
     const sDepose  = depots.reduce((s, p) => s + (p.capital_depose || 0), 0)
-    // Capital investi = achats − ventes
-    const sAchete  = trading.reduce((s, p) => s + (p.usdt_investi || 0), 0)
-    const sVendu   = trading.reduce((s, p) => s + (p.usdt_recu    || 0), 0)
+    const sAchete  = trading.reduce((s, p) => s + (p.usdt_investi  || 0), 0)
+    const sVendu   = trading.reduce((s, p) => s + (p.usdt_recu     || 0), 0)
     const sInvesti = sAchete - sVendu
     const sPnlR    = trading.reduce((s, p) => s + (p.pnl_realise_live ?? p.pnl_realise ?? 0), 0)
     const sPnlL    = trading.reduce((s, p) => s + (p.pnl_latent_live  ?? p.pnl_latent  ?? 0), 0)
@@ -113,17 +97,14 @@ export default function KpiRow({
     const sVente   = pairList.reduce((s, p) => s + (p.nb_vente  || 0), 0)
     const bw       = sAchat + sVente > 0 ? (sAchat / (sAchat + sVente)) * 100 : 0
     d = {
-      capitalDepose:   sDepose,
-      capitalInvesti:  sInvesti,
-      capitalDispo:    sDepose - sInvesti,
+      capitalDepose: sDepose, capitalInvesti: sInvesti,
+      capitalDispo: sDepose - sInvesti,
       capitalDispoPct: sDepose > 0 ? ((sDepose - sInvesti) / sDepose) * 100 : 0,
-      pnlRealise:     sPnlR,
-      pnlRealisePct:  sInvesti > 0 ? (sPnlR / sInvesti) * 100 : 0,
-      pnlLatent:      sPnlL,
-      pnlLatentPct:   sInvesti > 0 ? (sPnlL / sInvesti) * 100 : 0,
-      pnlTotal:       sPnlR + sPnlL,
-      pnlTotalPct:    sInvesti > 0 ? ((sPnlR + sPnlL) / sInvesti) * 100 : 0,
-      nbTotal: sTot, nbExec: sExec, nbAnnule: sCanc, tauxExec: sTot > 0 ? (sExec / sTot) * 100 : 0,
+      pnlRealise: sPnlR, pnlRealisePct: sInvesti > 0 ? (sPnlR / sInvesti) * 100 : 0,
+      pnlLatent:  sPnlL, pnlLatentPct:  sInvesti > 0 ? (sPnlL / sInvesti) * 100 : 0,
+      pnlTotal: sPnlR + sPnlL, pnlTotalPct: sInvesti > 0 ? ((sPnlR + sPnlL) / sInvesti) * 100 : 0,
+      nbTotal: sTot, nbExec: sExec, nbAnnule: sCanc,
+      tauxExec: sTot > 0 ? (sExec / sTot) * 100 : 0,
       nbAchat: sAchat, nbVente: sVente, buyW: bw, sellW: 100 - bw,
     }
   }
@@ -133,8 +114,7 @@ export default function KpiRow({
   const {
     capitalDepose, capitalInvesti, capitalDispo, capitalDispoPct,
     pnlRealise, pnlRealisePct, pnlLatent, pnlLatentPct, pnlTotal, pnlTotalPct,
-    nbTotal, nbExec, nbAnnule, tauxExec,
-    nbAchat, nbVente, buyW, sellW,
+    nbTotal, nbExec, nbAnnule, tauxExec, nbAchat, nbVente, buyW, sellW,
   } = d
 
   const totBorderColor = pnlTotal > 0
@@ -143,7 +123,6 @@ export default function KpiRow({
     ? 'var(--color-border-danger, rgba(245,71,106,.5))'
     : undefined
 
-  const updateLabel = lastPriceUpdate ?? '—'
   const sourceLabel = pricesError ? '⚠️ Erreur' : (pricesLoading ? 'chargement…' : 'live')
 
   return (
@@ -152,6 +131,7 @@ export default function KpiRow({
       {/* ══ CAPITAL ══════════════════════════════════════════════════════════ */}
       <section className="v5-section">
         <h2 className="v5-section-title">Capital</h2>
+        {/* Ordre : Déposé · Disponible · Investi */}
         <div className="v5-kpi-grid v5-g3">
 
           <KpiCard
@@ -164,22 +144,22 @@ export default function KpiRow({
           />
 
           <KpiCard
-            label="Capital investi"
-            value={fmtN(capitalInvesti)}
-            tipId="tip-inv" tipTitle="Capital investi"
-            tipDesc="Capital actuellement engagé sur le marché — ce que vous avez acheté moins ce que vous avez vendu."
-            tipFormula="Σ achats USDT − Σ ventes USDT"
-            openId={openTip} setOpenId={setOpenTip}
-          />
-
-          <KpiCard
             label="Capital disponible"
             value={fmtN(capitalDispo)}
             sub={fmtN(capitalDispoPct, 0) + ' % du capital déposé'}
             subClass="neu"
             tipId="tip-dispo" tipTitle="Capital disponible"
-            tipDesc="USDT non investi, prêt à être déployé."
-            tipFormula="Capital déposé − Capital investi"
+            tipDesc="USDT non investi sur l'ensemble de votre historique. Valeur stable, non filtrée par la période."
+            tipFormula="Capital déposé − (Σ achats all time − Σ ventes all time)"
+            openId={openTip} setOpenId={setOpenTip}
+          />
+
+          <KpiCard
+            label="Capital investi"
+            value={fmtN(capitalInvesti)}
+            tipId="tip-inv" tipTitle="Capital investi"
+            tipDesc="Capital actuellement engagé sur la période sélectionnée."
+            tipFormula="Σ achats USDT − Σ ventes USDT"
             openId={openTip} setOpenId={setOpenTip}
           />
 
@@ -193,18 +173,14 @@ export default function KpiRow({
           Performance (cours actuel)
           <span className="v5-perf-source">
             {sourceLabel}
-            {!pricesLoading && !pricesError && lastPriceUpdate && (
-              <> · {updateLabel}</>
-            )}
+            {!pricesLoading && !pricesError && lastPriceUpdate && <> · {lastPriceUpdate}</>}
           </span>
           {refreshPrices && (
             <button
               className="v5-refresh-btn"
               onClick={e => { e.stopPropagation(); refreshPrices() }}
               title="Rafraîchir les prix"
-            >
-              ↺
-            </button>
+            >↺</button>
           )}
         </h2>
         <div className="v5-kpi-grid v5-g3">
@@ -212,8 +188,7 @@ export default function KpiRow({
           <KpiCard
             label="PnL réalisé"
             value={<span className={cc(pnlRealise)}>{fmtS(pnlRealise)}</span>}
-            sub={fmtPct(pnlRealisePct)}
-            subClass={cc(pnlRealisePct)}
+            sub={fmtPct(pnlRealisePct)} subClass={cc(pnlRealisePct)}
             tipId="tip-real" tipTitle="PnL réalisé"
             tipDesc="Gains/pertes sur les ventes clôturées dans la période sélectionnée."
             tipFormula="Σ PnL réalisé par paire"
@@ -223,8 +198,7 @@ export default function KpiRow({
           <KpiCard
             label="PnL latent"
             value={<span className={cc(pnlLatent)}>{fmtS(pnlLatent)}</span>}
-            sub={fmtPct(pnlLatentPct)}
-            subClass={cc(pnlLatentPct)}
+            sub={fmtPct(pnlLatentPct)} subClass={cc(pnlLatentPct)}
             tipId="tip-lat" tipTitle="PnL latent"
             tipDesc="Variation de valeur des positions encore ouvertes."
             tipFormula="Σ (prix actuel − breakeven) × position nette"
@@ -234,8 +208,7 @@ export default function KpiRow({
           <KpiCard
             label="PnL total"
             value={<span className={cc(pnlTotal)}>{fmtS(pnlTotal)}</span>}
-            sub={fmtPct(pnlTotalPct)}
-            subClass={cc(pnlTotalPct)}
+            sub={fmtPct(pnlTotalPct)} subClass={cc(pnlTotalPct)}
             borderColor={totBorderColor}
             className="v5-kpi--total"
             tipId="tip-tot" tipTitle="PnL total"
