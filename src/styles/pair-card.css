@@ -30,13 +30,20 @@
 /* ── En-tête ───────────────────────────────────────────────────────────── */
 .pc2-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 10px;
   padding: 16px 20px 14px;
   background: var(--bg3);
   border-bottom: 1px solid var(--border);
   border-radius: 14px 14px 0 0;
-  gap: 20px;
+}
+
+/* Rangée 1 : nom + badge + flag */
+.pc2-head-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 .pc2-head-left  { flex: 1; min-width: 0; }
 .pc2-head-right { display: flex; align-items: flex-start; gap: 10px; flex-shrink: 0; }
@@ -49,8 +56,6 @@
   letter-spacing: -.01em;
   line-height: 1;
 }
-
-/* Ligne prix + live dot + delta breakeven */
 .pc2-sub {
   display: flex;
   align-items: center;
@@ -72,13 +77,14 @@
 .pc2-be.neg { color: var(--red); }
 .pc2-be.neu { color: var(--muted); }
 
-/* Deltas vs moy. achat / vente — dans le header */
+/* Rangée 2 : deltas pleine largeur */
 .pc2-deltas {
-  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid var(--border2);
 }
 .pc2-delta {
   display: flex;
@@ -157,7 +163,6 @@
   padding: 16px 20px;
   border-top: 1px solid var(--border);
 }
-
 .pc2-slabel {
   font-family: 'Space Mono', monospace;
   font-size: .46rem;
@@ -314,12 +319,7 @@
 /* ── Dépôt ─────────────────────────────────────────────────────────────── */
 .pc2-depot      { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
 .pc2-depot-stat { display: flex; flex-direction: column; gap: 3px; }
-.pc2-depot-val  {
-  font-family: 'Space Mono', monospace;
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--text);
-}
+.pc2-depot-val  { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--text); }
 .pc2-depot-val.gold { color: var(--gold); }
 .pc2-depot-unit { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .pc2-depot-note { font-size: .52rem; color: var(--muted); font-style: italic; margin-top: 8px; }
