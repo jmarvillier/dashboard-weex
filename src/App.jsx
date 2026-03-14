@@ -1,3 +1,4 @@
+import './styles/pair-card.css'
 import { useState, useEffect }       from 'react'
 import { useTrading }                 from './hooks/useTrading.js'
 import LoadingOverlay                 from './components/LoadingOverlay.jsx'
