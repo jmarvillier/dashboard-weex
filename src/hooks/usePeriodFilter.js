@@ -140,6 +140,12 @@ function buildKpis(rows, capitalDepose, capitalDispo) {
   const tauxExec = nbTotal > 0 ? (nbExec / nbTotal) * 100 : 0
   const buyW     = nbAchat + nbVente > 0 ? (nbAchat / (nbAchat + nbVente)) * 100 : 0
 
+  // ── Volumes USDT ──────────────────────────────────────────────────────────
+  const volumeAchat  = rows.reduce((s, r) => s + (r.usdtAchete || 0), 0)
+  const volumeVente  = rows.reduce((s, r) => s + (r.usdtVendu  || 0), 0)
+  const volTotal     = volumeAchat + volumeVente
+  const volumeBuyW   = volTotal > 0 ? (volumeAchat / volTotal) * 100 : 0
+
   return {
     capitalDepose,
     capitalInvesti,
@@ -150,6 +156,7 @@ function buildKpis(rows, capitalDepose, capitalDispo) {
     pnlTotal,    pnlTotalPct:   pctOf(pnlTotal,   capitalInvesti),
     nbTotal, nbExec, nbAnnule, tauxExec,
     nbAchat, nbVente, buyW, sellW: 100 - buyW,
+    volumeAchat, volumeVente, volumeBuyW, volumeSellW: 100 - volumeBuyW,
     rows,
   }
 }
