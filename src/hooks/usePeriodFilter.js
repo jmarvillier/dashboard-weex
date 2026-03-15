@@ -63,7 +63,7 @@ function computeFromRaw(rawRows, period, pairList, prices) {
     if (r.sens === 'Vente') { p.usdtVendu  += r.usdt || 0; p.volVendu  += r.vol || 0 }
   })
 
-  const rows = Object.values(map).map(p => {
+  const rows = Object.values(map).filter(p => p.nbExec > 0).map(p => {
     const position  = p.volAchete - p.volVendu
     const prixMoy   = p.volAchete > 0 ? p.usdtAchete / p.volAchete : 0
     const breakeven = position > 0 && prixMoy > 0 ? prixMoy : 0
