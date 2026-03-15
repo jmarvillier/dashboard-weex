@@ -8,6 +8,7 @@ import './styles/data-panel.css'
 import './styles/entry-form.css'
 import './styles/data-menu.css'
 import './styles/pair-card.css'
+import './styles/dca.css'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import App from './App.jsx'
 
