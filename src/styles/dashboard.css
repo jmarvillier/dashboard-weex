@@ -69,7 +69,26 @@
 .v5-tooltip-wrap { position: relative; display: inline-flex; align-items: center; }
 .v5-info-btn     { width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--border); background: transparent; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; color: var(--muted); cursor: pointer; flex-shrink: 0; line-height: 1; user-select: none; transition: border-color .15s, color .15s; padding: 0; }
 .v5-info-btn:hover { border-color: var(--text2); color: var(--text2); }
-.v5-tooltip      { position: absolute; z-index: 20; bottom: calc(100% + 8px); left: 0; min-width: 210px; max-width: 280px; background: var(--bg2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 8px 32px rgba(0,0,0,.5); animation: fadeUp .15s ease; }
+.v5-tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 210px;
+  max-width: 280px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  z-index: 9999;
+  white-space: normal;
+  pointer-events: none;
+}
+.v5-tooltip--top    { bottom: calc(100% + 8px); animation: fadeUp .12s ease; }
+.v5-tooltip--bottom { top: calc(100% + 8px);    animation: fadeDown .12s ease; }
 .v5-tooltip strong { font-size: .6rem; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 .v5-tooltip span   { font-size: .57rem; color: var(--text2); line-height: 1.5; }
 .v5-tooltip code   { font-family: 'Space Mono', monospace; font-size: .52rem; background: var(--bg3); padding: 3px 7px; border-radius: 5px; display: block; margin-top: 2px; color: var(--gold); line-height: 1.6; }

@@ -4,7 +4,7 @@
  * Capital dispo = non filtré (all time)
  */
 
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 
 const fmtN = (v, d = 2) =>
   isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
@@ -25,9 +25,28 @@ const cc = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu')
 
 /* ── Tooltip ─────────────────────────────────────────────────────────────── */
 function Tooltip({ id, title, desc, formula, openId, setOpenId }) {
-  const isOpen = openId === id
+  const isOpen    = openId === id
+  const wrapRef   = useRef(null)
+  const bubbleRef = useRef(null)
+  const [placement, setPlacement] = useState('top')
+  const [ready,     setReady]     = useState(false)
+
+  useLayoutEffect(() => {
+    if (!isOpen || !wrapRef.current || !bubbleRef.current) return
+    const wrap    = wrapRef.current.getBoundingClientRect()
+    const bub     = bubbleRef.current.getBoundingClientRect()
+    const topbarH = 54
+    const gap     = 8
+    setPlacement(wrap.top - bub.height - gap < topbarH ? 'bottom' : 'top')
+    setReady(true)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) setReady(false)
+  }, [isOpen])
+
   return (
-    <div className="v5-tooltip-wrap">
+    <div className="v5-tooltip-wrap" ref={wrapRef}>
       <button
         className="v5-info-btn"
         aria-label={`Info ${title}`}
@@ -36,7 +55,11 @@ function Tooltip({ id, title, desc, formula, openId, setOpenId }) {
         i
       </button>
       {isOpen && (
-        <div className="v5-tooltip">
+        <div
+          ref={bubbleRef}
+          className={`v5-tooltip v5-tooltip--${placement}`}
+          style={{ opacity: ready ? 1 : 0 }}
+        >
           <strong>{title}</strong>
           <span>{desc}</span>
           {formula && <code>{formula}</code>}
