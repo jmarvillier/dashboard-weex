@@ -257,34 +257,42 @@ export default function KpiRow({
 
             {/* ── Barre 1 : nombre d'ordres ── */}
             <div className="v5-bar-row">
+              <div className="v5-bar-sublabel">Nombre d'ordres</div>
               <div className="v5-bar-labels">
-                <span><strong>{nbAchat}</strong> achats</span>
-                <span className="v5-bar-legend v5-bar-legend--pct">
-                  {buyW > 0 ? fmtN(buyW, 0) + ' %' : '—'}
+                <span className="v5-bar-side v5-bar-side--buy">
+                  <strong>{nbAchat}</strong>
+                  <span className="v5-bar-pct">{buyW > 0 ? fmtN(buyW, 0) + ' %' : '—'}</span>
                 </span>
-                <span><strong>{nbVente}</strong> ventes</span>
+                <span className="v5-bar-side v5-bar-side--sell">
+                  <span className="v5-bar-pct">{sellW > 0 ? fmtN(sellW, 0) + ' %' : '—'}</span>
+                  <strong>{nbVente}</strong>
+                </span>
               </div>
               <div className="v5-bar-track">
                 <div className="v5-bar-buy"  style={{ width: buyW  + '%' }} />
                 <div className="v5-bar-sell" style={{ width: sellW + '%' }} />
               </div>
-              <div className="v5-bar-sublabel">Nombre d'ordres</div>
             </div>
 
             {/* ── Barre 2 : volume USDT ── */}
             <div className="v5-bar-row v5-bar-row--volume">
+              <div className="v5-bar-sublabel">Volume USDT</div>
               <div className="v5-bar-labels">
-                <span><strong>{fmtN(volumeAchat, 0)}</strong> <span className="v5-bar-unit">USDT</span></span>
-                <span className="v5-bar-legend v5-bar-legend--pct">
-                  {volumeBuyW > 0 ? fmtN(volumeBuyW, 0) + ' %' : '—'}
+                <span className="v5-bar-side v5-bar-side--buy">
+                  <strong>{fmtN(volumeAchat, 0)}</strong>
+                  <span className="v5-bar-unit">USDT</span>
+                  <span className="v5-bar-pct">{volumeBuyW > 0 ? fmtN(volumeBuyW, 0) + ' %' : '—'}</span>
                 </span>
-                <span><strong>{fmtN(volumeVente, 0)}</strong> <span className="v5-bar-unit">USDT</span></span>
+                <span className="v5-bar-side v5-bar-side--sell">
+                  <span className="v5-bar-pct">{volumeSellW > 0 ? fmtN(volumeSellW, 0) + ' %' : '—'}</span>
+                  <span className="v5-bar-unit">USDT</span>
+                  <strong>{fmtN(volumeVente, 0)}</strong>
+                </span>
               </div>
               <div className="v5-bar-track">
                 <div className="v5-bar-buy"  style={{ width: volumeBuyW  + '%' }} />
                 <div className="v5-bar-sell" style={{ width: volumeSellW + '%' }} />
               </div>
-              <div className="v5-bar-sublabel">Volume USDT</div>
             </div>
 
           </div>
