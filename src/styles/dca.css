@@ -1,0 +1,237 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   dca.css — Scaled Mirror DCA — charte bleu nuit v5
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Conteneur principal ────────────────────────────────────────────────── */
+.dca-page { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.dca-scroll { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Stepper ─────────────────────────────────────────────────────────────── */
+.dca-stepper { display: flex; align-items: flex-end; gap: 0; padding: 0 0 18px; flex-shrink: 0; }
+.dca-step   { display: flex; align-items: center; gap: 8px; flex: 1; }
+.dca-step-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--bg3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .65rem; font-weight: 700; flex-shrink: 0;
+  font-family: 'Space Mono', monospace; color: var(--muted); transition: all .2s;
+}
+.dca-step-text { font-size: .58rem; color: var(--muted); line-height: 1.4; }
+.dca-step.active .dca-step-circle  { background: rgba(74,128,168,.15); border-color: var(--blue); color: var(--blue); }
+.dca-step.active .dca-step-text    { color: var(--text2); }
+.dca-step.done .dca-step-circle    { background: rgba(61,191,144,.12); border-color: var(--green); color: var(--green); }
+.dca-step-line { flex: 1; height: 1px; background: var(--border); margin-bottom: 12px; transition: background .3s; }
+.dca-step-line.done { background: var(--green); }
+
+/* ── Card générique ──────────────────────────────────────────────────────── */
+.dca-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px 20px;
+}
+.dca-card-title {
+  font-family: 'Space Mono', monospace; font-weight: 700; font-size: .72rem;
+  color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.dca-tag { font-size: .5rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; }
+.dca-tag-req  { background: rgba(212,90,80,.12); border: 1px solid rgba(212,90,80,.3); color: var(--red); }
+.dca-tag-opt  { background: rgba(110,152,182,.08); border: 1px solid var(--border); color: var(--muted); }
+.dca-tag-min  { background: rgba(200,160,32,.1); border: 1px solid rgba(200,160,32,.25); color: var(--gold); }
+
+/* ── Bannières ───────────────────────────────────────────────────────────── */
+.dca-banner { padding: 10px 14px; border-radius: 8px; font-size: .62rem; line-height: 1.6; border: 1px solid; }
+.dca-banner-info { background: rgba(74,128,168,.08); border-color: rgba(74,128,168,.25); color: var(--text2); }
+.dca-banner-warn { background: rgba(200,160,32,.07); border-color: rgba(200,160,32,.25); color: var(--gold); }
+.dca-banner-danger { background: rgba(212,90,80,.08); border-color: rgba(212,90,80,.28); color: var(--red); }
+.dca-banner-success { background: rgba(61,191,144,.07); border-color: rgba(61,191,144,.22); color: var(--green); }
+
+/* ── Liste des plans ─────────────────────────────────────────────────────── */
+.dca-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.dca-list-title { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); }
+.dca-list-sub   { font-size: .58rem; color: var(--muted); margin-top: 3px; }
+
+.dca-plan-item {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  cursor: pointer; transition: all .2s; margin-bottom: 8px;
+}
+.dca-plan-item:hover { border-color: var(--blue); transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+.dca-plan-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: .72rem; flex-shrink: 0; }
+.dca-plan-icon-btc { background: rgba(74,128,168,.18); color: var(--blue); }
+.dca-plan-icon-eth { background: rgba(61,191,144,.14); color: var(--green); }
+.dca-plan-icon-def { background: rgba(200,160,32,.1); color: var(--gold); }
+.dca-plan-info    { flex: 1 }
+.dca-plan-pair    { font-family: 'Space Mono', monospace; font-weight: 700; font-size: .8rem; color: var(--text); }
+.dca-plan-meta    { font-size: .56rem; color: var(--muted); margin-top: 3px; }
+.dca-plan-right   { text-align: right; flex-shrink: 0; }
+.dca-plan-status  { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: .55rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.dca-status-acc   { background: rgba(61,191,144,.12); color: var(--green); border: 1px solid rgba(61,191,144,.25); }
+.dca-status-dist  { background: rgba(212,90,80,.1); color: var(--red); border: 1px solid rgba(212,90,80,.2); }
+.dca-plan-avg     { font-size: .56rem; color: var(--muted); margin-top: 5px; }
+.dca-plan-del-btn { background: none; border: 1px solid rgba(212,90,80,.25); color: rgba(212,90,80,.6); border-radius: 6px; padding: 4px 8px; font-size: .6rem; cursor: pointer; transition: all .2s; }
+.dca-plan-del-btn:hover { background: rgba(212,90,80,.1); color: var(--red); border-color: var(--red); }
+
+.dca-empty-zone { border: 1px dashed var(--border); border-radius: 12px; padding: 28px; text-align: center; color: var(--muted); font-size: .65rem; cursor: pointer; transition: border-color .2s; }
+.dca-empty-zone:hover { border-color: var(--blue); color: var(--text2); }
+
+/* ── Pair chips ──────────────────────────────────────────────────────────── */
+.dca-chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.dca-chip { padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: .65rem; background: var(--bg3); color: var(--text2); transition: all .15s; user-select: none; }
+.dca-chip:hover { border-color: var(--blue); color: var(--text); }
+.dca-chip.sel { background: rgba(74,128,168,.15); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+.dca-chip.new-pair { border-style: dashed; }
+
+/* ── Form inputs ─────────────────────────────────────────────────────────── */
+.dca-form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.dca-form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 130px; }
+.dca-form-group label { font-size: .56rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.dca-input, .dca-select {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: .7rem; padding: 9px 12px;
+  border-radius: 8px; outline: none; transition: border-color .2s; width: 100%;
+}
+.dca-input:focus, .dca-select:focus { border-color: var(--gold); }
+.dca-input::placeholder { color: var(--muted); }
+.dca-input-group { display: flex; }
+.dca-input-group .dca-input { border-radius: 8px 0 0 8px; border-right: none; }
+.dca-input-sfx { padding: 9px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 0 8px 8px 0; font-size: .65rem; color: var(--muted); white-space: nowrap; }
+
+/* ── Param tables ────────────────────────────────────────────────────────── */
+.dca-ptbl { width: 100%; border-collapse: collapse; font-size: .65rem; }
+.dca-ptbl th { font-size: .5rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+.dca-ptbl td { padding: 4px 4px; border-bottom: 1px solid rgba(26,48,80,.5); vertical-align: middle; }
+.dca-ptbl tr:last-child td { border-bottom: none; }
+.dca-pi { background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-family: 'Space Mono', monospace; font-size: .65rem; padding: 5px 8px; border-radius: 6px; width: 100%; outline: none; transition: border-color .2s; }
+.dca-pi:focus { border-color: var(--gold); }
+.dca-pi-group { display: flex; align-items: center; }
+.dca-pi-group .dca-pi { border-radius: 6px 0 0 6px; border-right: none; }
+.dca-pi-sfx { padding: 5px 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 0 6px 6px 0; font-size: .58rem; color: var(--muted); white-space: nowrap; }
+.dca-price-hint { font-size: .55rem; color: var(--green); white-space: nowrap; }
+.dca-zdot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; vertical-align: middle; flex-shrink: 0; }
+.dca-del-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .9rem; padding: 2px 4px; border-radius: 4px; }
+.dca-del-btn:hover { color: var(--red); background: rgba(212,90,80,.1); }
+.dca-add-row { display: flex; align-items: center; gap: 7px; font-size: .6rem; color: var(--muted); cursor: pointer; padding: 8px 0; border-top: 1px solid rgba(26,48,80,.5); margin-top: 4px; transition: color .15s; }
+.dca-add-row:hover { color: var(--gold); }
+.dca-add-ic { width: 17px; height: 17px; border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; }
+
+/* ── Pointage table (read-only DataBrowser style) ────────────────────────── */
+.dca-ops-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.dca-ops-title  { font-family: 'Space Mono', monospace; font-weight: 700; font-size: .75rem; color: var(--text); }
+.dca-ops-meta   { font-size: .56rem; color: var(--muted); margin-top: 3px; }
+.dca-ops-btns   { display: flex; gap: 6px; }
+.dca-ops-btn    { background: none; border: 1px solid var(--border); color: var(--text2); font-family: 'Space Mono', monospace; font-size: .6rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; transition: all .15s; }
+.dca-ops-btn:hover { border-color: var(--gold); color: var(--gold); }
+.dca-ops-tbl-wrap { overflow-x: auto; }
+.dca-ops-tbl { width: 100%; border-collapse: collapse; font-size: .62rem; }
+.dca-ops-tbl th { font-size: .5rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; background: var(--bg3); }
+.dca-ops-tbl th.th-dca { background: rgba(61,191,144,.1); color: var(--green); text-align: center; }
+.dca-ops-tbl td { padding: 6px 8px; border-bottom: 1px solid rgba(26,48,80,.4); color: var(--text2); }
+.dca-ops-tbl tr:last-child td { border-bottom: none; }
+.dca-ops-tbl tr:hover td { background: rgba(255,255,255,.02); }
+.dca-ops-tbl td.td-chk { text-align: center; }
+.dca-ops-chk { width: 15px; height: 15px; cursor: pointer; accent-color: var(--green); }
+.dca-ops-summary { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .62rem; }
+.dca-ops-summary span { color: var(--muted); }
+.dca-ops-summary b { color: var(--text); }
+
+/* ── Dashboard Hero ──────────────────────────────────────────────────────── */
+.dca-hero {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; position: relative;
+}
+.dca-hero-prices { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dca-hero-block  { text-align: center; flex: 1; min-width: 100px; }
+.dca-hero-lbl    { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
+.dca-hero-val    { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.6rem; color: var(--text); line-height: 1; }
+.dca-hero-val-main { font-size: 1.8rem; color: var(--gold); }
+.dca-hero-sub    { font-size: .52rem; color: var(--muted); margin-top: 5px; }
+.dca-hero-sep    { width: 1px; height: 60px; background: var(--border); flex-shrink: 0; }
+.dca-hero-delta  { text-align: center; flex: 1; }
+.dca-hero-delta-arrow { font-size: 1.4rem; line-height: 1; }
+.dca-hero-delta-pct   { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.1rem; line-height: 1; margin-top: 2px; }
+.dca-hero-delta-lbl   { font-size: .5rem; color: var(--muted); margin-top: 4px; }
+.up   { color: var(--red); }
+.down { color: var(--green); }
+
+/* ── Zone bar ────────────────────────────────────────────────────────────── */
+.dca-zone-bar-wrap { margin-top: 16px; }
+.dca-zone-bar { display: flex; height: 22px; border-radius: 5px; overflow: hidden; position: relative; }
+.dca-zone-seg { flex: 1; display: flex; align-items: center; justify-content: center; font-size: .55rem; font-weight: 700; }
+.dca-zone-seg.z4 { background: rgba(61,191,144,.35); color: #3dbf90; }
+.dca-zone-seg.z3 { background: rgba(61,191,144,.2); color: #3dbf90; }
+.dca-zone-seg.z2 { background: rgba(200,160,32,.2); color: var(--gold); }
+.dca-zone-seg.z1 { background: rgba(200,160,32,.35); color: var(--gold); }
+.dca-zone-seg.z0 { background: rgba(212,90,80,.25); color: var(--red); }
+.dca-zone-needle { position: absolute; width: 2px; top: 0; bottom: 0; background: var(--text); transform: translateX(-50%); border-radius: 1px; transition: left .4s; }
+.dca-zone-needle::before { content: '▼'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: .55rem; color: var(--text); }
+.dca-zone-labels { display: flex; font-size: .48rem; color: var(--muted); margin-top: 3px; }
+.dca-zone-labels span { flex: 1; text-align: center; }
+
+/* ── Signal box ──────────────────────────────────────────────────────────── */
+.dca-signal { border-radius: 10px; padding: 14px 16px; border: 1px solid; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dca-signal.buy    { background: rgba(61,191,144,.08); border-color: rgba(61,191,144,.25); }
+.dca-signal.buy50  { background: rgba(200,160,32,.07); border-color: rgba(200,160,32,.22); }
+.dca-signal.debt   { background: rgba(74,128,168,.08); border-color: rgba(74,128,168,.25); }
+.dca-signal.profit { background: rgba(212,90,80,.07); border-color: rgba(212,90,80,.2); }
+.dca-signal.hold   { background: rgba(110,152,182,.05); border-color: var(--border); }
+.dca-signal-title  { font-family: 'Space Mono', monospace; font-weight: 700; font-size: .78rem; color: var(--text); margin-bottom: 5px; }
+.dca-signal-desc   { font-size: .6rem; color: var(--text2); line-height: 1.6; }
+.dca-signal-amount { text-align: right; flex-shrink: 0; }
+.dca-signal-amt    { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.2rem; color: var(--text); }
+.dca-signal-amt-lbl { font-size: .52rem; color: var(--muted); margin-top: 3px; }
+
+/* ── KPIs ────────────────────────────────────────────────────────────────── */
+.dca-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.dca-kpi { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.dca-kpi-val { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); }
+.dca-kpi-lbl { font-size: .5rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-top: 4px; }
+.dca-kpi-sub { font-size: .54rem; color: var(--muted); margin-top: 3px; }
+
+/* ── Palier rows ─────────────────────────────────────────────────────────── */
+.dca-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dca-pal-row { display: flex; align-items: center; gap: 7px; padding: 6px 0; border-bottom: 1px solid rgba(26,48,80,.4); font-size: .6rem; }
+.dca-pal-row:last-child { border-bottom: none; }
+.dca-pal-row.active-debt   { background: rgba(74,128,168,.1); border-radius: 6px; padding: 6px 8px; margin: 2px -8px; border-color: transparent; }
+.dca-pal-row.active-profit { background: rgba(212,90,80,.1); border-radius: 6px; padding: 6px 8px; margin: 2px -8px; border-color: transparent; }
+.dca-pal-lbl   { flex: 1; color: var(--text2); }
+.dca-pal-price { color: var(--muted); font-family: 'Space Mono', monospace; font-size: .58rem; min-width: 70px; text-align: right; }
+.dca-pal-action { font-weight: 700; color: var(--text); min-width: 80px; text-align: right; font-family: 'Space Mono', monospace; font-size: .6rem; }
+
+/* ── Timeline ────────────────────────────────────────────────────────────── */
+.dca-tl      { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; margin: 10px 0; }
+.dca-tc      { aspect-ratio: 1; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: .5rem; cursor: default; position: relative; }
+.dca-tc:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; white-space: nowrap; font-size: .55rem; color: var(--text); z-index: 9; pointer-events: none; }
+.tc-100 { background: rgba(61,191,144,.3); color: var(--green); }
+.tc-75  { background: rgba(61,191,144,.18); color: var(--green); }
+.tc-50  { background: rgba(200,160,32,.22); color: var(--gold); }
+.tc-25  { background: rgba(200,160,32,.35); color: var(--gold); }
+.tc-sk  { background: var(--bg3); color: var(--muted); }
+.tc-sl  { background: rgba(212,90,80,.2); color: var(--red); }
+.tc-dt  { background: rgba(74,128,168,.2); color: var(--blue); }
+.tc-today { outline: 2px solid var(--text2); outline-offset: 1px; }
+
+.dca-tl-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: .54rem; color: var(--muted); margin-bottom: 4px; }
+.dca-tl-leg-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 3px; }
+
+/* ── Navigation bas de page ──────────────────────────────────────────────── */
+.dca-btm { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.dca-step-hint { font-size: .56rem; color: var(--muted); }
+.dca-btn { padding: 9px 18px; border-radius: 8px; font-size: .65rem; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-family: 'Space Mono', monospace; transition: all .15s; }
+.dca-btn:hover { border-color: var(--text2); color: var(--text); }
+.dca-btn-primary { background: rgba(74,128,168,.15); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+.dca-btn-primary:hover { background: rgba(74,128,168,.25); }
+.dca-btn-success { background: rgba(61,191,144,.12); border-color: var(--green); color: var(--green); font-weight: 700; }
+.dca-btn-success:hover { background: rgba(61,191,144,.22); }
+.dca-btn-ghost { background: none; border-color: transparent; color: var(--muted); }
+.dca-btn-ghost:hover { color: var(--text2); background: none; }
+
+/* ── Retour ──────────────────────────────────────────────────────────────── */
+.dca-back-bar { display: flex; align-items: center; gap: 10px; padding: 0 0 12px; flex-shrink: 0; }
+.dca-back-btn { background: none; border: none; color: var(--muted); font-size: .6rem; cursor: pointer; font-family: 'Space Mono', monospace; display: flex; align-items: center; gap: 5px; padding: 4px 0; }
+.dca-back-btn:hover { color: var(--text2); }
+.dca-back-pair { font-size: .6rem; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .dca-two-col { grid-template-columns: 1fr; }
+  .dca-kpi-grid { grid-template-columns: 1fr 1fr; }
+  .dca-hero-sep { display: none; }
+}

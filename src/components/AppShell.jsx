@@ -1,5 +1,5 @@
 /**
- * AppShell.jsx — v5
+ * AppShell.jsx — v5 + Scaled Mirror DCA
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -9,16 +9,18 @@ import SummaryTable  from './SummaryTable.jsx'
 import PairesView    from './PairesView.jsx'
 import DataPanel     from './DataPanel.jsx'
 import PeriodFilter  from './PeriodFilter.jsx'
+import DcaView       from './DcaView.jsx'
 import { usePeriodFilter } from '../hooks/usePeriodFilter.js'
 import { auth, signOut }   from '../lib/firebase.js'
 
 const NAV_ITEMS = [
-  { id: 'dashboard', icon: '🚀', label: 'Dashboard',  sublabel: 'Vue globale'      },
-  { id: 'paires',    icon: '📊', label: 'Paires',     sublabel: 'Détail par paire' },
-  { id: 'donnees',   icon: '🗃️', label: 'Données',    sublabel: 'Gérer le journal' },
+  { id: 'dashboard', icon: '🚀', label: 'Dashboard',         sublabel: 'Vue globale'            },
+  { id: 'paires',    icon: '📊', label: 'Paires',            sublabel: 'Détail par paire'        },
+  { id: 'donnees',   icon: '🗃️', label: 'Données',           sublabel: 'Gérer le journal'        },
+  { id: 'dca',       icon: '📈', label: 'Scaled Mirror DCA', sublabel: 'Accumulation graduée'    },
 ]
 
-/* ── Topbar — sans live dot ──────────────────────────────────────────────── */
+/* ── Topbar ──────────────────────────────────────────────────────────────── */
 function Topbar({ activePage, setSidebarOpen }) {
   const pageItem = NAV_ITEMS.find(i => i.id === activePage)
 
@@ -180,20 +182,13 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
   )
 }
 
-/* ── PageDashboard v5 ────────────────────────────────────────────────────── */
+/* ── Pages existantes ────────────────────────────────────────────────────── */
 function PageDashboard({ pairList, rawRows, prices, pricesLoading, pricesError, lastPriceUpdate, refreshPrices }) {
   const { period, setPeriod, data } = usePeriodFilter(pairList, rawRows, prices)
-
   return (
     <div className="page-content">
       <PeriodFilter period={period} onChange={setPeriod} />
-      <KpiRow
-        data={data}
-        pricesLoading={pricesLoading}
-        pricesError={pricesError}
-        lastPriceUpdate={lastPriceUpdate}
-        refreshPrices={refreshPrices}
-      />
+      <KpiRow data={data} pricesLoading={pricesLoading} pricesError={pricesError} lastPriceUpdate={lastPriceUpdate} refreshPrices={refreshPrices} />
       <section className="v5-section">
         <h2 className="v5-section-title">Récapitulatif par paire</h2>
         <SummaryTable rows={data.rows} period={period} />
@@ -202,7 +197,6 @@ function PageDashboard({ pairList, rawRows, prices, pricesLoading, pricesError, 
   )
 }
 
-/* ── PagePaires ──────────────────────────────────────────────────────────── */
 function PagePaires({ pairList, excluded, toggleFlag }) {
   return (
     <div className="page-content">
@@ -249,6 +243,9 @@ export default function AppShell({
               loadFromFile={loadFromFile} loadFromDrive={loadFromDrive}
               driveErr={driveErr} setDriveErr={setDriveErr} onRepoUpdated={onRepoUpdated}
             />
+          )}
+          {activePage === 'dca' && (
+            <DcaView pairList={pairList} rawRows={rawRows} prices={prices} />
           )}
         </main>
       </div>
