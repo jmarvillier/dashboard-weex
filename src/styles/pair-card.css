@@ -238,7 +238,6 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  z-index: 10;
 }
 .pc2-tip-btn {
   width: 13px; height: 13px;
@@ -262,7 +261,6 @@
 
 .pc2-tip-bubble {
   position: absolute;
-  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   background: var(--bg2);
@@ -280,16 +278,18 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  animation: fadeUp .15s ease;
   white-space: normal;
 }
-
-/* Visible une fois positionnée correctement */
-.pc2-tip-bubble--visible {
-  opacity: 1;
-  animation: fadeUp .15s ease;
+/* Placement au-dessus (défaut) */
+.pc2-tip-bubble--top {
+  bottom: calc(100% + 8px);
+  animation: fadeUp .12s ease;
 }
-
+/* Placement en-dessous (si débordement topbar) */
+.pc2-tip-bubble--bottom {
+  top: calc(100% + 8px);
+  animation: fadeDown .12s ease;
+}
 .pc2-tip-title   { font-size: .58rem; font-weight: 600; color: var(--text); letter-spacing: .03em; }
 .pc2-tip-desc    { color: var(--text2); }
 .pc2-tip-formula {
