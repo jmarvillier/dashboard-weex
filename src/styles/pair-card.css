@@ -238,6 +238,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  z-index: 10;
 }
 .pc2-tip-btn {
   width: 13px; height: 13px;
@@ -260,7 +261,10 @@
 .pc2-tip-btn:hover { border-color: var(--text2); color: var(--text2); }
 
 .pc2-tip-bubble {
-  position: fixed;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -276,8 +280,10 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  transition: opacity .1s ease;
+  animation: fadeUp .15s ease;
+  white-space: normal;
 }
+
 /* Visible une fois positionnée correctement */
 .pc2-tip-bubble--visible {
   opacity: 1;

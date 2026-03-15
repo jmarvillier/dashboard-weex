@@ -261,10 +261,12 @@ export default function KpiRow({
               <div className="v5-bar-labels">
                 <span className="v5-bar-side v5-bar-side--buy">
                   <strong>{nbAchat}</strong>
-                  <span className="v5-bar-pct">{buyW > 0 ? fmtN(buyW, 0) + ' %' : '—'}</span>
+                  <strong>{nbAchat > 1 ? 'achats' : 'achat'}</strong>
+                  <span className="v5-bar-pct v5-bar-pct--pill">{buyW > 0 ? fmtN(buyW, 0) + ' %' : '—'}</span>
                 </span>
                 <span className="v5-bar-side v5-bar-side--sell">
-                  <span className="v5-bar-pct">{sellW > 0 ? fmtN(sellW, 0) + ' %' : '—'}</span>
+                  <span className="v5-bar-pct v5-bar-pct--pill">{sellW > 0 ? fmtN(sellW, 0) + ' %' : '—'}</span>
+                  <strong>{nbVente > 1 ? 'ventes' : 'vente'}</strong>
                   <strong>{nbVente}</strong>
                 </span>
               </div>
@@ -280,12 +282,12 @@ export default function KpiRow({
               <div className="v5-bar-labels">
                 <span className="v5-bar-side v5-bar-side--buy">
                   <strong>{fmtN(volumeAchat, 0)}</strong>
-                  <span className="v5-bar-unit">USDT</span>
-                  <span className="v5-bar-pct">{volumeBuyW > 0 ? fmtN(volumeBuyW, 0) + ' %' : '—'}</span>
+                  <strong className="v5-bar-unit-bold">USDT</strong>
+                  <span className="v5-bar-pct v5-bar-pct--pill">{volumeBuyW > 0 ? fmtN(volumeBuyW, 0) + ' %' : '—'}</span>
                 </span>
                 <span className="v5-bar-side v5-bar-side--sell">
-                  <span className="v5-bar-pct">{volumeSellW > 0 ? fmtN(volumeSellW, 0) + ' %' : '—'}</span>
-                  <span className="v5-bar-unit">USDT</span>
+                  <span className="v5-bar-pct v5-bar-pct--pill">{volumeSellW > 0 ? fmtN(volumeSellW, 0) + ' %' : '—'}</span>
+                  <strong className="v5-bar-unit-bold">USDT</strong>
                   <strong>{fmtN(volumeVente, 0)}</strong>
                 </span>
               </div>
@@ -294,7 +296,6 @@ export default function KpiRow({
                 <div className="v5-bar-sell" style={{ width: volumeSellW + '%' }} />
               </div>
             </div>
-
           </div>
 
         </div>

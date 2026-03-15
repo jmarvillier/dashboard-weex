@@ -129,10 +129,26 @@
   font-size: .48rem;
   opacity: .75;
 }
+.v5-bar-pct--pill {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  opacity: 1;
+  font-size: .5rem;
+  font-weight: 600;
+  color: var(--text);
+}
 .v5-bar-unit {
   font-size: .44rem;
   opacity: .6;
   font-weight: 400;
+}
+.v5-bar-unit-bold {
+  font-family: 'Space Mono', monospace;
+  font-size: .52rem;
+  font-weight: 700;
+  opacity: .85;
 }
 .v5-bar-track   { width: 100%; height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; display: flex; }
 .v5-bar-buy     { height: 100%; background: var(--green); transition: width .4s ease; }
