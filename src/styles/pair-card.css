@@ -280,15 +280,11 @@
   gap: 5px;
   white-space: normal;
 }
-/* Placement au-dessus (défaut) */
 .pc2-tip-bubble--top {
   bottom: calc(100% + 8px);
-  animation: fadeUp .12s ease;
 }
-/* Placement en-dessous (si débordement topbar) */
 .pc2-tip-bubble--bottom {
   top: calc(100% + 8px);
-  animation: fadeDown .12s ease;
 }
 .pc2-tip-title   { font-size: .58rem; font-weight: 600; color: var(--text); letter-spacing: .03em; }
 .pc2-tip-desc    { color: var(--text2); }
