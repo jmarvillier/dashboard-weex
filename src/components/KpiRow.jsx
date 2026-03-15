@@ -96,6 +96,8 @@ export default function KpiRow({
     const sAchat   = pairList.reduce((s, p) => s + (p.nb_achat  || 0), 0)
     const sVente   = pairList.reduce((s, p) => s + (p.nb_vente  || 0), 0)
     const bw       = sAchat + sVente > 0 ? (sAchat / (sAchat + sVente)) * 100 : 0
+    const volTotal = sAchete + sVendu
+    const vbw      = volTotal > 0 ? (sAchete / volTotal) * 100 : 0
     d = {
       capitalDepose: sDepose, capitalInvesti: sInvesti,
       capitalDispo: sDepose - sInvesti,
@@ -106,6 +108,7 @@ export default function KpiRow({
       nbTotal: sTot, nbExec: sExec, nbAnnule: sCanc,
       tauxExec: sTot > 0 ? (sExec / sTot) * 100 : 0,
       nbAchat: sAchat, nbVente: sVente, buyW: bw, sellW: 100 - bw,
+      volumeAchat: sAchete, volumeVente: sVendu, volumeBuyW: vbw, volumeSellW: 100 - vbw,
     }
   }
 
@@ -132,7 +135,6 @@ export default function KpiRow({
       {/* ══ CAPITAL ══════════════════════════════════════════════════════════ */}
       <section className="v5-section">
         <h2 className="v5-section-title">Capital</h2>
-        {/* Ordre : Déposé · Disponible · Investi */}
         <div className="v5-kpi-grid v5-g3">
 
           <KpiCard
@@ -284,7 +286,10 @@ export default function KpiRow({
               </div>
               <div className="v5-bar-sublabel">Volume USDT</div>
             </div>
+
           </div>
+
+        </div>
       </section>
 
     </div>
