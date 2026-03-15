@@ -50,18 +50,20 @@ function computeFromRaw(rawRows, period, pairList, prices) {
       volAchete: 0,  volVendu: 0,
       nbTotal: 0, nbExec: 0, nbAnnule: 0, nbAchat: 0, nbVente: 0,
     }
-    const p = map[r.pair]
+   const p = map[r.pair]
     p.nbTotal++
-    if (r.sens === 'Achat') p.nbAchat++
-    if (r.sens === 'Vente') p.nbVente++
     if (r.annule) { p.nbAnnule++; return }
     if (!r.exec)  return
     p.nbExec++
+    
+    if (r.sens === 'Achat') p.nbAchat++
+    if (r.sens === 'Vente') p.nbVente++
+    
     if (r.sens === 'Achat') { p.usdtAchete += r.usdt || 0; p.volAchete += r.vol || 0 }
     if (r.sens === 'Vente') { p.usdtVendu  += r.usdt || 0; p.volVendu  += r.vol || 0 }
   })
 
-  const rows = Object.values(map).map(p => {
+  const rows = Object.values(map).filter(p => p.nbExec > 0).map(p => {
     const position  = p.volAchete - p.volVendu
     const prixMoy   = p.volAchete > 0 ? p.usdtAchete / p.volAchete : 0
     const breakeven = position > 0 && prixMoy > 0 ? prixMoy : 0
@@ -140,6 +142,12 @@ function buildKpis(rows, capitalDepose, capitalDispo) {
   const tauxExec = nbTotal > 0 ? (nbExec / nbTotal) * 100 : 0
   const buyW     = nbAchat + nbVente > 0 ? (nbAchat / (nbAchat + nbVente)) * 100 : 0
 
+  // ── Volumes USDT ──────────────────────────────────────────────────────────
+  const volumeAchat  = rows.reduce((s, r) => s + (r.usdtAchete || 0), 0)
+  const volumeVente  = rows.reduce((s, r) => s + (r.usdtVendu  || 0), 0)
+  const volTotal     = volumeAchat + volumeVente
+  const volumeBuyW   = volTotal > 0 ? (volumeAchat / volTotal) * 100 : 0
+
   return {
     capitalDepose,
     capitalInvesti,
@@ -150,6 +158,7 @@ function buildKpis(rows, capitalDepose, capitalDispo) {
     pnlTotal,    pnlTotalPct:   pctOf(pnlTotal,   capitalInvesti),
     nbTotal, nbExec, nbAnnule, tauxExec,
     nbAchat, nbVente, buyW, sellW: 100 - buyW,
+    volumeAchat, volumeVente, volumeBuyW, volumeSellW: 100 - volumeBuyW,
     rows,
   }
 }

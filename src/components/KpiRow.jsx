@@ -4,7 +4,7 @@
  * Capital dispo = non filtré (all time)
  */
 
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 
 const fmtN = (v, d = 2) =>
   isNaN(+v) ? '—' : (+v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d })
@@ -25,9 +25,28 @@ const cc = v => (v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu')
 
 /* ── Tooltip ─────────────────────────────────────────────────────────────── */
 function Tooltip({ id, title, desc, formula, openId, setOpenId }) {
-  const isOpen = openId === id
+  const isOpen    = openId === id
+  const wrapRef   = useRef(null)
+  const bubbleRef = useRef(null)
+  const [placement, setPlacement] = useState('top')
+  const [ready,     setReady]     = useState(false)
+
+  useLayoutEffect(() => {
+    if (!isOpen || !wrapRef.current || !bubbleRef.current) return
+    const wrap    = wrapRef.current.getBoundingClientRect()
+    const bub     = bubbleRef.current.getBoundingClientRect()
+    const topbarH = 54
+    const gap     = 8
+    setPlacement(wrap.top - bub.height - gap < topbarH ? 'bottom' : 'top')
+    setReady(true)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) setReady(false)
+  }, [isOpen])
+
   return (
-    <div className="v5-tooltip-wrap">
+    <div className="v5-tooltip-wrap" ref={wrapRef}>
       <button
         className="v5-info-btn"
         aria-label={`Info ${title}`}
@@ -36,7 +55,11 @@ function Tooltip({ id, title, desc, formula, openId, setOpenId }) {
         i
       </button>
       {isOpen && (
-        <div className="v5-tooltip">
+        <div
+          ref={bubbleRef}
+          className={`v5-tooltip v5-tooltip--${placement}`}
+          style={{ opacity: ready ? 1 : 0 }}
+        >
           <strong>{title}</strong>
           <span>{desc}</span>
           {formula && <code>{formula}</code>}
@@ -96,6 +119,8 @@ export default function KpiRow({
     const sAchat   = pairList.reduce((s, p) => s + (p.nb_achat  || 0), 0)
     const sVente   = pairList.reduce((s, p) => s + (p.nb_vente  || 0), 0)
     const bw       = sAchat + sVente > 0 ? (sAchat / (sAchat + sVente)) * 100 : 0
+    const volTotal = sAchete + sVendu
+    const vbw      = volTotal > 0 ? (sAchete / volTotal) * 100 : 0
     d = {
       capitalDepose: sDepose, capitalInvesti: sInvesti,
       capitalDispo: sDepose - sInvesti,
@@ -106,6 +131,7 @@ export default function KpiRow({
       nbTotal: sTot, nbExec: sExec, nbAnnule: sCanc,
       tauxExec: sTot > 0 ? (sExec / sTot) * 100 : 0,
       nbAchat: sAchat, nbVente: sVente, buyW: bw, sellW: 100 - bw,
+      volumeAchat: sAchete, volumeVente: sVendu, volumeBuyW: vbw, volumeSellW: 100 - vbw,
     }
   }
 
@@ -115,6 +141,7 @@ export default function KpiRow({
     capitalDepose, capitalInvesti, capitalDispo, capitalDispoPct,
     pnlRealise, pnlRealisePct, pnlLatent, pnlLatentPct, pnlTotal, pnlTotalPct,
     nbTotal, nbExec, nbAnnule, tauxExec, nbAchat, nbVente, buyW, sellW,
+    volumeAchat = 0, volumeVente = 0, volumeBuyW = 0, volumeSellW = 0,
   } = d
 
   const totBorderColor = pnlTotal > 0
@@ -131,7 +158,6 @@ export default function KpiRow({
       {/* ══ CAPITAL ══════════════════════════════════════════════════════════ */}
       <section className="v5-section">
         <h2 className="v5-section-title">Capital</h2>
-        {/* Ordre : Déposé · Disponible · Investi */}
         <div className="v5-kpi-grid v5-g3">
 
           <KpiCard
@@ -251,13 +277,47 @@ export default function KpiRow({
 
           <div className="v5-kpi v5-orders-bar-card">
             <div className="v5-kpi-label">Achats vs ventes</div>
-            <div className="v5-bar-labels">
-              <span><strong>{nbAchat}</strong> achats</span>
-              <span><strong>{nbVente}</strong> ventes</span>
+
+            {/* ── Barre 1 : nombre d'ordres ── */}
+            <div className="v5-bar-row">
+              <div className="v5-bar-sublabel">Nombre d'ordres</div>
+              <div className="v5-bar-labels">
+                <span className="v5-bar-side v5-bar-side--buy">
+                  <strong>{nbAchat}</strong>
+                  <strong>{nbAchat > 1 ? 'achats' : 'achat'}</strong>
+                  <span className="v5-bar-pct v5-bar-pct--pill">{buyW > 0 ? fmtN(buyW, 0) + ' %' : '—'}</span>
+                </span>
+                <span className="v5-bar-side v5-bar-side--sell">
+                  <span className="v5-bar-pct v5-bar-pct--pill">{sellW > 0 ? fmtN(sellW, 0) + ' %' : '—'}</span>
+                  <strong>{nbVente > 1 ? 'ventes' : 'vente'}</strong>
+                  <strong>{nbVente}</strong>
+                </span>
+              </div>
+              <div className="v5-bar-track">
+                <div className="v5-bar-buy"  style={{ width: buyW  + '%' }} />
+                <div className="v5-bar-sell" style={{ width: sellW + '%' }} />
+              </div>
             </div>
-            <div className="v5-bar-track">
-              <div className="v5-bar-buy"  style={{ width: buyW  + '%' }} />
-              <div className="v5-bar-sell" style={{ width: sellW + '%' }} />
+
+            {/* ── Barre 2 : volume USDT ── */}
+            <div className="v5-bar-row v5-bar-row--volume">
+              <div className="v5-bar-sublabel">Volume USDT</div>
+              <div className="v5-bar-labels">
+                <span className="v5-bar-side v5-bar-side--buy">
+                  <strong>{fmtN(volumeAchat, 0)}</strong>
+                  <strong className="v5-bar-unit-bold">USDT</strong>
+                  <span className="v5-bar-pct v5-bar-pct--pill">{volumeBuyW > 0 ? fmtN(volumeBuyW, 0) + ' %' : '—'}</span>
+                </span>
+                <span className="v5-bar-side v5-bar-side--sell">
+                  <span className="v5-bar-pct v5-bar-pct--pill">{volumeSellW > 0 ? fmtN(volumeSellW, 0) + ' %' : '—'}</span>
+                  <strong className="v5-bar-unit-bold">USDT</strong>
+                  <strong>{fmtN(volumeVente, 0)}</strong>
+                </span>
+              </div>
+              <div className="v5-bar-track">
+                <div className="v5-bar-buy"  style={{ width: volumeBuyW  + '%' }} />
+                <div className="v5-bar-sell" style={{ width: volumeSellW + '%' }} />
+              </div>
             </div>
           </div>
 

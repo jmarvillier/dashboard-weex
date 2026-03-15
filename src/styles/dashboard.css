@@ -69,7 +69,26 @@
 .v5-tooltip-wrap { position: relative; display: inline-flex; align-items: center; }
 .v5-info-btn     { width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--border); background: transparent; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; color: var(--muted); cursor: pointer; flex-shrink: 0; line-height: 1; user-select: none; transition: border-color .15s, color .15s; padding: 0; }
 .v5-info-btn:hover { border-color: var(--text2); color: var(--text2); }
-.v5-tooltip      { position: absolute; z-index: 20; bottom: calc(100% + 8px); left: 0; min-width: 210px; max-width: 280px; background: var(--bg2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 8px 32px rgba(0,0,0,.5); animation: fadeUp .15s ease; }
+.v5-tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 210px;
+  max-width: 280px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  z-index: 9999;
+  white-space: normal;
+  pointer-events: none;
+}
+.v5-tooltip--top    { bottom: calc(100% + 8px); }
+.v5-tooltip--bottom { top: calc(100% + 8px); }
 .v5-tooltip strong { font-size: .6rem; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 .v5-tooltip span   { font-size: .57rem; color: var(--text2); line-height: 1.5; }
 .v5-tooltip code   { font-family: 'Space Mono', monospace; font-size: .52rem; background: var(--bg3); padding: 3px 7px; border-radius: 5px; display: block; margin-top: 2px; color: var(--gold); line-height: 1.6; }
@@ -90,8 +109,66 @@
 .v5-order-val.pos { color: var(--green); }
 .v5-order-rate.pos { color: var(--green); }
 .v5-order-rate.neg { color: var(--red); }
-.v5-bar-labels  { display: flex; justify-content: space-between; font-size: .55rem; color: var(--text2); margin-bottom: 5px; }
-.v5-bar-labels strong { color: var(--text); font-weight: 600; }
+
+/* ── Double barre achats/ventes ─────────────────────────────────────────── */
+.v5-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.v5-bar-row--volume {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.v5-bar-sublabel {
+  font-family: 'Space Mono', monospace;
+  font-size: .44rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.v5-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: .58rem;
+  color: var(--text2);
+}
+.v5-bar-side {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.v5-bar-side--buy  { color: var(--green); }
+.v5-bar-side--sell { color: var(--red); }
+.v5-bar-side strong { font-size: .68rem; font-weight: 700; }
+.v5-bar-pct {
+  font-family: 'Space Mono', monospace;
+  font-size: .48rem;
+  opacity: .75;
+}
+.v5-bar-pct--pill {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  opacity: 1;
+  font-size: .5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.v5-bar-unit {
+  font-size: .44rem;
+  opacity: .6;
+  font-weight: 400;
+}
+.v5-bar-unit-bold {
+  font-family: 'Space Mono', monospace;
+  font-size: .52rem;
+  font-weight: 700;
+  opacity: .85;
+}
 .v5-bar-track   { width: 100%; height: 5px; background: var(--bg3); border-radius: 3px; overflow: hidden; display: flex; }
 .v5-bar-buy     { height: 100%; background: var(--green); transition: width .4s ease; }
 .v5-bar-sell    { height: 100%; background: var(--red);   transition: width .4s ease; }
@@ -121,7 +198,7 @@
 .v5-tbl-empty { padding: 24px; text-align: center; font-size: .65rem; color: var(--muted); font-style: italic; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Pair Cards
+   Pair Cards (legacy .pc classes)
    ══════════════════════════════════════════════════════════════════════════ */
 .pairs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-bottom: 12px; }
 
@@ -159,7 +236,6 @@
 .pc-price-live { display: flex; align-items: center; gap: 4px; font-size: .5rem; font-family: 'Space Mono', monospace; color: var(--green); margin-top: 3px; }
 .pc-pnl-source { font-size: .44rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--green); background: rgba(61,191,144,.1); padding: 1px 4px; border-radius: 3px; align-self: flex-start; }
 
-/* Metrics grid dans pair card */
 .metrics-grid { display: grid; grid-template-columns: repeat(3,1fr); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .m-cell { padding: 10px 12px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .m-cell:nth-child(3n) { border-right: none; }
@@ -169,7 +245,6 @@
 .mv.g { color: var(--green); } .mv.r { color: var(--red); } .mv.o { color: var(--gold); } .mv.b { color: var(--blue); }
 .mv-sub { font-size: .52rem; color: var(--muted); margin-top: 2px; }
 
-/* PnL boxes dans pair card */
 .pnl-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .pnl-box  { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; text-align: center; display: flex; flex-direction: column; gap: 3px; transition: border-color .2s; }
 .pnl-box.g  { border-color: rgba(61,191,144,.2);  background: rgba(61,191,144,.04); }
@@ -189,7 +264,6 @@
 .pnl-section-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); font-size: .46rem; }
 .pnl-live-price { margin-left: auto; font-family: 'Space Mono', monospace; font-size: .5rem; color: var(--green); background: rgba(61,191,144,.08); padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(61,191,144,.2); }
 
-/* Tags ordres dans pair card */
 .tbar { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .tc { flex: 1; padding: 7px 4px; text-align: center; border-right: 1px solid var(--border); background: rgba(255,255,255,.01); transition: background .15s; }
 .tc:last-child { border-right: none; }
@@ -201,7 +275,6 @@
 .tc.buy .tn { color: var(--blue); }
 .tc.sel .tn { color: var(--gold); }
 
-/* Dépôt card */
 .depot-body  { display: flex; align-items: center; gap: 24px; padding: 8px 0; flex-wrap: wrap; }
 .depot-stat  { display: flex; flex-direction: column; gap: 2px; }
 .depot-val   { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.2rem; color: var(--text); }
@@ -209,11 +282,9 @@
 .depot-unit  { font-size: .52rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .depot-note  { font-size: .54rem; color: var(--muted); font-style: italic; margin-top: 4px; }
 
-/* Source tag live */
 .kpi-source-tag { display: inline-block; font-size: .42rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; margin-left: 4px; background: rgba(255,255,255,.05); color: var(--muted); vertical-align: middle; }
 .kpi-source-tag.live { background: rgba(61,191,144,.12); color: var(--green); }
 
-/* Excluded counter */
 .excl-counter { display: none; background: rgba(212,90,80,.1); border: 1px solid rgba(212,90,80,.25); color: var(--red); font-size: .6rem; padding: 4px 10px; border-radius: 6px; letter-spacing: .05em; white-space: nowrap; }
 .excl-counter.visible { display: block; }
 
