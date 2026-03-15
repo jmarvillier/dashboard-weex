@@ -4,69 +4,68 @@ export default function KpiTooltip({ id, title, description, formula, openId, se
   const btnRef    = useRef(null)
   const bubbleRef = useRef(null)
   const isOpen    = openId === id
-
-  // Position initiale brute (relative au btn)
-  const [pos, setPos] = useState({ top: 0, left: 0, placement: 'top' })
+  const [style, setStyle] = useState({ opacity: 0, top: 0, left: 0 })
 
   function toggle(e) {
     e.stopPropagation()
-    if (!isOpen && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      // On stocke les coordonnées du bouton ; l'ajustement fin se fait dans useLayoutEffect
-      setPos({ btnRect: r, placement: 'top', top: 0, left: 0 })
-    }
     setOpenId(isOpen ? null : id)
   }
 
-  // Après rendu de la bubble, ajuster pour rester dans le viewport
+  // Repositionner la bubble après chaque ouverture
   useLayoutEffect(() => {
-    if (!isOpen || !bubbleRef.current || !pos.btnRect) return
-    const r   = pos.btnRect
+    if (!isOpen || !bubbleRef.current || !btnRef.current) return
+
+    const btn = btnRef.current.getBoundingClientRect()
     const bub = bubbleRef.current.getBoundingClientRect()
     const vw  = window.innerWidth
     const vh  = window.innerHeight
-    const gap = 8
+    const gap = 6
 
-    // Placement vertical : préférer au-dessus, sinon en-dessous
-    let placement = 'top'
-    let top = r.top - bub.height - gap
-    if (top < 8) {
-      placement = 'bottom'
-      top = r.bottom + gap
-    }
-    // Si en-dessous dépasse aussi → coller en haut du viewport
-    if (top + bub.height > vh - 8) top = vh - bub.height - 8
+    // Centré horizontalement sur le bouton
+    let left = btn.left + btn.width / 2 - bub.width / 2
+    // Au-dessus par défaut
+    let top  = btn.top - bub.height - gap
 
-    // Placement horizontal : centré sur le bouton, puis clampé
-    let left = r.left + r.width / 2 - bub.width / 2
-    if (left < 8) left = 8
+    // Flip vers le bas si débordement en haut
+    if (top < 8) top = btn.bottom + gap
+
+    // Clamp horizontal
+    if (left < 8)              left = 8
     if (left + bub.width > vw - 8) left = vw - bub.width - 8
 
-    setPos(p => ({ ...p, top, left, placement }))
-  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Clamp vertical
+    if (top + bub.height > vh - 8) top = vh - bub.height - 8
 
-  // Fermeture au clic extérieur
+    setStyle({ opacity: 1, top, left })
+  }, [isOpen])
+
+  // Fermeture au clic extérieur + touch
   useEffect(() => {
     if (!isOpen) return
-    function onDoc(e) {
+    function onOut(e) {
       if (btnRef.current && !btnRef.current.contains(e.target)) setOpenId(null)
     }
-    document.addEventListener('mousedown', onDoc)
-    document.addEventListener('touchstart', onDoc)
+    document.addEventListener('mousedown', onOut)
+    document.addEventListener('touchstart', onOut)
     return () => {
-      document.removeEventListener('mousedown', onDoc)
-      document.removeEventListener('touchstart', onDoc)
+      document.removeEventListener('mousedown', onOut)
+      document.removeEventListener('touchstart', onOut)
     }
   }, [isOpen, setOpenId])
 
+  // Reset opacité à la fermeture
+  useEffect(() => {
+    if (!isOpen) setStyle({ opacity: 0, top: 0, left: 0 })
+  }, [isOpen])
+
   return (
-    <span className="pc2-tip-wrap" ref={btnRef}>
+    <span ref={btnRef} className="pc2-tip-wrap">
       <button className="pc2-tip-btn" onClick={toggle} type="button" aria-label="info">i</button>
       {isOpen && (
         <div
           ref={bubbleRef}
-          className={`pc2-tip-bubble${pos.btnRect ? ' pc2-tip-bubble--visible' : ''}`}
-          style={{ top: pos.top, left: pos.left }}
+          className="pc2-tip-bubble"
+          style={{ top: style.top, left: style.left, opacity: style.opacity }}
         >
           {title       && <div className="pc2-tip-title">{title}</div>}
           {description && <div className="pc2-tip-desc">{description}</div>}
