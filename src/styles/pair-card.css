@@ -279,11 +279,8 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  /* Invisible pendant le premier rendu (mesure du layout) */
-  opacity: 0;
-  transition: opacity .12s ease;
+  transition: opacity .1s ease;
 }
-
 /* Visible une fois positionnée correctement */
 .pc2-tip-bubble--visible {
   opacity: 1;
