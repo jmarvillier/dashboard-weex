@@ -226,3 +226,46 @@
   .v5-g2 { grid-template-columns: 1fr; }
   .pnl-row { grid-template-columns: 1fr; }
 }
+
+
+/* ── Double barre achats/ventes ─────────────────────────────────────────── */
+.v5-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.v5-bar-row--volume {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.v5-bar-sublabel {
+  font-family: 'Space Mono', monospace;
+  font-size: .44rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.v5-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: .55rem;
+  color: var(--text2);
+  margin-bottom: 2px;
+}
+.v5-bar-legend--pct {
+  font-family: 'Space Mono', monospace;
+  font-size: .5rem;
+  color: var(--muted);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.v5-bar-unit {
+  font-size: .44rem;
+  color: var(--muted);
+  font-weight: 400;
+}

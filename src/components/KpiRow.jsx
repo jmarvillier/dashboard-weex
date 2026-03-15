@@ -96,6 +96,8 @@ export default function KpiRow({
     const sAchat   = pairList.reduce((s, p) => s + (p.nb_achat  || 0), 0)
     const sVente   = pairList.reduce((s, p) => s + (p.nb_vente  || 0), 0)
     const bw       = sAchat + sVente > 0 ? (sAchat / (sAchat + sVente)) * 100 : 0
+    const volTotal = sAchete + sVendu
+    const vbw      = volTotal > 0 ? (sAchete / volTotal) * 100 : 0
     d = {
       capitalDepose: sDepose, capitalInvesti: sInvesti,
       capitalDispo: sDepose - sInvesti,
@@ -106,6 +108,7 @@ export default function KpiRow({
       nbTotal: sTot, nbExec: sExec, nbAnnule: sCanc,
       tauxExec: sTot > 0 ? (sExec / sTot) * 100 : 0,
       nbAchat: sAchat, nbVente: sVente, buyW: bw, sellW: 100 - bw,
+      volumeAchat: sAchete, volumeVente: sVendu, volumeBuyW: vbw, volumeSellW: 100 - vbw,
     }
   }
 
@@ -115,6 +118,7 @@ export default function KpiRow({
     capitalDepose, capitalInvesti, capitalDispo, capitalDispoPct,
     pnlRealise, pnlRealisePct, pnlLatent, pnlLatentPct, pnlTotal, pnlTotalPct,
     nbTotal, nbExec, nbAnnule, tauxExec, nbAchat, nbVente, buyW, sellW,
+    volumeAchat = 0, volumeVente = 0, volumeBuyW = 0, volumeSellW = 0,
   } = d
 
   const totBorderColor = pnlTotal > 0
@@ -131,7 +135,6 @@ export default function KpiRow({
       {/* ══ CAPITAL ══════════════════════════════════════════════════════════ */}
       <section className="v5-section">
         <h2 className="v5-section-title">Capital</h2>
-        {/* Ordre : Déposé · Disponible · Investi */}
         <div className="v5-kpi-grid v5-g3">
 
           <KpiCard
@@ -251,14 +254,39 @@ export default function KpiRow({
 
           <div className="v5-kpi v5-orders-bar-card">
             <div className="v5-kpi-label">Achats vs ventes</div>
-            <div className="v5-bar-labels">
-              <span><strong>{nbAchat}</strong> achats</span>
-              <span><strong>{nbVente}</strong> ventes</span>
+
+            {/* ── Barre 1 : nombre d'ordres ── */}
+            <div className="v5-bar-row">
+              <div className="v5-bar-labels">
+                <span><strong>{nbAchat}</strong> achats</span>
+                <span className="v5-bar-legend v5-bar-legend--pct">
+                  {buyW > 0 ? fmtN(buyW, 0) + ' %' : '—'}
+                </span>
+                <span><strong>{nbVente}</strong> ventes</span>
+              </div>
+              <div className="v5-bar-track">
+                <div className="v5-bar-buy"  style={{ width: buyW  + '%' }} />
+                <div className="v5-bar-sell" style={{ width: sellW + '%' }} />
+              </div>
+              <div className="v5-bar-sublabel">Nombre d'ordres</div>
             </div>
-            <div className="v5-bar-track">
-              <div className="v5-bar-buy"  style={{ width: buyW  + '%' }} />
-              <div className="v5-bar-sell" style={{ width: sellW + '%' }} />
+
+            {/* ── Barre 2 : volume USDT ── */}
+            <div className="v5-bar-row v5-bar-row--volume">
+              <div className="v5-bar-labels">
+                <span><strong>{fmtN(volumeAchat, 0)}</strong> <span className="v5-bar-unit">USDT</span></span>
+                <span className="v5-bar-legend v5-bar-legend--pct">
+                  {volumeBuyW > 0 ? fmtN(volumeBuyW, 0) + ' %' : '—'}
+                </span>
+                <span><strong>{fmtN(volumeVente, 0)}</strong> <span className="v5-bar-unit">USDT</span></span>
+              </div>
+              <div className="v5-bar-track">
+                <div className="v5-bar-buy"  style={{ width: volumeBuyW  + '%' }} />
+                <div className="v5-bar-sell" style={{ width: volumeSellW + '%' }} />
+              </div>
+              <div className="v5-bar-sublabel">Volume USDT</div>
             </div>
+
           </div>
 
         </div>

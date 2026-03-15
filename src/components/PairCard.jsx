@@ -170,6 +170,9 @@ export default function PairCard({ p, excluded, onToggle, index }) {
 
         <div className="pc2-g2">
           <KpiBox label="Position nette" value={`${fmtQty(p.netPosition ?? p.position)} ${sym}`}
+            sublabel={price > 0 && (p.netPosition ?? p.position) > 0
+              ? `≈ ${fmt((p.netPosition ?? p.position) * price, 2)} USDT`
+              : undefined}
             tooltipId={`${id}-np`} tooltipTitle="Position nette"
             tooltipDesc="Quantité crypto encore détenue."
             tooltipFormula="Σ achats − Σ ventes"

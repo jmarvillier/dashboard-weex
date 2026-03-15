@@ -77,25 +77,37 @@
 .pc2-be.neg { color: var(--red); }
 .pc2-be.neu { color: var(--muted); }
 
-/* Rangée 2 : deltas pleine largeur */
+/* ── Rangée 2 : deltas — grille 2 colonnes pour aligner label | valeur ── */
 .pc2-deltas {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 16px;
+  row-gap: 5px;
   width: 100%;
-  padding-top: 6px;
+  padding-top: 8px;
   border-top: 1px solid var(--border2);
 }
+
+/* display:contents aplatit chaque .pc2-delta dans la grille parente */
 .pc2-delta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: contents;
+}
+
+.pc2-delta-lbl {
   font-family: 'Space Mono', monospace;
   font-size: .54rem;
-  width: 100%;
+  color: var(--muted);
+  white-space: nowrap;
+  align-self: center;
 }
-.pc2-delta-lbl { color: var(--muted); flex-shrink: 0; }
-.pc2-delta-val { font-weight: 600; text-align: right; }
+.pc2-delta-val {
+  font-family: 'Space Mono', monospace;
+  font-size: .54rem;
+  font-weight: 600;
+  text-align: right;
+  justify-self: end;
+  align-self: center;
+}
 .pc2-delta-val.pos { color: var(--green); }
 .pc2-delta-val.neg { color: var(--red); }
 .pc2-delta-val.neu { color: var(--muted); font-style: italic; font-weight: 400; }
@@ -263,12 +275,21 @@
   max-width: 260px;
   z-index: 9999;
   box-shadow: 0 8px 32px rgba(0,0,0,.6);
-  animation: fadeUp .15s ease;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   gap: 5px;
+  /* Invisible pendant le premier rendu (mesure du layout) */
+  opacity: 0;
+  transition: opacity .12s ease;
 }
+
+/* Visible une fois positionnée correctement */
+.pc2-tip-bubble--visible {
+  opacity: 1;
+  animation: fadeUp .15s ease;
+}
+
 .pc2-tip-title   { font-size: .58rem; font-weight: 600; color: var(--text); letter-spacing: .03em; }
 .pc2-tip-desc    { color: var(--text2); }
 .pc2-tip-formula {
