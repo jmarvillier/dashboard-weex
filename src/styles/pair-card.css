@@ -275,12 +275,21 @@
   max-width: 260px;
   z-index: 9999;
   box-shadow: 0 8px 32px rgba(0,0,0,.6);
-  animation: fadeUp .15s ease;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   gap: 5px;
+  /* Invisible pendant le premier rendu (mesure du layout) */
+  opacity: 0;
+  transition: opacity .12s ease;
 }
+
+/* Visible une fois positionnée correctement */
+.pc2-tip-bubble--visible {
+  opacity: 1;
+  animation: fadeUp .15s ease;
+}
+
 .pc2-tip-title   { font-size: .58rem; font-weight: 600; color: var(--text); letter-spacing: .03em; }
 .pc2-tip-desc    { color: var(--text2); }
 .pc2-tip-formula {
