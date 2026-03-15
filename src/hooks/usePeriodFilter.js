@@ -50,13 +50,15 @@ function computeFromRaw(rawRows, period, pairList, prices) {
       volAchete: 0,  volVendu: 0,
       nbTotal: 0, nbExec: 0, nbAnnule: 0, nbAchat: 0, nbVente: 0,
     }
-    const p = map[r.pair]
+   const p = map[r.pair]
     p.nbTotal++
-    if (r.sens === 'Achat') p.nbAchat++
-    if (r.sens === 'Vente') p.nbVente++
     if (r.annule) { p.nbAnnule++; return }
     if (!r.exec)  return
     p.nbExec++
+    
+    if (r.sens === 'Achat') p.nbAchat++
+    if (r.sens === 'Vente') p.nbVente++
+    
     if (r.sens === 'Achat') { p.usdtAchete += r.usdt || 0; p.volAchete += r.vol || 0 }
     if (r.sens === 'Vente') { p.usdtVendu  += r.usdt || 0; p.volVendu  += r.vol || 0 }
   })
