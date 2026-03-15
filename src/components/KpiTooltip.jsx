@@ -1,5 +1,34 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+
 export default function KpiTooltip({ id, title, description, formula, openId, setOpenId }) {
-  const isOpen = openId === id
+  const isOpen    = openId === id
+  const wrapRef   = useRef(null)
+  const bubbleRef = useRef(null)
+  const [placement, setPlacement] = useState('top')
+
+  // Calcule si la bubble déborde en haut (topbar = 54px)
+  useLayoutEffect(() => {
+    if (!isOpen || !wrapRef.current || !bubbleRef.current) return
+    const wrap = wrapRef.current.getBoundingClientRect()
+    const bub  = bubbleRef.current.getBoundingClientRect()
+    const gap  = 8
+    const topbarH = 54
+    setPlacement(wrap.top - bub.height - gap < topbarH ? 'bottom' : 'top')
+  }, [isOpen])
+
+  // Fermeture clic extérieur
+  useEffect(() => {
+    if (!isOpen) return
+    function onOut(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpenId(null)
+    }
+    document.addEventListener('mousedown', onOut)
+    document.addEventListener('touchstart', onOut)
+    return () => {
+      document.removeEventListener('mousedown', onOut)
+      document.removeEventListener('touchstart', onOut)
+    }
+  }, [isOpen, setOpenId])
 
   function toggle(e) {
     e.stopPropagation()
@@ -7,10 +36,13 @@ export default function KpiTooltip({ id, title, description, formula, openId, se
   }
 
   return (
-    <span className="pc2-tip-wrap">
+    <span ref={wrapRef} className="pc2-tip-wrap">
       <button className="pc2-tip-btn" onClick={toggle} type="button" aria-label="info">i</button>
       {isOpen && (
-        <div className="pc2-tip-bubble">
+        <div
+          ref={bubbleRef}
+          className={`pc2-tip-bubble pc2-tip-bubble--${placement}`}
+        >
           {title       && <div className="pc2-tip-title">{title}</div>}
           {description && <div className="pc2-tip-desc">{description}</div>}
           {formula     && <div className="pc2-tip-formula">{formula}</div>}
