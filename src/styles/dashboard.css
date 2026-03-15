@@ -87,8 +87,8 @@
   white-space: normal;
   pointer-events: none;
 }
-.v5-tooltip--top    { bottom: calc(100% + 8px); animation: fadeUp .12s ease; }
-.v5-tooltip--bottom { top: calc(100% + 8px);    animation: fadeDown .12s ease; }
+.v5-tooltip--top    { bottom: calc(100% + 8px); }
+.v5-tooltip--bottom { top: calc(100% + 8px); }
 .v5-tooltip strong { font-size: .6rem; font-weight: 600; color: var(--text); letter-spacing: .04em; }
 .v5-tooltip span   { font-size: .57rem; color: var(--text2); line-height: 1.5; }
 .v5-tooltip code   { font-family: 'Space Mono', monospace; font-size: .52rem; background: var(--bg3); padding: 3px 7px; border-radius: 5px; display: block; margin-top: 2px; color: var(--gold); line-height: 1.6; }
