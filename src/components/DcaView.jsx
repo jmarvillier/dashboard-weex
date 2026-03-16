@@ -356,16 +356,13 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving }) {
   function addZone(key, tmpl) { setP(key, [...(p[key]||[]), tmpl]) }
 
   // Validation profits
-  const profitWarnings = profitZones.map(z => {
-    const v = parseFloat(z.positionPct)
-    if (!z.positionPct && z.positionPct !== 0) return 'empty'
-    if (v > 100) return 'over'
-    if (v < 100) return 'partial'
-    return 'ok'
-  })
+  const profitTotal    = profitZones.reduce((s, z) => s + (parseFloat(z.positionPct) || 0), 0)
+  const profitHasEmpty = profitZones.some(z => z.positionPct === '' || z.positionPct == null)
+  const profitOverflow = profitTotal > 100
+  const profitPartial  = !profitHasEmpty && !profitOverflow && profitTotal < 100
 
   const canSubmit = accZones.length >= 1 && profitZones.length >= 1 && (p.baseAmount||0) > 0
-    && profitZones.every(z => z.positionPct !== '' && parseFloat(z.positionPct) <= 100)
+    && !profitHasEmpty && !profitOverflow
 
   return (
     <div className="dca-scroll">
@@ -446,19 +443,15 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving }) {
       {/* Profits — colonnes séparées, warning si < 100 */}
       <div className="dca-card">
         <div className="dca-card-title">Paliers de prise de profits <span className="dca-tag dca-tag-req">min. 1 ligne</span></div>
-        <div style={{fontSize:'.58rem',color:'var(--muted)',marginBottom:8}}>% position vendu < 100 = prise de profit partielle (vous conservez la fraction restante).</div>
+        <div style={{fontSize:'.58rem',color:'var(--muted)',marginBottom:8}}>% position vendu &lt; 100 = prise de profit partielle (vous conservez la fraction restante).</div>
         <table className="dca-ptbl">
           <thead><tr><th/><th>Palier</th><th>Cours ≥ breakeven + (%)</th><th>% position vendu *</th><th>Prix cible</th><th/></tr></thead>
           <tbody>
             {profitZones.map((r,i) => {
-              const warn = profitWarnings[i]
-              const extraCell = (
-                <td>
-                  {warn==='partial' && <span style={{fontSize:'.52rem',color:'var(--gold)'}}>⚡ partiel {r.positionPct}%</span>}
-                  {warn==='over'    && <span style={{fontSize:'.52rem',color:'var(--red)'}}>⚠ max 100%</span>}
-                  {warn==='empty'   && <span style={{fontSize:'.52rem',color:'var(--muted)'}}>requis</span>}
-                </td>
-              )
+              const isEmpty = r.positionPct === '' || r.positionPct == null
+              const extraCell = isEmpty
+                ? <td><span style={{fontSize:'.52rem',color:'var(--muted)'}}>requis</span></td>
+                : <td/>
               return (
                 <ParamRow key={i} row={r} colorArr={ZONE_COLORS.profit} idx={i} refPrice={breakeven}
                   valKey="positionPct" ecartKey="ecartThreshold" unitLabel="%" showHint={true}
@@ -470,9 +463,14 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving }) {
             })}
           </tbody>
         </table>
-        {profitZones.some((_,i)=>profitWarnings[i]==='partial') && (
+        {profitOverflow && (
+          <div className="dca-banner dca-banner-danger" style={{marginTop:8}}>
+            Total cumulé {profitTotal.toFixed(0)}% — dépasse 100%. Réduisez les pourcentages.
+          </div>
+        )}
+        {profitPartial && (
           <div className="dca-banner dca-banner-warn" style={{marginTop:8}}>
-            {profitZones.filter((_,i)=>profitWarnings[i]==='partial').map(z => `${z.label} : prise partielle à ${z.positionPct}% de la position`).join(' · ')}
+            Profits partiels — {profitTotal.toFixed(0)}% de la position seront vendus au total. Vous conserverez {(100 - profitTotal).toFixed(0)}% de votre position après tous les paliers.
           </div>
         )}
         <div className="dca-add-row" onClick={()=>addZone('profitZones',{label:`Palier ${profitZones.length+1}`,ecartThreshold:'',positionPct:''})}><div className="dca-add-ic">+</div> Ajouter un palier</div>
