@@ -150,7 +150,7 @@ function DcaEntryModal({ pair, onClose, onSaved, isRecharge = false }) {
         <div style={{ display:'flex', gap:10, marginTop:4 }}>
           <button className="dca-btn dca-btn-ghost" style={{ flex:1 }} onClick={onClose}>Annuler</button>
           <button className="dca-btn dca-btn-success" style={{ flex:2 }} disabled={busy} onClick={save}>
-            {busy ? '⏳ Sauvegarde…' : isRecharge ? '⚡ Enregistrer rechargement' : '✓ Enregistrer l'achat'}
+            {busy ? '⏳ Sauvegarde…' : isRecharge ? '⚡ Enregistrer rechargement' : "✓ Enregistrer l'achat"}
           </button>
         </div>
       </div>
