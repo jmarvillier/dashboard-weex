@@ -1,52 +1,54 @@
 /**
- * DcaView.jsx — v2
- * Corrections : breakeven, dette, paliers, timeline, stepper, wizard création seule
+ * DcaView.jsx — v3
+ * Rechargement DCA, achats partiels, cycle en cours, paliers profits améliorés
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan } from '../lib/dcaRepository.js'
-import { computeBreakeven, computeAvgPrice, computeDebt, computeSignal, generateTimeline, getEffectiveStart } from '../hooks/useDcaStrategy.js'
-import EntryForm from './EntryForm.jsx'
+import {
+  computeBreakeven, computeAvgPrice, computeRechargement,
+  computeSignal, generateTimeline, getEffectiveStart, getCurrentPeriodOps,
+} from '../hooks/useDcaStrategy.js'
+import { appendRow } from '../lib/repository.js'
 
-/* ── Valeurs BTC par défaut ──────────────────────────────────────────────── */
+/* ── Defaults ────────────────────────────────────────────────────────────── */
 const DEFAULT_ACC_ZONES = [
-  { label: 'Zone A', ecartMin: -Infinity, ecartMax: 0,   amount: 10  },
-  { label: 'Zone B', ecartMin: 0,         ecartMax: 5,   amount: 7.5 },
-  { label: 'Zone C', ecartMin: 5,         ecartMax: 10,  amount: 5   },
-  { label: 'Zone D', ecartMin: 10,        ecartMax: 20,  amount: 2.5 },
+  { label: 'Zone A', ecartMin: '',  ecartMax: '0',   amount: 10  },
+  { label: 'Zone B', ecartMin: '0', ecartMax: '5',   amount: 7.5 },
+  { label: 'Zone C', ecartMin: '5', ecartMax: '10',  amount: 5   },
+  { label: 'Zone D', ecartMin: '10',ecartMax: '20',  amount: 2.5 },
 ]
 const DEFAULT_DEBT_ZONES = [
-  { label: 'Signal fort',    ecartThreshold: -10, debtPct: 50  },
-  { label: 'Signal extrême', ecartThreshold: -20, debtPct: 100 },
+  { label: 'Signal fort',    ecartThreshold: '-10', debtPct: 50  },
+  { label: 'Signal extrême', ecartThreshold: '-20', debtPct: 100 },
 ]
 const DEFAULT_PROFIT_ZONES = [
-  { label: 'Palier 1', ecartThreshold: 20,  positionPct: 25  },
-  { label: 'Palier 2', ecartThreshold: 50,  positionPct: 50  },
-  { label: 'Palier 3', ecartThreshold: 100, positionPct: 75  },
-  { label: 'Palier 4', ecartThreshold: 200, positionPct: 100 },
-  { label: 'Palier 5', ecartThreshold: 400, positionPct: 100 },
+  { label: 'Palier 1', ecartThreshold: '25',  positionPct: '' },
+  { label: 'Palier 2', ecartThreshold: '50',  positionPct: '' },
+  { label: 'Palier 3', ecartThreshold: '75',  positionPct: '' },
+  { label: 'Palier 4', ecartThreshold: '100', positionPct: '' },
 ]
 const ZONE_COLORS = {
   acc:    ['#3dbf90','#2a9d70','#c8a020','#d4720a','#b85808'],
   debt:   ['#85B7EB','#378ADD'],
   profit: ['#F7C1C1','#F09595','#E24B4A','#A32D2D','#501313'],
 }
+const PERIOD_LABEL = { day: 'jour', week: 'semaine', month: 'mois' }
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
-function fmt(v, decimals = 0) {
+function fmt(v, dec = 0) {
   if (v == null || isNaN(v)) return '—'
-  return '$' + Number(v).toLocaleString('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+  return '$' + Number(v).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
-function pct(v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%' }
+function pct(v) { return v == null ? '—' : (v >= 0 ? '+' : '') + Number(v).toFixed(2) + '%' }
 
 function filterOpsForPlan(rawRows, pair, startDate, endDate) {
-  if (!rawRows || !rawRows.length || !pair) return []
+  if (!rawRows?.length || !pair) return []
   const start = startDate ? new Date(startDate) : null
   const end   = endDate   ? new Date(endDate)   : new Date()
   return rawRows.filter(r => {
-    if (!r.exec) return false
-    if (r.pair !== pair) return false
+    if (!r.exec || r.pair !== pair) return false
     if (start && r.date && r.date < start) return false
     if (end   && r.date && r.date > end)   return false
     return true
@@ -55,21 +57,121 @@ function filterOpsForPlan(rawRows, pair, startDate, endDate) {
 
 function getOpKey(op, idx) { return `${op.date?.toISOString?.() || idx}_${idx}` }
 
-/* ── Stepper (uniquement wizard création) ────────────────────────────────── */
+function nowLocal() {
+  const d = new Date(); d.setSeconds(0, 0)
+  return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
+/* ── Mini formulaire d'ajout journal DCA ─────────────────────────────────── */
+function DcaEntryModal({ pair, onClose, onSaved, isRecharge = false }) {
+  const [form, setForm]   = useState({ datetime: nowLocal(), cours: '', usdt: '', volume: '' })
+  const [busy, setBusy]   = useState(false)
+  const [err, setErr]     = useState('')
+
+  function setF(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function save() {
+    if (!form.cours || !form.usdt) { setErr('Cours et montant USDT sont obligatoires.'); return }
+    setBusy(true)
+    try {
+      const notes = isRecharge ? 'RECHARGE_DCA' : 'DCA'
+      const row = [
+        form.datetime,         // 0  Date
+        pair,                  // 1  Paire
+        'Achat',               // 2  Sens
+        'Exécuté',             // 3  Statut
+        parseFloat(form.cours) || '', // 4 Cours
+        parseFloat(form.usdt)  || '', // 5 USDT
+        '', '', '', '',        // 6-9
+        parseFloat(form.volume) || '',// 10 Volume
+        notes,                 // 11 Notes (flag DCA / RECHARGE_DCA)
+        'true',                // 12 Dashboard
+      ]
+      await appendRow(row)
+      onSaved()
+    } catch (e) {
+      setErr('Erreur : ' + e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.82)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div className="dca-card" style={{ maxWidth:380, width:'100%' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div className="dca-card-title" style={{ margin:0 }}>
+            {isRecharge ? '⚡ Rechargement DCA' : '+ Ajouter au journal DCA'}
+          </div>
+          <button className="dca-del-btn" onClick={onClose}>✕</button>
+        </div>
+
+        {isRecharge && (
+          <div className="dca-banner dca-banner-info" style={{ marginBottom:12 }}>
+            Cette entrée sera comptabilisée comme un <b>rechargement DCA</b> et réduira le solde de rechargement disponible.
+          </div>
+        )}
+
+        <div style={{ fontSize:'.62rem', color:'var(--muted)', marginBottom:10 }}>
+          Paire : <b style={{ color:'var(--text)' }}>{pair}</b> · Achat exécuté · Dashboard: ✓ · {isRecharge ? 'Recharge: ✓' : 'DCA: ✓'}
+        </div>
+
+        <div className="dca-form-row">
+          <div className="dca-form-group">
+            <label>Date & heure</label>
+            <input className="dca-input" type="datetime-local" value={form.datetime} onChange={e => setF('datetime', e.target.value)} />
+          </div>
+        </div>
+        <div className="dca-form-row">
+          <div className="dca-form-group">
+            <label>Cours *</label>
+            <div className="dca-input-group">
+              <input className="dca-input" type="number" placeholder="ex: 83500" value={form.cours} onChange={e => setF('cours', e.target.value)} />
+              <span className="dca-input-sfx">$</span>
+            </div>
+          </div>
+          <div className="dca-form-group">
+            <label>Montant *</label>
+            <div className="dca-input-group">
+              <input className="dca-input" type="number" placeholder="ex: 10" value={form.usdt} onChange={e => setF('usdt', e.target.value)} />
+              <span className="dca-input-sfx">USDT</span>
+            </div>
+          </div>
+        </div>
+        <div className="dca-form-row">
+          <div className="dca-form-group">
+            <label>Volume <span style={{ color:'var(--muted)', fontWeight:'normal' }}>(optionnel)</span></label>
+            <input className="dca-input" type="number" placeholder="ex: 0.000119" value={form.volume} onChange={e => setF('volume', e.target.value)} />
+          </div>
+        </div>
+
+        {err && <div className="dca-banner dca-banner-danger" style={{ marginBottom:8 }}>{err}</div>}
+
+        <div style={{ display:'flex', gap:10, marginTop:4 }}>
+          <button className="dca-btn dca-btn-ghost" style={{ flex:1 }} onClick={onClose}>Annuler</button>
+          <button className="dca-btn dca-btn-success" style={{ flex:2 }} disabled={busy} onClick={save}>
+            {busy ? '⏳ Sauvegarde…' : isRecharge ? '⚡ Enregistrer rechargement' : '✓ Enregistrer l'achat'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Stepper ─────────────────────────────────────────────────────────────── */
 function Stepper({ step }) {
   const steps = [['Paire','& période'],['Pointage','opérations'],['Paramètres','stratégie']]
   return (
     <div className="dca-stepper">
       {steps.map(([label, sub], i) => {
-        const done   = i + 1 < step
-        const active = i + 1 === step
+        const done = i+1 < step, active = i+1 === step
         return (
           <>
             <div key={i} className={`dca-step${active?' active':done?' done':''}`}>
-              <div className="dca-step-circle">{done ? '✓' : i + 1}</div>
+              <div className="dca-step-circle">{done ? '✓' : i+1}</div>
               <div className="dca-step-text">{label}<br/>{sub}</div>
             </div>
-            {i < steps.length - 1 && <div key={`l${i}`} className={`dca-step-line${done?' done':''}`}/>}
+            {i < steps.length-1 && <div key={`l${i}`} className={`dca-step-line${done?' done':''}`}/>}
           </>
         )
       })}
@@ -77,133 +179,76 @@ function Stepper({ step }) {
   )
 }
 
-/* ═══ SCREEN 0 — Liste des plans ══════════════════════════════════════════ */
+/* ═══ SCREEN 0 — Liste ════════════════════════════════════════════════════ */
 function DcaList({ onNew, onOpen, plans, loading, onDelete }) {
   const [confirm, setConfirm] = useState(null)
-
-  function iconClass(pair='') {
-    if (pair.startsWith('BTC')) return 'dca-plan-icon dca-plan-icon-btc'
-    if (pair.startsWith('ETH')) return 'dca-plan-icon dca-plan-icon-eth'
-    return 'dca-plan-icon dca-plan-icon-def'
-  }
-
+  function iconClass(p='') { return `dca-plan-icon${p.startsWith('BTC')?' dca-plan-icon-btc':p.startsWith('ETH')?' dca-plan-icon-eth':' dca-plan-icon-def'}` }
   return (
     <div className="dca-scroll">
       <div className="dca-list-header">
         <div>
           <div className="dca-list-title">Scaled Mirror DCA</div>
-          <div className="dca-list-sub">Plans actifs · accumulation graduée + distribution</div>
+          <div className="dca-list-sub">Accumulation graduée + distribution symétrique</div>
         </div>
         <button className="dca-btn dca-btn-primary" onClick={onNew}>+ Nouveau plan</button>
       </div>
-
-      {loading && <div className="dca-banner dca-banner-info">Chargement des plans…</div>}
-
-      {!loading && plans.length === 0 && (
-        <div className="dca-empty-zone" onClick={onNew}>
-          + Aucun plan DCA — cliquez pour en créer un
-        </div>
-      )}
-
+      {loading && <div className="dca-banner dca-banner-info">Chargement…</div>}
+      {!loading && plans.length === 0 && <div className="dca-empty-zone" onClick={onNew}>+ Aucun plan — cliquez pour en créer un</div>}
       {plans.map(plan => (
         <div key={plan.id} className="dca-plan-item" onClick={() => onOpen(plan)}>
           <div className={iconClass(plan.pair)}>{(plan.pair||'').split('/')[0].slice(0,3)}</div>
           <div className="dca-plan-info">
             <div className="dca-plan-pair">{plan.pair}</div>
-            <div className="dca-plan-meta">
-              {plan.baseAmount} USDT/{plan.frequency==='day'?'jour':plan.frequency==='week'?'sem.':'mois'}
-              {plan.startDate ? ` · depuis ${new Date(plan.startDate).toLocaleDateString('fr-FR')}` : ''}
-            </div>
+            <div className="dca-plan-meta">{plan.baseAmount} USDT/{PERIOD_LABEL[plan.frequency]||'jour'}{plan.startDate ? ` · depuis ${new Date(plan.startDate).toLocaleDateString('fr-FR')}` : ''}</div>
           </div>
-          <div className="dca-plan-right">
-            <div className="dca-plan-status dca-status-acc">Accumulation</div>
-          </div>
+          <div className="dca-plan-right"><div className="dca-plan-status dca-status-acc">Accumulation</div></div>
           <button className="dca-plan-del-btn" onClick={e => { e.stopPropagation(); setConfirm(plan.id) }}>✕</button>
         </div>
       ))}
-
       {confirm && (
         <div className="dca-banner dca-banner-danger" style={{marginTop:8}}>
-          Supprimer ce plan ? Les lignes du journal <b>ne seront pas modifiées</b>.{' '}
+          Supprimer ce plan ? Le journal <b>ne sera pas modifié</b>.{' '}
           <button className="dca-btn" style={{marginLeft:8,padding:'3px 10px',fontSize:'.6rem'}} onClick={async()=>{ await onDelete(confirm); setConfirm(null) }}>Confirmer</button>
           <button className="dca-btn dca-btn-ghost" style={{marginLeft:4,padding:'3px 8px',fontSize:'.6rem'}} onClick={()=>setConfirm(null)}>Annuler</button>
         </div>
       )}
-
-      <div className="dca-banner dca-banner-info" style={{marginTop:8}}>
-        La suppression d'un plan efface uniquement la configuration DCA — les lignes du journal ne sont pas modifiées.
-      </div>
+      <div className="dca-banner dca-banner-info" style={{marginTop:8}}>Supprimer un plan efface uniquement sa configuration — le journal n'est pas touché.</div>
     </div>
   )
 }
 
-/* ═══ STEP 1 — Paire & Période ════════════════════════════════════════════ */
+/* ═══ STEP 1 — Paire ══════════════════════════════════════════════════════ */
 function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack }) {
-  const pairs    = pairList.map(p => p.name).filter(n => !n.startsWith('USD'))
-  const effectivePair = wizard.pair === 'NEW' ? (wizard.customPair || '') : wizard.pair
+  const pairs = pairList.map(p => p.name).filter(n => !n.startsWith('USD'))
+  const effectivePair = wizard.pair === 'NEW' ? (wizard.customPair||'') : wizard.pair
   const opsCount = useMemo(() => filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate).length, [rawRows, effectivePair, wizard.startDate, wizard.endDate])
-
-  function warnLevel(pair) {
-    if (!pair || pair === 'NEW') return null
-    if (pair.startsWith('BTC')) return null
-    if (pair.startsWith('ETH')) return 'warn'
-    return 'danger'
-  }
+  function warnLevel(pair) { if (!pair||pair==='NEW') return null; if (pair.startsWith('BTC')) return null; if (pair.startsWith('ETH')) return 'warn'; return 'danger' }
   const warn = warnLevel(wizard.pair)
-
   return (
     <div className="dca-scroll">
       <Stepper step={1}/>
       <div className="dca-card">
         <div className="dca-card-title">Paire <span className="dca-tag dca-tag-req">requis</span></div>
         <div className="dca-chip-grid">
-          {pairs.map(p => (
-            <button key={p} className={`dca-chip${wizard.pair===p?' sel':''}`} onClick={()=>setWizard(w=>({...w,pair:p}))}>
-              {p}
-            </button>
-          ))}
+          {pairs.map(p => <button key={p} className={`dca-chip${wizard.pair===p?' sel':''}`} onClick={()=>setWizard(w=>({...w,pair:p}))}>{p}</button>)}
           <button className={`dca-chip new-pair${wizard.pair==='NEW'?' sel':''}`} onClick={()=>setWizard(w=>({...w,pair:'NEW'}))}>+ Nouvelle paire</button>
         </div>
-
-        {wizard.pair==='NEW' && (
-          <div className="dca-form-row" style={{marginBottom:0}}>
-            <div className="dca-form-group">
-              <label>Nom de la paire</label>
-              <input className="dca-input" placeholder="ex: AVAX/USDT" value={wizard.customPair||''} onChange={e=>setWizard(w=>({...w,customPair:e.target.value}))}/>
-            </div>
-          </div>
-        )}
-
-        {warn==='warn' && <div className="dca-banner dca-banner-warn" style={{marginTop:10}}>⚠️ ETH peut être intégré avec prudence — volatilité plus élevée que BTC. Adaptez vos paliers.</div>}
-        {warn==='danger' && <div className="dca-banner dca-banner-danger" style={{marginTop:10}}>⛔ Le DCA gradué est <b>fortement déconseillé</b> sur les altcoins hors BTC. Seul BTC (et ETH avec précaution) sont adaptés.</div>}
-
-        {wizard.pair && wizard.pair!=='NEW' && (
-          <div className="dca-banner dca-banner-info" style={{marginTop:10}}>
-            <b>{wizard.pair}</b> — {opsCount} opération{opsCount!==1?'s':''} exécutée{opsCount!==1?'s':''} trouvée{opsCount!==1?'s':''}{wizard.startDate ? ` depuis le ${new Date(wizard.startDate).toLocaleDateString('fr-FR')}` : ''}.
-          </div>
-        )}
+        {wizard.pair==='NEW' && <div className="dca-form-row" style={{marginBottom:0}}><div className="dca-form-group"><label>Nom</label><input className="dca-input" placeholder="ex: AVAX/USDT" value={wizard.customPair||''} onChange={e=>setWizard(w=>({...w,customPair:e.target.value}))}/></div></div>}
+        {warn==='warn' && <div className="dca-banner dca-banner-warn" style={{marginTop:10}}>⚠️ ETH — avec précaution, volatilité plus élevée que BTC.</div>}
+        {warn==='danger' && <div className="dca-banner dca-banner-danger" style={{marginTop:10}}>⛔ DCA gradué <b>fortement déconseillé</b> hors BTC (ETH avec précaution).</div>}
+        {wizard.pair && wizard.pair!=='NEW' && <div className="dca-banner dca-banner-info" style={{marginTop:10}}><b>{wizard.pair}</b> — {opsCount} opération{opsCount!==1?'s':''} exécutée{opsCount!==1?'s':''} trouvée{opsCount!==1?'s':''}{wizard.startDate?` depuis le ${new Date(wizard.startDate).toLocaleDateString('fr-FR')}`:''}</div>}
       </div>
-
       <div className="dca-card">
         <div className="dca-card-title">Période</div>
         <div className="dca-form-row">
-          <div className="dca-form-group">
-            <label>Date de début du DCA <span style={{color:'var(--muted)',fontWeight:'normal'}}>(vide = 1ère opération pointée)</span></label>
-            <input className="dca-input" type="date" value={wizard.startDate||''} onChange={e=>setWizard(w=>({...w,startDate:e.target.value}))}/>
-          </div>
-          <div className="dca-form-group">
-            <label>Date de fin <span style={{color:'var(--muted)',fontWeight:'normal'}}>(vide = aujourd'hui)</span></label>
-            <input className="dca-input" type="date" value={wizard.endDate||''} onChange={e=>setWizard(w=>({...w,endDate:e.target.value}))}/>
-          </div>
+          <div className="dca-form-group"><label>Date de début <span style={{color:'var(--muted)',fontWeight:'normal'}}>(vide = 1ère op pointée)</span></label><input className="dca-input" type="date" value={wizard.startDate||''} onChange={e=>setWizard(w=>({...w,startDate:e.target.value}))}/></div>
+          <div className="dca-form-group"><label>Date de fin <span style={{color:'var(--muted)',fontWeight:'normal'}}>(vide = aujourd'hui)</span></label><input className="dca-input" type="date" value={wizard.endDate||''} onChange={e=>setWizard(w=>({...w,endDate:e.target.value}))}/></div>
         </div>
       </div>
-
       <div className="dca-btm">
         <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button>
         <span className="dca-step-hint">Étape 1 / 3</span>
-        <button className="dca-btn dca-btn-primary" disabled={!wizard.pair||(wizard.pair==='NEW'&&!wizard.customPair)} onClick={onNext}>
-          {opsCount>0 ? 'Voir les opérations →' : 'Paramétrer la stratégie →'}
-        </button>
+        <button className="dca-btn dca-btn-primary" disabled={!wizard.pair||(wizard.pair==='NEW'&&!wizard.customPair)} onClick={onNext}>{opsCount>0?'Voir les opérations →':'Paramétrer →'}</button>
       </div>
     </div>
   )
@@ -213,84 +258,45 @@ function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack }) {
 function Step2({ wizard, setWizard, rawRows, onNext, onBack }) {
   const effectivePair = wizard.pair==='NEW' ? (wizard.customPair||'') : wizard.pair
   const ops = useMemo(() => filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate), [rawRows, effectivePair, wizard.startDate, wizard.endDate])
-
-  // Init : TOUTES les ops cochées par défaut (achats ET ventes)
   useEffect(() => {
-    if (ops.length && wizard.pointedOps === undefined) {
+    if (ops.length && wizard.pointedOps === undefined)
       setWizard(w => ({ ...w, pointedOps: ops.map((op,i) => getOpKey(op,i)) }))
-    }
   }, [ops.length])
-
   const pointed = wizard.pointedOps || []
-
-  function toggle(key) {
-    setWizard(w => {
-      const s = new Set(w.pointedOps||[])
-      s.has(key) ? s.delete(key) : s.add(key)
-      return {...w, pointedOps:[...s]}
-    })
-  }
-  function setAll(val) {
-    setWizard(w => ({...w, pointedOps: val ? ops.map((op,i)=>getOpKey(op,i)) : []}))
-  }
-
+  function toggle(key) { setWizard(w => { const s=new Set(w.pointedOps||[]); s.has(key)?s.delete(key):s.add(key); return {...w,pointedOps:[...s]} }) }
+  function setAll(val) { setWizard(w => ({...w, pointedOps: val ? ops.map((op,i)=>getOpKey(op,i)) : []})) }
   const pointedOps = ops.filter((op,i) => pointed.includes(getOpKey(op,i)))
   const breakeven  = computeBreakeven(pointedOps)
   const avgPrice   = computeAvgPrice(pointedOps)
   const totalUsdt  = pointedOps.filter(o=>o.sens==='Achat').reduce((s,o)=>s+o.usdt,0)
-
   if (ops.length === 0) return (
-    <div className="dca-scroll">
-      <Stepper step={2}/>
-      <div className="dca-banner dca-banner-warn">Aucune opération exécutée pour <b>{effectivePair}</b>. Vous passerez directement au paramétrage.</div>
-      <div className="dca-btm">
-        <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button>
-        <button className="dca-btn dca-btn-primary" onClick={onNext}>Paramétrer →</button>
-      </div>
+    <div className="dca-scroll"><Stepper step={2}/>
+      <div className="dca-banner dca-banner-warn">Aucune opération exécutée pour <b>{effectivePair}</b>. Passage direct au paramétrage.</div>
+      <div className="dca-btm"><button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button><button className="dca-btn dca-btn-primary" onClick={onNext}>Paramétrer →</button></div>
     </div>
   )
-
   return (
-    <div className="dca-scroll">
-      <Stepper step={2}/>
+    <div className="dca-scroll"><Stepper step={2}/>
       <div className="dca-card">
         <div className="dca-ops-header">
-          <div>
-            <div className="dca-ops-title">{effectivePair} — Opérations exécutées</div>
-            <div className="dca-ops-meta">{ops.length} opérations · <b style={{color:'var(--green)'}}>{pointed.length} intégrées au DCA</b></div>
-          </div>
-          <div className="dca-ops-btns">
-            <button className="dca-ops-btn" onClick={()=>setAll(true)}>Tout cocher</button>
-            <button className="dca-ops-btn" onClick={()=>setAll(false)}>Tout décocher</button>
-          </div>
+          <div><div className="dca-ops-title">{effectivePair} — Opérations exécutées</div><div className="dca-ops-meta">{ops.length} opérations · <b style={{color:'var(--green)'}}>{pointed.length} intégrées au DCA</b></div></div>
+          <div className="dca-ops-btns"><button className="dca-ops-btn" onClick={()=>setAll(true)}>Tout cocher</button><button className="dca-ops-btn" onClick={()=>setAll(false)}>Tout décocher</button></div>
         </div>
-        <div className="dca-banner dca-banner-info" style={{marginBottom:10}}>
-          Seuls les ordres exécutés sont affichés. Toutes les lignes sont cochées par défaut. Décochez les opérations à exclure (ex: ventes de profit à ne pas comptabiliser).
-        </div>
+        <div className="dca-banner dca-banner-info" style={{marginBottom:10}}>Toutes les opérations sont cochées par défaut. Décochez celles à exclure (ex: ventes de profit à ne pas comptabiliser dans le breakeven).</div>
         <div className="dca-ops-tbl-wrap">
           <table className="dca-ops-tbl">
-            <thead><tr>
-              <th>Date</th><th>Sens</th>
-              <th style={{textAlign:'right'}}>Prix</th>
-              <th style={{textAlign:'right'}}>Montant</th>
-              <th style={{textAlign:'right'}}>Volume</th>
-              <th className="th-dca">DCA ✓</th>
-            </tr></thead>
+            <thead><tr><th>Date</th><th>Sens</th><th style={{textAlign:'right'}}>Prix</th><th style={{textAlign:'right'}}>Montant</th><th style={{textAlign:'right'}}>Volume</th><th className="th-dca">DCA ✓</th></tr></thead>
             <tbody>
-              {ops.map((op,i) => {
-                const key = getOpKey(op,i)
-                const chk = pointed.includes(key)
-                return (
-                  <tr key={key}>
-                    <td>{op.date ? op.date.toLocaleDateString('fr-FR') : '—'}</td>
-                    <td><span className={`db-badge ${op.sens==='Achat'?'badge-buy':'badge-sell'}`}>{op.sens}</span></td>
-                    <td style={{textAlign:'right',fontFamily:"'Space Mono',monospace",fontSize:'.6rem'}}>{op.prix ? fmt(op.prix) : '—'}</td>
-                    <td style={{textAlign:'right',fontFamily:"'Space Mono',monospace",fontSize:'.6rem'}}>{op.usdt ? `$${op.usdt.toFixed(2)}` : '—'}</td>
-                    <td style={{textAlign:'right',fontFamily:"'Space Mono',monospace",fontSize:'.58rem',color:'var(--muted)'}}>{op.vol ? op.vol.toFixed(6) : '—'}</td>
-                    <td className="td-chk"><input type="checkbox" className="dca-ops-chk" checked={chk} onChange={()=>toggle(key)}/></td>
-                  </tr>
-                )
-              })}
+              {ops.map((op,i) => { const key=getOpKey(op,i); const chk=pointed.includes(key); return (
+                <tr key={key}>
+                  <td>{op.date?op.date.toLocaleDateString('fr-FR'):'—'}</td>
+                  <td><span className={`db-badge ${op.sens==='Achat'?'badge-buy':'badge-sell'}`}>{op.sens}</span></td>
+                  <td style={{textAlign:'right',fontFamily:"'Space Mono',monospace",fontSize:'.6rem'}}>{op.prix?fmt(op.prix):'—'}</td>
+                  <td style={{textAlign:'right',fontFamily:"'Space Mono',monospace",fontSize:'.6rem'}}>{op.usdt?`$${op.usdt.toFixed(2)}`:'—'}</td>
+                  <td style={{textAlign:'right',fontFamily:"'Space Mono',monospace",fontSize:'.58rem',color:'var(--muted)'}}>{op.vol?op.vol.toFixed(6):'—'}</td>
+                  <td className="td-chk"><input type="checkbox" className="dca-ops-chk" checked={chk} onChange={()=>toggle(key)}/></td>
+                </tr>
+              )})}
             </tbody>
           </table>
         </div>
@@ -301,41 +307,29 @@ function Step2({ wizard, setWizard, rawRows, onNext, onBack }) {
           <div><span>Lignes : </span><b>{pointed.length} / {ops.length}</b></div>
         </div>
       </div>
-      <div className="dca-btm">
-        <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button>
-        <span className="dca-step-hint">Étape 2 / 3</span>
-        <button className="dca-btn dca-btn-primary" onClick={onNext}>Paramétrer la stratégie →</button>
-      </div>
+      <div className="dca-btm"><button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button><span className="dca-step-hint">Étape 2 / 3</span><button className="dca-btn dca-btn-primary" onClick={onNext}>Paramétrer →</button></div>
     </div>
   )
 }
 
 /* ─── Ligne tableau paramètre ────────────────────────────────────────────── */
-function ParamRow({ row, colorArr, idx, refPrice, onChange, onDelete, showHint, unitLabel, col1Label, col2Label, col2Placeholder }) {
-  const ecartNum   = parseFloat(String(row[col2Label]||'').replace(/[^0-9\-\.]/g,'')) || 0
+function ParamRow({ row, colorArr, idx, refPrice, onChange, onDelete, showHint, unitLabel, valKey, ecartKey, placeholder, extraCell }) {
+  const ecartNum   = parseFloat(String(row[ecartKey]||'').replace(/[^0-9\-\.]/g,''))
   const targetPrice = refPrice > 0 && !isNaN(ecartNum) ? refPrice * (1 + ecartNum / 100) : null
   const color      = (colorArr||[])[idx] || 'var(--muted)'
-
   return (
     <tr>
       <td><span className="dca-zdot" style={{background:color}}/></td>
-      <td>
-        <input className="dca-pi" value={row.label||''} onChange={e=>onChange(idx,'label',e.target.value)} style={{width:80}}/>
-      </td>
-      <td>
-        <input className="dca-pi" value={row[col2Label]!=null?row[col2Label]:''} onChange={e=>onChange(idx,col2Label,e.target.value)}
-          style={{width:80}} placeholder={col2Placeholder||''}/>
-      </td>
+      <td><input className="dca-pi" value={row.label||''} onChange={e=>onChange(idx,'label',e.target.value)} style={{width:80}}/></td>
+      <td><input className="dca-pi" value={row[ecartKey]!=null?row[ecartKey]:''} onChange={e=>onChange(idx,ecartKey,e.target.value)} style={{width:80}} placeholder={placeholder}/></td>
       <td>
         <div className="dca-pi-group">
-          <input className="dca-pi" type="number" min="0" step="any"
-            value={row[col1Label]!=null?row[col1Label]:''}
-            onChange={e=>onChange(idx,col1Label,parseFloat(e.target.value)||0)}
-            style={{width:70}}/>
+          <input className="dca-pi" type="number" min="0" step="any" value={row[valKey]!=null?row[valKey]:''} onChange={e=>onChange(idx,valKey,e.target.value===''?'':parseFloat(e.target.value)||0)} style={{width:70}}/>
           <span className="dca-pi-sfx">{unitLabel}</span>
         </div>
       </td>
-      {showHint && <td><span className="dca-price-hint">{targetPrice ? fmt(targetPrice) : '—'}</span></td>}
+      {showHint && <td><span className="dca-price-hint">{targetPrice?fmt(targetPrice):'—'}</span></td>}
+      {extraCell}
       <td><button className="dca-del-btn" onClick={()=>onDelete(idx)}>×</button></td>
     </tr>
   )
@@ -346,59 +340,49 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving }) {
   const [showConfirm, setShowConfirm] = useState(false)
   const effectivePair = wizard.pair==='NEW' ? (wizard.customPair||'') : wizard.pair
   const ops        = useMemo(() => filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate), [rawRows, effectivePair, wizard.startDate, wizard.endDate])
-  const pointedOps = useMemo(() => {
-    const p = wizard.pointedOps||[]
-    return ops.filter((op,i)=>p.includes(getOpKey(op,i)))
-  }, [ops, wizard.pointedOps])
-
-  // Breakeven des lignes pointées pour les prix cibles
-  const breakeven = computeBreakeven(pointedOps)
-
-  // Date de début effective (fallback 1ère op pointée)
-  const effectiveStartDate = wizard.startDate || (
-    pointedOps.filter(o=>o.sens==='Achat'&&o.date).sort((a,b)=>a.date-b.date)[0]?.date?.toISOString().split('T')[0]
-  ) || ''
+  const pointedOps = useMemo(() => { const p=wizard.pointedOps||[]; return ops.filter((op,i)=>p.includes(getOpKey(op,i))) }, [ops, wizard.pointedOps])
+  const breakeven  = computeBreakeven(pointedOps)
+  const firstBuyDate = pointedOps.filter(o=>o.sens==='Achat'&&o.date).sort((a,b)=>a.date-b.date)[0]?.date?.toISOString().split('T')[0]
+  const effectiveStartDate = wizard.startDate || firstBuyDate || ''
 
   const p = wizard.params || {}
-  function setP(key, val) { setWizard(w => ({...w, params:{...(w.params||{}), [key]:val}})) }
-
-  const accZones   = p.accZones   || DEFAULT_ACC_ZONES
-  const debtZones  = p.debtZones  || DEFAULT_DEBT_ZONES
+  function setP(k,v) { setWizard(w=>({...w,params:{...(w.params||{}),[k]:v}})) }
+  const accZones    = p.accZones    || DEFAULT_ACC_ZONES
+  const debtZones   = p.debtZones   || DEFAULT_DEBT_ZONES
   const profitZones = p.profitZones || DEFAULT_PROFIT_ZONES
 
-  function updateZone(arr, key, idx, field, val) {
-    setP(key, arr.map((r,i) => i===idx ? {...r,[field]:val} : r))
-  }
-  function deleteZone(arr, key, idx) {
-    if (arr.length <= 1) return
-    setP(key, arr.filter((_,i)=>i!==idx))
-  }
-  function addZone(key, template) {
-    const arr = p[key] || (key==='accZones'?DEFAULT_ACC_ZONES:key==='debtZones'?DEFAULT_DEBT_ZONES:DEFAULT_PROFIT_ZONES)
-    setP(key, [...arr, template])
-  }
+  function updateZone(arr, key, idx, field, val) { setP(key, arr.map((r,i)=>i===idx?{...r,[field]:val}:r)) }
+  function deleteZone(arr, key, idx) { if(arr.length<=1) return; setP(key, arr.filter((_,i)=>i!==idx)) }
+  function addZone(key, tmpl) { setP(key, [...(p[key]||[]), tmpl]) }
+
+  // Validation profits
+  const profitWarnings = profitZones.map(z => {
+    const v = parseFloat(z.positionPct)
+    if (!z.positionPct && z.positionPct !== 0) return 'empty'
+    if (v > 100) return 'over'
+    if (v < 100) return 'partial'
+    return 'ok'
+  })
 
   const canSubmit = accZones.length >= 1 && profitZones.length >= 1 && (p.baseAmount||0) > 0
+    && profitZones.every(z => z.positionPct !== '' && parseFloat(z.positionPct) <= 100)
 
   return (
     <div className="dca-scroll">
       <Stepper step={3}/>
 
-      {/* Confirmation modal */}
       {showConfirm && (
         <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,0.75)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
           <div className="dca-card" style={{maxWidth:400,width:'100%'}}>
-            <div className="dca-card-title">⚠️ Confirmer la création du plan</div>
+            <div className="dca-card-title">⚠️ Confirmer la création</div>
             <div style={{fontSize:'.68rem',color:'var(--text2)',lineHeight:1.7,marginBottom:16}}>
-              Une fois le plan DCA créé, <b style={{color:'var(--text)'}}>le paramétrage ne sera plus modifiable</b>.<br/><br/>
-              Vous pourrez consulter votre dashboard de suivi et ajouter des entrées au journal, mais les zones d'accumulation, paliers de dette et paliers de profit seront verrouillés.<br/><br/>
+              Une fois créé, le <b style={{color:'var(--text)'}}>paramétrage ne sera plus modifiable</b>.<br/>
+              Les zones, paliers et seuils seront verrouillés. Vous pourrez consulter le dashboard et ajouter des entrées au journal.<br/><br/>
               Voulez-vous continuer ?
             </div>
             <div style={{display:'flex',gap:10}}>
               <button className="dca-btn dca-btn-ghost" style={{flex:1}} onClick={()=>setShowConfirm(false)}>← Modifier</button>
-              <button className="dca-btn dca-btn-success" style={{flex:1}} disabled={saving} onClick={()=>{ setShowConfirm(false); onNext() }}>
-                {saving ? '⏳ Sauvegarde…' : 'Créer le plan ✓'}
-              </button>
+              <button className="dca-btn dca-btn-success" style={{flex:1}} disabled={saving} onClick={()=>{ setShowConfirm(false); onNext() }}>{saving?'⏳ Sauvegarde…':'Créer ✓'}</button>
             </div>
           </div>
         </div>
@@ -409,104 +393,89 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving }) {
         <div className="dca-card-title">Paramètres de base</div>
         {effectiveStartDate && !wizard.startDate && (
           <div className="dca-banner dca-banner-info" style={{marginBottom:12}}>
-            Date de début non renseignée — utilisation de la date de la première opération pointée : <b>{new Date(effectiveStartDate).toLocaleDateString('fr-FR')}</b>
+            Pas de date renseignée — départ depuis la 1ère opération pointée : <b>{new Date(effectiveStartDate).toLocaleDateString('fr-FR')}</b>
           </div>
         )}
         <div className="dca-form-row">
-          <div className="dca-form-group">
-            <label>Montant de base *</label>
-            <div className="dca-input-group">
-              <input className="dca-input" type="number" value={p.baseAmount??10} onChange={e=>setP('baseAmount',parseFloat(e.target.value)||0)}/>
-              <span className="dca-input-sfx">USDT</span>
-            </div>
-          </div>
-          <div className="dca-form-group">
-            <label>Fréquence *</label>
-            <select className="dca-select" value={p.frequency||'day'} onChange={e=>setP('frequency',e.target.value)}>
-              <option value="day">Tous les jours</option>
-              <option value="week">Toutes les semaines</option>
-              <option value="month">Tous les mois</option>
-            </select>
-          </div>
-          <div className="dca-form-group">
-            <label>Seuil bull run <span className="dca-tag dca-tag-opt">opt.</span></label>
-            <div className="dca-input-group">
-              <input className="dca-input" type="number" value={p.bullThreshold??20} onChange={e=>setP('bullThreshold',parseFloat(e.target.value)||null)}/>
-              <span className="dca-input-sfx">%</span>
-            </div>
-          </div>
-          <div className="dca-form-group">
-            <label>Plafond dette <span className="dca-tag dca-tag-opt">opt.</span></label>
-            <div className="dca-input-group">
-              <input className="dca-input" type="number" value={p.debtCeiling??300} onChange={e=>setP('debtCeiling',parseFloat(e.target.value)||null)}/>
-              <span className="dca-input-sfx">USDT</span>
-            </div>
-          </div>
+          <div className="dca-form-group"><label>Montant de base *</label><div className="dca-input-group"><input className="dca-input" type="number" value={p.baseAmount??10} onChange={e=>setP('baseAmount',parseFloat(e.target.value)||0)}/><span className="dca-input-sfx">USDT</span></div></div>
+          <div className="dca-form-group"><label>Fréquence *</label><select className="dca-select" value={p.frequency||'day'} onChange={e=>setP('frequency',e.target.value)}><option value="day">Tous les jours</option><option value="week">Toutes les semaines</option><option value="month">Tous les mois</option></select></div>
+          <div className="dca-form-group"><label>Seuil bull run <span className="dca-tag dca-tag-opt">opt.</span></label><div className="dca-input-group"><input className="dca-input" type="number" value={p.bullThreshold??20} onChange={e=>setP('bullThreshold',parseFloat(e.target.value)||null)}/><span className="dca-input-sfx">%</span></div></div>
+          <div className="dca-form-group"><label>Plafond rechargement <span className="dca-tag dca-tag-opt">opt.</span></label><div className="dca-input-group"><input className="dca-input" type="number" value={p.debtCeiling??300} onChange={e=>setP('debtCeiling',parseFloat(e.target.value)||null)}/><span className="dca-input-sfx">USDT</span></div></div>
         </div>
-        {breakeven > 0 && <div style={{fontSize:'.6rem',color:'var(--muted)',marginTop:4}}>Breakeven des lignes pointées : <b style={{color:'var(--gold)'}}>{fmt(breakeven)}</b> · utilisé comme référence pour les prix cibles ci-dessous</div>}
+        {breakeven > 0 && <div style={{fontSize:'.6rem',color:'var(--muted)',marginTop:4}}>Breakeven des lignes pointées : <b style={{color:'var(--gold)'}}>{fmt(breakeven)}</b> · référence pour les prix cibles</div>}
       </div>
 
-      {/* Accumulation */}
+      {/* Accumulation — sans -Infinity visible */}
       <div className="dca-card">
         <div className="dca-card-title">Zones d'accumulation <span className="dca-tag dca-tag-req">min. 1 ligne</span></div>
+        <div style={{fontSize:'.58rem',color:'var(--muted)',marginBottom:8}}>Écart min. vide = toutes valeurs inférieures à l'écart max. (équivalent à −∞).</div>
         <table className="dca-ptbl">
           <thead><tr><th/><th>Zone</th><th>Écart min. (% vs breakeven)</th><th>Montant</th><th/></tr></thead>
           <tbody>
             {accZones.map((r,i)=>(
               <ParamRow key={i} row={r} colorArr={ZONE_COLORS.acc} idx={i} refPrice={0}
-                col1Label="amount" col2Label="ecartMin" unitLabel="USDT" showHint={false}
-                col2Placeholder="ex: 0 pour Zone B"
+                valKey="amount" ecartKey="ecartMin" unitLabel="USDT" showHint={false}
+                placeholder="vide = tout en dessous"
                 onChange={(idx,field,val)=>updateZone(accZones,'accZones',idx,field,val)}
                 onDelete={idx=>deleteZone(accZones,'accZones',idx)}/>
             ))}
           </tbody>
         </table>
-        <div className="dca-add-row" onClick={()=>addZone('accZones',{label:`Zone ${String.fromCharCode(65+accZones.length)}`,ecartMin:0,ecartMax:null,amount:5})}>
-          <div className="dca-add-ic">+</div> Ajouter une zone
-        </div>
+        <div className="dca-add-row" onClick={()=>addZone('accZones',{label:`Zone ${String.fromCharCode(65+accZones.length)}`,ecartMin:'',ecartMax:'',amount:5})}><div className="dca-add-ic">+</div> Ajouter une zone</div>
       </div>
 
-      {/* Redistribution dette */}
+      {/* Rechargement DCA */}
       <div className="dca-card">
-        <div className="dca-card-title">Redistribution de la dette <span className="dca-tag dca-tag-opt">optionnel</span></div>
-        <div style={{fontSize:'.6rem',color:'var(--text2)',marginBottom:10,lineHeight:1.6}}>
-          Lorsque le prix plonge fortement, injecter une partie de la dette accumulée pour renforcer la position.
-        </div>
+        <div className="dca-card-title">Redistribution du rechargement DCA <span className="dca-tag dca-tag-opt">optionnel</span></div>
+        <div style={{fontSize:'.6rem',color:'var(--text2)',marginBottom:10,lineHeight:1.6}}>Lorsque le cours plonge, déployer une partie du solde de rechargement accumulé pour renforcer la position.</div>
         <table className="dca-ptbl">
-          <thead><tr><th/><th>Condition</th><th>Écart ≤ (% vs breakeven)</th><th>% dette injectée</th><th>Prix cible</th><th/></tr></thead>
+          <thead><tr><th/><th>Condition</th><th>Cours ≤ breakeven − (%)</th><th>% rechargement</th><th>Prix cible</th><th/></tr></thead>
           <tbody>
             {debtZones.map((r,i)=>(
               <ParamRow key={i} row={r} colorArr={ZONE_COLORS.debt} idx={i} refPrice={breakeven}
-                col1Label="debtPct" col2Label="ecartThreshold" unitLabel="%" showHint={true}
-                col2Placeholder="-10"
+                valKey="debtPct" ecartKey="ecartThreshold" unitLabel="%" showHint={true}
+                placeholder="-10"
                 onChange={(idx,field,val)=>updateZone(debtZones,'debtZones',idx,field,val)}
                 onDelete={idx=>deleteZone(debtZones,'debtZones',idx)}/>
             ))}
           </tbody>
         </table>
-        <div className="dca-add-row" onClick={()=>addZone('debtZones',{label:'Signal',ecartThreshold:-15,debtPct:75})}>
-          <div className="dca-add-ic">+</div> Ajouter un palier
-        </div>
+        <div className="dca-add-row" onClick={()=>addZone('debtZones',{label:'Signal',ecartThreshold:'-15',debtPct:75})}><div className="dca-add-ic">+</div> Ajouter un palier</div>
       </div>
 
-      {/* Profits */}
+      {/* Profits — colonnes séparées, warning si < 100 */}
       <div className="dca-card">
         <div className="dca-card-title">Paliers de prise de profits <span className="dca-tag dca-tag-req">min. 1 ligne</span></div>
+        <div style={{fontSize:'.58rem',color:'var(--muted)',marginBottom:8}}>% position vendu < 100 = prise de profit partielle (vous conservez la fraction restante).</div>
         <table className="dca-ptbl">
-          <thead><tr><th/><th>Palier</th><th>Écart ≥ (% vs breakeven)</th><th>% position vendu</th><th>Prix cible</th><th/></tr></thead>
+          <thead><tr><th/><th>Palier</th><th>Cours ≥ breakeven + (%)</th><th>% position vendu *</th><th>Prix cible</th><th/></tr></thead>
           <tbody>
-            {profitZones.map((r,i)=>(
-              <ParamRow key={i} row={r} colorArr={ZONE_COLORS.profit} idx={i} refPrice={breakeven}
-                col1Label="positionPct" col2Label="ecartThreshold" unitLabel="%" showHint={true}
-                col2Placeholder="+20"
-                onChange={(idx,field,val)=>updateZone(profitZones,'profitZones',idx,field,val)}
-                onDelete={idx=>deleteZone(profitZones,'profitZones',idx)}/>
-            ))}
+            {profitZones.map((r,i) => {
+              const warn = profitWarnings[i]
+              const extraCell = (
+                <td>
+                  {warn==='partial' && <span style={{fontSize:'.52rem',color:'var(--gold)'}}>⚡ partiel {r.positionPct}%</span>}
+                  {warn==='over'    && <span style={{fontSize:'.52rem',color:'var(--red)'}}>⚠ max 100%</span>}
+                  {warn==='empty'   && <span style={{fontSize:'.52rem',color:'var(--muted)'}}>requis</span>}
+                </td>
+              )
+              return (
+                <ParamRow key={i} row={r} colorArr={ZONE_COLORS.profit} idx={i} refPrice={breakeven}
+                  valKey="positionPct" ecartKey="ecartThreshold" unitLabel="%" showHint={true}
+                  placeholder="+25"
+                  extraCell={extraCell}
+                  onChange={(idx,field,val)=>updateZone(profitZones,'profitZones',idx,field,val)}
+                  onDelete={idx=>deleteZone(profitZones,'profitZones',idx)}/>
+              )
+            })}
           </tbody>
         </table>
-        <div className="dca-add-row" onClick={()=>addZone('profitZones',{label:`Palier ${profitZones.length+1}`,ecartThreshold:50,positionPct:50})}>
-          <div className="dca-add-ic">+</div> Ajouter un palier
-        </div>
+        {profitZones.some((_,i)=>profitWarnings[i]==='partial') && (
+          <div className="dca-banner dca-banner-warn" style={{marginTop:8}}>
+            {profitZones.filter((_,i)=>profitWarnings[i]==='partial').map(z => `${z.label} : prise partielle à ${z.positionPct}% de la position`).join(' · ')}
+          </div>
+        )}
+        <div className="dca-add-row" onClick={()=>addZone('profitZones',{label:`Palier ${profitZones.length+1}`,ecartThreshold:'',positionPct:''})}><div className="dca-add-ic">+</div> Ajouter un palier</div>
       </div>
 
       <div className="dca-btm">
@@ -520,76 +489,72 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving }) {
   )
 }
 
-/* ═══ STEP 4 — Dashboard ══════════════════════════════════════════════════ */
+/* ═══ DASHBOARD ═══════════════════════════════════════════════════════════ */
 function DcaDashboard({ plan, rawRows, prices, onBack }) {
-  const [showCal, setShowCal]       = useState(false)
-  const [showEntryForm, setShowEntry] = useState(false)
-  const [entryAdded, setEntryAdded]  = useState(false)
-  const [manualPrice, setManualPrice] = useState('')
+  const [showCal,      setShowCal]      = useState(false)
+  const [showEntry,    setShowEntry]    = useState(false)   // achat normal
+  const [showRecharge, setShowRecharge] = useState(false)   // rechargement DCA
+  const [savedMsg,     setSavedMsg]     = useState('')
+  const [manualPrice,  setManualPrice]  = useState('')
 
   const effectivePair = plan.pair || ''
-  const ops = useMemo(()=> filterOpsForPlan(rawRows, effectivePair, plan.startDate, plan.endDate), [rawRows, effectivePair, plan.startDate, plan.endDate])
-  const pointed       = plan.pointedOps || []
-  const pointedOps    = useMemo(()=> ops.filter((op,i)=>pointed.includes(getOpKey(op,i))), [ops, pointed])
+  const ops = useMemo(() => filterOpsForPlan(rawRows, effectivePair, plan.startDate, plan.endDate), [rawRows, effectivePair, plan.startDate, plan.endDate])
+  const pointed    = plan.pointedOps || []
+  const pointedOps = useMemo(() => ops.filter((op,i)=>pointed.includes(getOpKey(op,i))), [ops, pointed])
 
-  // Utilise plan directement (flat structure)
-  const breakeven    = computeBreakeven(pointedOps)
-  const debt         = computeDebt(plan, pointedOps)
-  const debtPct      = plan.debtCeiling ? Math.min(100, (debt / plan.debtCeiling) * 100) : 0
+  const breakeven     = computeBreakeven(pointedOps)
+  const rechargement  = computeRechargement(plan, pointedOps)
+  const rechargePct   = plan.debtCeiling ? Math.min(100, (rechargement.total / plan.debtCeiling) * 100) : 0
 
-  const currentPrice = prices[effectivePair] || (manualPrice ? parseFloat(manualPrice) : null)
-  const signal       = useMemo(()=> computeSignal(plan, currentPrice, breakeven, debt), [plan, currentPrice, breakeven, debt])
-  const delta        = currentPrice && breakeven ? (currentPrice - breakeven) / breakeven * 100 : null
+  const currentPrice  = prices[effectivePair] || (manualPrice ? parseFloat(manualPrice) : null)
+  const signal        = useMemo(() => computeSignal(plan, currentPrice, breakeven, rechargement), [plan, currentPrice, breakeven, rechargement])
+  const delta         = currentPrice && breakeven ? (currentPrice - breakeven) / breakeven * 100 : null
 
   // KPIs
-  const buys           = pointedOps.filter(o=>o.sens==='Achat')
-  const sells          = pointedOps.filter(o=>o.sens==='Vente')
-  const totalInvested  = buys.reduce((s,o)=>s+o.usdt,0)
-  const totalVolBought = buys.reduce((s,o)=>s+(o.vol||0),0)
-  const totalVolSold   = sells.reduce((s,o)=>s+(o.vol||0),0)
-  const position       = totalVolBought - totalVolSold
-  const pnlLatent      = currentPrice && position>0 && breakeven>0 ? position*(currentPrice-breakeven) : 0
+  const buys          = pointedOps.filter(o=>o.sens==='Achat')
+  const sells         = pointedOps.filter(o=>o.sens==='Vente')
+  const totalInvested = buys.reduce((s,o)=>s+o.usdt,0)
+  const position      = buys.reduce((s,o)=>s+(o.vol||0),0) - sells.reduce((s,o)=>s+(o.vol||0),0)
+  const pnlLatent     = currentPrice && position>0 && breakeven>0 ? position*(currentPrice-breakeven) : 0
 
-  // Timeline avec périodes manquées
-  const timeline = useMemo(()=> generateTimeline(plan, pointedOps, 15), [plan, pointedOps])
+  // Cycle en cours
+  const cyclePeriod   = getCurrentPeriodOps(plan, pointedOps)
+  const freqLabel     = PERIOD_LABEL[plan.frequency||'day'] || 'jour'
 
-  // Calendrier mensuel (mois courant)
-  const calDays = useMemo(()=>{
-    const now  = new Date()
-    const y    = now.getFullYear()
-    const m    = now.getMonth()
-    const first= new Date(y, m, 1)
-    const last = new Date(y, m+1, 0)
-    const days = []
-    // Padding début (lundi=0)
-    const startDow = (first.getDay()+6)%7
-    for (let i=0;i<startDow;i++) days.push(null)
-    for (let d=1;d<=last.getDate();d++) {
-      const day = new Date(y,m,d)
-      // Trouver le statut de ce jour dans la timeline
-      const slot = timeline.find(t => t.date && t.date.toDateString()===day.toDateString())
-      days.push({ day:d, slot, isToday: d===now.getDate() })
+  // Timeline
+  const timeline = useMemo(() => generateTimeline(plan, pointedOps, 15), [plan, pointedOps])
+  const missedCount = timeline.filter(t=>t.type==='missed').length
+
+  // Calendrier
+  const calDays = useMemo(() => {
+    const now=new Date(), y=now.getFullYear(), m=now.getMonth()
+    const first=new Date(y,m,1), last=new Date(y,m+1,0)
+    const days=[]
+    const startDow=(first.getDay()+6)%7
+    for(let i=0;i<startDow;i++) days.push(null)
+    for(let d=1;d<=last.getDate();d++) {
+      const day=new Date(y,m,d)
+      const slot=timeline.find(t=>t.date&&t.date.toDateString()===day.toDateString())
+      days.push({day:d,slot,isToday:d===now.getDate()})
     }
     return days
   }, [timeline])
 
-  // Needle position
-  const bull    = plan.bullThreshold || 20
-  const MIN_D   = -25, MAX_D = bull * 1.5
-  const needlePct = delta!=null ? Math.min(98,Math.max(2,(delta-MIN_D)/(MAX_D-MIN_D)*100)) : 50
+  // Zone bar
+  const bull=plan.bullThreshold||20, MIN_D=-25, MAX_D=bull*1.5
+  const needlePct=delta!=null?Math.min(98,Math.max(2,(delta-MIN_D)/(MAX_D-MIN_D)*100)):50
 
   function signalClass() {
     if (signal.zone==='PROFIT') return 'profit'
-    if (signal.zone==='DEBT'||signal.zone==='FORCE') return 'debt'
+    if (signal.zone==='RECHARGE'||signal.zone==='FORCE') return 'debt'
     if (signal.deployAmount>=(plan.baseAmount||10)) return 'buy'
     if (signal.deployAmount>0) return 'buy50'
     return 'hold'
   }
 
   function tlClass(slot) {
-    if (!slot) return 'tc-sk'
-    if (slot.type==='missed') return 'tc-sk'
-    if (slot.type==='sell')   return 'tc-sl'
+    if (!slot||slot.type==='missed') return 'tc-sk'
+    if (slot.type==='sell') return 'tc-sl'
     if (slot.type==='future') return 'tc-sk'
     if (slot.pct>=90) return 'tc-100'
     if (slot.pct>=65) return 'tc-75'
@@ -604,35 +569,30 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
   }
   function tlTip(slot) {
     if (!slot||slot.type==='future') return 'Période future'
-    const d = slot.date?.toLocaleDateString('fr-FR')||'—'
-    if (slot.type==='missed') return `${d} : Manqué`
+    const d=slot.date?.toLocaleDateString('fr-FR')||'—'
+    if (slot.type==='missed') return `${d} : Manqué (−${plan.baseAmount} USDT rechargement)`
     if (slot.type==='sell')   return `${d} : Vente`
     return `${d} : Acheté ${slot.amount?.toFixed(2)||'?'} USDT (${slot.pct||0}%)`
   }
 
-  function calClass(slot) {
-    if (!slot) return 'tc-sk'
-    if (slot.type==='missed') return 'tc-sk'
-    if (slot.type==='sell')   return 'tc-sl'
-    if (slot.type==='future') return 'tc-sk'
-    if (slot.pct>=90) return 'tc-100'
-    if (slot.pct>=65) return 'tc-75'
-    if (slot.pct>=40) return 'tc-50'
-    return 'tc-25'
-  }
-
   const profitZones = plan.profitZones || DEFAULT_PROFIT_ZONES
   const debtZones   = plan.debtZones   || []
-  const missedCount = timeline.filter(t=>t.type==='missed').length
+
+  function onSaved(isRecharge) {
+    setShowEntry(false); setShowRecharge(false)
+    setSavedMsg(isRecharge ? '⚡ Rechargement enregistré. Le solde de rechargement sera mis à jour au prochain rechargement de données.' : '✓ Achat enregistré au journal.')
+    setTimeout(()=>setSavedMsg(''), 5000)
+  }
 
   return (
     <div className="dca-scroll">
       <div className="dca-banner dca-banner-success">
-        Plan <b>{effectivePair}</b> actif{plan.startDate ? ` depuis le ${new Date(plan.startDate).toLocaleDateString('fr-FR')}` : ''}
-        {plan.baseAmount ? ` · ${plan.baseAmount} USDT/${plan.frequency==='day'?'jour':plan.frequency==='week'?'sem.':'mois'}` : ''}
+        Plan <b>{effectivePair}</b> actif{plan.startDate?` depuis ${new Date(plan.startDate).toLocaleDateString('fr-FR')}`:''}{plan.baseAmount?` · ${plan.baseAmount} USDT/${freqLabel}`:''}
       </div>
 
-      {/* ── Price Hero ──────────────────────────────────────────────────────── */}
+      {savedMsg && <div className="dca-banner dca-banner-success">{savedMsg}</div>}
+
+      {/* ── Hero prix ──────────────────────────────────────────────────────── */}
       <div className="dca-hero">
         <div className="dca-hero-prices">
           <div className="dca-hero-block">
@@ -642,16 +602,14 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
           </div>
           <div className="dca-hero-sep"/>
           <div className="dca-hero-delta">
-            {delta!=null ? (<>
+            {delta!=null?(<>
               <div className={`dca-hero-delta-arrow ${delta<0?'down':'up'}`}>{delta<0?'↓':'↑'}</div>
               <div className={`dca-hero-delta-pct ${delta<0?'down':'up'}`}>{pct(delta)}</div>
               <div className="dca-hero-delta-lbl">cours vs breakeven</div>
-            </>) : (
+            </>):(
               <div style={{textAlign:'center'}}>
-                <div style={{fontSize:'.52rem',color:'var(--muted)',marginBottom:4}}>Cours introuvable</div>
-                <input className="dca-input" type="number" placeholder="Saisir cours ($)"
-                  value={manualPrice} onChange={e=>setManualPrice(e.target.value)}
-                  style={{width:110,textAlign:'center',fontSize:'.6rem'}}/>
+                <div style={{fontSize:'.52rem',color:'var(--muted)',marginBottom:4}}>Cours introuvable — saisir manuellement</div>
+                <input className="dca-input" type="number" placeholder="Cours ($)" value={manualPrice} onChange={e=>setManualPrice(e.target.value)} style={{width:110,textAlign:'center',fontSize:'.6rem'}}/>
               </div>
             )}
           </div>
@@ -659,48 +617,78 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
           <div className="dca-hero-block">
             <div className="dca-hero-lbl">Cours actuel</div>
             <div className="dca-hero-val">{currentPrice?fmt(currentPrice):'—'}</div>
-            <div className="dca-hero-sub">{prices[effectivePair]?'live':'saisie manuelle'}</div>
+            <div className="dca-hero-sub">{prices[effectivePair]?'mis à jour en direct':'saisie manuelle'}</div>
           </div>
         </div>
-
-        {/* Zone bar */}
         <div className="dca-zone-bar-wrap">
           <div className="dca-zone-bar">
-            <div className="dca-zone-seg z4">100%</div>
-            <div className="dca-zone-seg z3">75%</div>
-            <div className="dca-zone-seg z2">50%</div>
-            <div className="dca-zone-seg z1">25%</div>
+            <div className="dca-zone-seg z4">100%</div><div className="dca-zone-seg z3">75%</div>
+            <div className="dca-zone-seg z2">50%</div><div className="dca-zone-seg z1">25%</div>
             <div className="dca-zone-seg z0">Vente</div>
             <div className="dca-zone-needle" style={{left:`${needlePct}%`}}/>
           </div>
-          <div className="dca-zone-labels">
-            <span>&lt; 0%</span><span>0–5%</span><span>5–10%</span><span>10–{bull}%</span><span>&gt; {bull}%</span>
-          </div>
+          <div className="dca-zone-labels"><span>&lt; 0%</span><span>0–5%</span><span>5–10%</span><span>10–{bull}%</span><span>&gt; {bull}%</span></div>
         </div>
       </div>
 
-      {/* ── Signal ──────────────────────────────────────────────────────────── */}
-      <div className={`dca-signal ${signalClass()}`}>
-        <div style={{flex:1}}>
-          <div className="dca-signal-title">{signal.label}</div>
-          <div className="dca-signal-desc">{signal.description}</div>
-        </div>
-        <div className="dca-signal-amount">
-          {signal.action==='sell' ? (<>
-            <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
-            <div className="dca-signal-amt-lbl">de la position</div>
-          </>) : (<>
-            <div className="dca-signal-amt">
-              {signal.deployAmount>0 ? `${signal.deployAmount.toFixed(2)} USDT` : '—'}
+      {/* ── Signal + Cycle en cours ─────────────────────────────────────── */}
+      <div className="dca-card">
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+          <div style={{flex:1}}>
+            <div className="dca-card-title" style={{marginBottom:6}}>
+              Signal du {freqLabel} en cours
+              <span style={{fontSize:'.56rem',fontWeight:'normal',color:'var(--muted)',marginLeft:8}}>
+                Cycle : {cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}
+              </span>
             </div>
-            <div className="dca-signal-amt-lbl">
-              {signal.deployAmount>0 ? (
-                signal.debtInject>0
-                  ? `${signal.base?.toFixed(2)} USDT + ${signal.debtInject?.toFixed(2)} dette`
-                  : 'à déployer ce cycle'
-              ) : 'aucune action ce cycle'}
+            <div className={`dca-signal ${signalClass()}`} style={{marginBottom:8}}>
+              <div style={{flex:1}}>
+                <div className="dca-signal-title">{signal.label}</div>
+                <div className="dca-signal-desc">{signal.description}</div>
+              </div>
+              <div className="dca-signal-amount">
+                {signal.action==='sell'?(<>
+                  <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
+                  <div className="dca-signal-amt-lbl">de la position</div>
+                </>):(<>
+                  <div className="dca-signal-amt">{signal.deployAmount>0?`${signal.deployAmount.toFixed(2)} USDT`:'—'}</div>
+                  <div className="dca-signal-amt-lbl">
+                    {signal.deployAmount>0
+                      ? signal.rechargeInject>0
+                        ? `${signal.base?.toFixed(2)} base + ${signal.rechargeInject?.toFixed(2)} rechargement`
+                        : 'à investir ce cycle'
+                      : 'aucune action ce cycle'}
+                  </div>
+                </>)}
+              </div>
             </div>
-          </>)}
+
+            {/* Stats cycle en cours */}
+            <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:'.6rem',color:'var(--text2)'}}>
+              <div>
+                <span style={{color:'var(--muted)'}}>Achats ce {freqLabel} : </span>
+                <b style={{color:'var(--green)'}}>{cyclePeriod.totalBought>0?`$${cyclePeriod.totalBought.toFixed(2)}`:'—'}</b>
+                {cyclePeriod.buys.length>0&&<span style={{color:'var(--muted)'}}> ({cyclePeriod.buys.length} op.)</span>}
+              </div>
+              <div>
+                <span style={{color:'var(--muted)'}}>Ventes ce {freqLabel} : </span>
+                <b style={{color:'var(--red)'}}>{cyclePeriod.totalSold>0?`$${cyclePeriod.totalSold.toFixed(2)}`:'—'}</b>
+                {cyclePeriod.sells.length>0&&<span style={{color:'var(--muted)'}}> ({cyclePeriod.sells.length} op.)</span>}
+              </div>
+              {signal.deployAmount>0&&signal.action!=='sell'&&(
+                <div><span style={{color:'var(--muted)'}}>Reste à investir : </span>
+                  <b style={{color:'var(--gold)'}}>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(2)}</b>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bouton ajout journal côté signal */}
+          {signal.action !== 'sell' && (
+            <button className="dca-btn dca-btn-primary" style={{alignSelf:'flex-start',whiteSpace:'nowrap'}} onClick={()=>setShowEntry(true)}>
+              + Ajouter au journal
+            </button>
+          )}
         </div>
       </div>
 
@@ -711,60 +699,75 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
           <div className="dca-kpi-lbl">Total investi</div>
           <div className="dca-kpi-sub">{buys.length} opérations pointées</div>
         </div>
-        <div className="dca-kpi">
-          <div className="dca-kpi-val" style={{color:debtPct>50?'var(--gold)':debtPct>0?'var(--text2)':'var(--muted)'}}>
-            ${debt.toFixed(0)}
+
+        {/* Rechargement DCA */}
+        <div className="dca-kpi" style={{position:'relative'}}>
+          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8}}>
+            <div>
+              <div className="dca-kpi-val" style={{color:rechargePct>50?'var(--gold)':rechargement.total>0?'var(--text2)':'var(--muted)'}}>
+                ${rechargement.total.toFixed(0)}
+              </div>
+              <div className="dca-kpi-lbl">Rechargement DCA disponible</div>
+              <div className="dca-kpi-sub">
+                {rechargement.missed} période{rechargement.missed!==1?'s':''} manquée{rechargement.missed!==1?'s':''}
+                {rechargement.deploye>0 && ` · $${rechargement.deploye.toFixed(0)} déjà rechargé`}
+                {plan.debtCeiling ? ` · ${rechargePct.toFixed(0)}% du plafond` : ''}
+              </div>
+            </div>
+            <button
+              className="dca-btn"
+              style={{fontSize:'.58rem',padding:'5px 10px',whiteSpace:'nowrap',flexShrink:0,background:'rgba(74,128,168,.15)',borderColor:'var(--blue)',color:'var(--blue)'}}
+              onClick={()=>setShowRecharge(true)}
+            >
+              ⚡ Recharger
+            </button>
           </div>
-          <div className="dca-kpi-lbl">Dette accumulée</div>
-          <div className="dca-kpi-sub">
-            {missedCount} période{missedCount!==1?'s':''} manquée{missedCount!==1?'s':''}
-            {plan.debtCeiling ? ` · ${debtPct.toFixed(0)}% du plafond` : ''}
-          </div>
+          {rechargePct > 0 && (
+            <div style={{height:4,background:'var(--border)',borderRadius:2,overflow:'hidden',marginTop:8}}>
+              <div style={{height:'100%',borderRadius:2,width:`${rechargePct}%`,background:rechargePct>75?'var(--red)':rechargePct>40?'var(--gold)':'var(--green)',transition:'width .4s'}}/>
+            </div>
+          )}
         </div>
+
         <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>
-            {pnlLatent!==0 ? (pnlLatent>=0?'+':'')+fmt(pnlLatent,2) : '—'}
+            {pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}
           </div>
           <div className="dca-kpi-lbl">PnL latent</div>
           <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
         </div>
       </div>
 
-      {/* ── Paliers ──────────────────────────────────────────────────────── */}
+      {/* ── Paliers ───────────────────────────────────────────────────────── */}
       <div className="dca-two-col">
-        {/* Redistribution dette */}
         {debtZones.length>0 && (
           <div className="dca-card">
-            <div className="dca-card-title">Redistribution de la dette</div>
+            <div className="dca-card-title">Redistribution rechargement DCA</div>
             {debtZones.map((z,i)=>{
-              const tp = breakeven>0 ? breakeven*(1+(parseFloat(z.ecartThreshold)||0)/100) : null
-              const active = delta!=null && delta<=(parseFloat(z.ecartThreshold)||0)
-              return (
-                <div key={i} className={`dca-pal-row${active?' active-debt':''}`}>
-                  <span className="dca-zdot" style={{background:ZONE_COLORS.debt[i]||'#378ADD'}}/>
-                  <span className="dca-pal-lbl">{z.label} · <b>{z.ecartThreshold}%</b></span>
-                  <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
-                  <span className="dca-pal-action">{active?'⚡ ':''}{z.debtPct}% dette</span>
-                </div>
-              )
+              const tp=breakeven>0?breakeven*(1+(parseFloat(z.ecartThreshold)||0)/100):null
+              const active=delta!=null&&delta<=(parseFloat(z.ecartThreshold)||0)
+              return (<div key={i} className={`dca-pal-row${active?' active-debt':''}`}>
+                <span className="dca-zdot" style={{background:ZONE_COLORS.debt[i]||'#378ADD'}}/>
+                <span className="dca-pal-lbl">{z.label} · <b>{z.ecartThreshold}%</b></span>
+                <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
+                <span className="dca-pal-action">{active?'⚡ ':''}{z.debtPct}% rech.</span>
+              </div>)
             })}
           </div>
         )}
-
-        {/* Profits */}
         <div className="dca-card">
           <div className="dca-card-title">Paliers de profits</div>
           {profitZones.map((z,i)=>{
-            const tp = breakeven>0 ? breakeven*(1+(parseFloat(z.ecartThreshold)||0)/100) : null
-            const active = delta!=null && delta>=(parseFloat(z.ecartThreshold)||0)
-            return (
-              <div key={i} className={`dca-pal-row${active?' active-profit':''}`}>
-                <span className="dca-zdot" style={{background:ZONE_COLORS.profit[i]||'#E24B4A'}}/>
-                <span className="dca-pal-lbl">{z.label} · <b>+{z.ecartThreshold}%</b></span>
-                <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
-                <span className="dca-pal-action">{active?'✓ ':''}{z.positionPct}% pos.</span>
-              </div>
-            )
+            const tp=breakeven>0?breakeven*(1+(parseFloat(z.ecartThreshold)||0)/100):null
+            const active=delta!=null&&delta>=(parseFloat(z.ecartThreshold)||0)
+            return (<div key={i} className={`dca-pal-row${active?' active-profit':''}`}>
+              <span className="dca-zdot" style={{background:ZONE_COLORS.profit[i]||'#E24B4A'}}/>
+              <span className="dca-pal-lbl">{z.label} · <b>+{z.ecartThreshold}%</b></span>
+              <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
+              <span className="dca-pal-action">{active?'✓ ':''}{z.positionPct}%
+                {z.positionPct && parseFloat(z.positionPct)<100 && <span style={{fontSize:'.52rem',color:'var(--gold)',marginLeft:3}}>partiel</span>}
+              </span>
+            </div>)
           })}
         </div>
       </div>
@@ -774,17 +777,9 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
           <div className="dca-card-title" style={{marginBottom:0}}>
             {timeline.length} dernières périodes
-            {missedCount>0 && <span style={{fontSize:'.56rem',color:'var(--gold)',marginLeft:8,fontWeight:'normal'}}>· {missedCount} manquée{missedCount!==1?'s':''}</span>}
+            {missedCount>0&&<span style={{fontSize:'.56rem',color:'var(--gold)',marginLeft:8,fontWeight:'normal'}}>· {missedCount} manquée{missedCount!==1?'s':''}</span>}
           </div>
-          <button
-            onClick={()=>setShowEntry(true)}
-            className="dca-btn dca-btn-primary"
-            style={{fontSize:'.6rem',padding:'5px 12px'}}
-          >
-            + Ajouter au journal
-          </button>
         </div>
-
         <div className="dca-tl-legend">
           <span><span className="dca-tl-leg-dot" style={{background:'rgba(61,191,144,.35)'}}/>100%</span>
           <span><span className="dca-tl-leg-dot" style={{background:'rgba(61,191,144,.2)'}}/>75%</span>
@@ -793,13 +788,9 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
           <span><span className="dca-tl-leg-dot" style={{background:'rgba(212,90,80,.22)'}}/>Vente</span>
           <span><span className="dca-tl-leg-dot" style={{background:'var(--bg3)',border:'1px solid var(--border)'}}/>Manqué</span>
         </div>
-
         <div className="dca-tl">
           {timeline.map((slot,i)=>(
-            <div key={i}
-              className={`dca-tc ${tlClass(slot)}${i===timeline.length-1?' tc-today':''}`}
-              data-tip={tlTip(slot)}
-            >
+            <div key={i} className={`dca-tc ${tlClass(slot)}${i===timeline.length-1?' tc-today':''}`} data-tip={tlTip(slot)}>
               {tlLabel(slot)}
             </div>
           ))}
@@ -809,85 +800,57 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
         </div>
 
         {/* Toggle calendrier */}
-        <div
-          className="dca-add-row"
-          style={{cursor:'pointer',userSelect:'none'}}
-          onClick={()=>setShowCal(v=>!v)}
-        >
+        <div className="dca-add-row" style={{cursor:'pointer',userSelect:'none'}} onClick={()=>setShowCal(v=>!v)}>
           <span style={{fontSize:'.75rem'}}>📅</span>
           <span>{showCal?'Masquer le calendrier':'Afficher le calendrier mensuel'}</span>
         </div>
 
-        {/* Calendrier */}
         {showCal && (
           <div style={{marginTop:10}}>
             <div style={{fontSize:'.58rem',fontWeight:'500',color:'var(--text2)',marginBottom:6}}>
               {new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
-              {['L','M','M','J','V','S','D'].map((d,i)=>(
-                <div key={i} style={{textAlign:'center',fontSize:'.48rem',color:'var(--muted)',fontWeight:'500'}}>{d}</div>
-              ))}
+              {['L','M','M','J','V','S','D'].map((d,i)=><div key={i} style={{textAlign:'center',fontSize:'.48rem',color:'var(--muted)',fontWeight:'500'}}>{d}</div>)}
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
               {calDays.map((cell,i)=>{
-                if (!cell) return <div key={i}/>
-                const cls = calClass(cell.slot)
-                return (
-                  <div key={i} className={`dca-tc ${cls}${cell.isToday?' tc-today':''}`} style={{aspectRatio:'1',fontSize:'.55rem'}}>
-                    {cell.day}
-                  </div>
-                )
+                if(!cell) return <div key={i}/>
+                const cls=cell.slot?tlClass(cell.slot):'tc-sk'
+                return <div key={i} className={`dca-tc ${cls}${cell.isToday?' tc-today':''}`} style={{aspectRatio:'1',fontSize:'.55rem'}}>{cell.day}</div>
               })}
             </div>
           </div>
         )}
 
         <div style={{fontSize:'.56rem',color:'var(--muted)',marginTop:8,borderTop:'1px solid var(--border)',paddingTop:8}}>
-          {buys.length} achats · {sells.length} ventes · {missedCount} manquées · Investi total {totalInvested>0?`$${totalInvested.toFixed(0)}`:'—'}
+          {buys.length} achats · {sells.length} ventes · {missedCount} manquées · Rechargement brut ${rechargement.brut?.toFixed(0)||0} · Déjà rechargé ${rechargement.deploye?.toFixed(0)||0}
         </div>
       </div>
-
-      {entryAdded && (
-        <div className="dca-banner dca-banner-success">
-          ✓ Entrée ajoutée au journal. Rechargez la page pour mettre à jour l'analyse DCA.
-        </div>
-      )}
 
       <div className="dca-btm">
         <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Plans DCA</button>
       </div>
 
-      {/* EntryForm modal */}
-      {showEntryForm && (
-        <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-          <EntryForm
-            onSaved={()=>{ setShowEntry(false); setEntryAdded(true) }}
-            onClose={()=>setShowEntry(false)}
-          />
-        </div>
-      )}
+      {/* Modals */}
+      {showEntry    && <DcaEntryModal pair={effectivePair} isRecharge={false} onClose={()=>setShowEntry(false)}    onSaved={()=>onSaved(false)}/>}
+      {showRecharge && <DcaEntryModal pair={effectivePair} isRecharge={true}  onClose={()=>setShowRecharge(false)} onSaved={()=>onSaved(true)}/>}
     </div>
   )
 }
 
-/* ═══ DcaView — Orchestrateur ═════════════════════════════════════════════ */
+/* ═══ Orchestrateur ═══════════════════════════════════════════════════════ */
 export default function DcaView({ pairList = [], rawRows = [], prices = {} }) {
-  const [screen, setScreen]   = useState('list')
-  const [plans, setPlans]     = useState([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving]   = useState(false)
+  const [screen, setScreen]         = useState('list')
+  const [plans, setPlans]           = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [saving, setSaving]         = useState(false)
   const [currentPlan, setCurrentPlan] = useState(null)
 
   const INIT_WIZARD = () => ({
     pair: pairList[0]?.name||'', customPair:'', startDate:'', endDate:'',
     pointedOps: undefined,
-    params: {
-      baseAmount:10, frequency:'day', bullThreshold:20, debtCeiling:300,
-      accZones:[...DEFAULT_ACC_ZONES],
-      debtZones:[...DEFAULT_DEBT_ZONES],
-      profitZones:[...DEFAULT_PROFIT_ZONES],
-    }
+    params: { baseAmount:10, frequency:'day', bullThreshold:20, debtCeiling:300, accZones:[...DEFAULT_ACC_ZONES], debtZones:[...DEFAULT_DEBT_ZONES], profitZones:[...DEFAULT_PROFIT_ZONES] }
   })
   const [wizard, setWizard] = useState(INIT_WIZARD)
 
@@ -895,22 +858,11 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {} }) {
     getDcaPlans().then(setPlans).catch(console.error).finally(()=>setLoading(false))
   }, [])
 
-  // Ouvrir un plan existant → direct dashboard (pas de wizard)
-  function openPlan(plan) {
-    setCurrentPlan(plan)
-    setScreen('dashboard')
-  }
+  function openPlan(plan) { setCurrentPlan(plan); setScreen('dashboard') }
 
-  function startNewWizard() {
-    setWizard(INIT_WIZARD())
-    setCurrentPlan(null)
-    setScreen(1)
-  }
+  function startNewWizard() { setWizard(INIT_WIZARD()); setCurrentPlan(null); setScreen(1) }
 
-  async function deletePlan(id) {
-    await deleteDcaPlan(id)
-    setPlans(p=>p.filter(x=>x.id!==id))
-  }
+  async function deletePlan(id) { await deleteDcaPlan(id); setPlans(p=>p.filter(x=>x.id!==id)) }
 
   function step1Next() {
     const pair = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
@@ -922,71 +874,46 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {} }) {
     setSaving(true)
     try {
       const pair = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
-      // Calcul de la date de début effective
-      const effectivePair = pair
-      const ops = filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate)
-      const pointed = wizard.pointedOps||[]
-      const pointedOps = ops.filter((op,i)=>pointed.includes(getOpKey(op,i)))
-      const firstBuyDate = pointedOps.filter(o=>o.sens==='Achat'&&o.date).sort((a,b)=>a.date-b.date)[0]?.date
-      const effectiveStartDate = wizard.startDate || (firstBuyDate ? firstBuyDate.toISOString().split('T')[0] : '')
-
+      const ops  = filterOpsForPlan(rawRows, pair, wizard.startDate, wizard.endDate)
+      const p    = wizard.pointedOps||[]
+      const pOps = ops.filter((op,i)=>p.includes(getOpKey(op,i)))
+      const firstDate = pOps.filter(o=>o.sens==='Achat'&&o.date).sort((a,b)=>a.date-b.date)[0]?.date
+      const startDate = wizard.startDate || (firstDate?firstDate.toISOString().split('T')[0]:'')
       const planData = {
-        id:          currentPlan?.id || null,
-        pair,
-        startDate:   effectiveStartDate,
-        endDate:     wizard.endDate || null,
-        pointedOps:  wizard.pointedOps || [],
-        // Spread flat (pas de sous-objet params)
-        baseAmount:  wizard.params?.baseAmount  ?? 10,
-        frequency:   wizard.params?.frequency   ?? 'day',
-        bullThreshold: wizard.params?.bullThreshold ?? 20,
-        debtCeiling: wizard.params?.debtCeiling ?? 300,
-        accZones:    wizard.params?.accZones    || DEFAULT_ACC_ZONES,
-        debtZones:   wizard.params?.debtZones   || DEFAULT_DEBT_ZONES,
-        profitZones: wizard.params?.profitZones || DEFAULT_PROFIT_ZONES,
+        id: currentPlan?.id||null, pair, startDate, endDate: wizard.endDate||null,
+        pointedOps: p,
+        baseAmount:   wizard.params?.baseAmount??10,
+        frequency:    wizard.params?.frequency??'day',
+        bullThreshold:wizard.params?.bullThreshold??20,
+        debtCeiling:  wizard.params?.debtCeiling??300,
+        accZones:     wizard.params?.accZones||DEFAULT_ACC_ZONES,
+        debtZones:    wizard.params?.debtZones||DEFAULT_DEBT_ZONES,
+        profitZones:  wizard.params?.profitZones||DEFAULT_PROFIT_ZONES,
       }
       const id   = await saveDcaPlan(planData)
       const saved = {...planData, id}
       setCurrentPlan(saved)
-      setPlans(prev => {
-        const exists = prev.find(p=>p.id===id)
-        return exists ? prev.map(p=>p.id===id?saved:p) : [...prev, saved]
-      })
+      setPlans(prev => { const ex=prev.find(x=>x.id===id); return ex?prev.map(x=>x.id===id?saved:x):[...prev,saved] })
       setScreen('dashboard')
-    } catch(e) {
-      alert('Erreur sauvegarde : '+e.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch(e) { alert('Erreur : '+e.message) }
+    finally { setSaving(false) }
   }
 
   const activePair = screen==='dashboard'&&currentPlan ? currentPlan.pair : (wizard.pair==='NEW'?wizard.customPair:wizard.pair)
 
   return (
     <div className="dca-page">
-      {/* Barre de navigation */}
       {screen !== 'list' && (
         <div className="dca-back-bar" style={{padding:'12px 20px 0'}}>
           <button className="dca-back-btn" onClick={()=>setScreen('list')}>← Plans DCA</button>
           {activePair && <span className="dca-back-pair">· {activePair}</span>}
         </div>
       )}
-
-      {screen==='list' && (
-        <DcaList plans={plans} loading={loading} onNew={startNewWizard} onOpen={openPlan} onDelete={deletePlan}/>
-      )}
-      {screen===1 && (
-        <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')}/>
-      )}
-      {screen===2 && (
-        <Step2 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={()=>setScreen(3)} onBack={()=>setScreen(1)}/>
-      )}
-      {screen===3 && (
-        <Step3 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={step3Save} onBack={()=>setScreen(2)} saving={saving}/>
-      )}
-      {screen==='dashboard' && currentPlan && (
-        <DcaDashboard plan={currentPlan} rawRows={rawRows} prices={prices} onBack={()=>setScreen('list')}/>
-      )}
+      {screen==='list'      && <DcaList plans={plans} loading={loading} onNew={startNewWizard} onOpen={openPlan} onDelete={deletePlan}/>}
+      {screen===1           && <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')}/>}
+      {screen===2           && <Step2 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={()=>setScreen(3)} onBack={()=>setScreen(1)}/>}
+      {screen===3           && <Step3 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={step3Save} onBack={()=>setScreen(2)} saving={saving}/>}
+      {screen==='dashboard' && currentPlan && <DcaDashboard plan={currentPlan} rawRows={rawRows} prices={prices} onBack={()=>setScreen('list')}/>}
     </div>
   )
 }
