@@ -212,6 +212,7 @@ export default function AppShell({
   repoAvailable, backToLanding, toggleFlag,
   loadFromFile, loadFromDrive, driveErr, setDriveErr, onRepoUpdated,
   pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
+  onRefresh,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -245,7 +246,7 @@ export default function AppShell({
             />
           )}
           {activePage === 'dca' && (
-            <DcaView pairList={pairList} rawRows={rawRows} prices={prices} />
+            <DcaView pairList={pairList} rawRows={rawRows} prices={prices} onRefresh={onRefresh} />
           )}
         </main>
       </div>

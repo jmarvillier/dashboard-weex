@@ -35,9 +35,9 @@ function nowLocal() {
 
 // ── Données statiques ─────────────────────────────────────────────────────────
 
-const INITIAL = {
+const makeInitial = (paire = '') => ({
   datetime  : nowLocal(),
-  paire     : '',
+  paire,
   sens      : 'Achat',
   statut    : 'Exécuté',
   cours     : '',
@@ -47,7 +47,8 @@ const INITIAL = {
   volume    : '',
   notes     : '',
   dashboard : true,
-}
+})
+const INITIAL = makeInitial()
 
 const SENS_OPTIONS = [
   { label: 'Achat',   icon: '↑', key: 'achat'   },
@@ -151,8 +152,10 @@ function PaireInput({ value, onChange }) {
 
 // ── Composant principal ───────────────────────────────────────────────────────
 
-export default function EntryForm({ onClose, onSaved }) {
-  const [form, setForm]       = useState(INITIAL)
+export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca = false, flagRecharge = false }) {
+  const [form, setForm]       = useState(() => makeInitial(defaultPaire))
+  const [isDca, setIsDca]         = useState(flagDca)
+  const [isRecharge, setIsRecharge] = useState(flagRecharge)
   const [busy, setBusy]       = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError]     = useState(null)
@@ -171,20 +174,25 @@ export default function EntryForm({ onClose, onSaved }) {
   }
 
   function toRow() {
+    // Construit la note : texte libre + flags techniques
+    const flags = []
+    if (isDca)      flags.push('[DCA]')
+    if (isRecharge) flags.push('[RECHARGE_DCA]')
+    const notesValue = [form.notes.trim(), ...flags].filter(Boolean).join(' ')
     return [
-      form.datetime,           // [0]  Date + heure
-      form.paire.trim(),       // [1]  Paire
-      form.sens,               // [2]  Sens
-      form.statut,             // [3]  Statut
-      form.cours   || '',      // [4]  Cours
-      form.usdt    || '',      // [5]  Montant USDT
-      form.usdc    || '',      // [6]  Montant USDC
-      form.eur     || '',      // [7]  Montant EUR
-      '',                      // [8]  réservé
-      '',                      // [9]  réservé
-      form.volume  || '',      // [10] Volume
-      form.notes   || '',      // [11] Notes
-      form.dashboard ? 'true' : 'false', // [12] Dashboard
+      form.datetime,
+      form.paire.trim(),
+      form.sens,
+      form.statut,
+      form.cours  || '',
+      form.usdt   || '',
+      form.usdc   || '',
+      form.eur    || '',
+      '',
+      '',
+      form.volume || '',
+      notesValue,
+      form.dashboard ? 'true' : 'false',
     ]
   }
 
@@ -198,7 +206,7 @@ export default function EntryForm({ onClose, onSaved }) {
       setSuccess(true)
       setTimeout(() => {
         setSuccess(false)
-        setForm({ ...INITIAL, datetime: nowLocal() })
+        setForm(makeInitial(defaultPaire))
         onSaved?.()
       }, 1400)
     } catch (e) {
@@ -356,6 +364,26 @@ export default function EntryForm({ onClose, onSaved }) {
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
             />
+          </div>
+
+          {/* ── DCA flags ── */}
+          <div className="ef-toggle-row" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}>
+            <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:'.72rem',color:'var(--text2)'}}>
+              <input type="checkbox" checked={isDca} onChange={e=>setIsDca(e.target.checked)}
+                style={{width:16,height:16,accentColor:'var(--green)',cursor:'pointer'}}/>
+              <span>
+                <b style={{color:'var(--text)'}}>Inclure dans le plan DCA</b>
+                <span style={{color:'var(--muted)',marginLeft:6}}>— cette entrée sera comptabilisée dans le suivi DCA</span>
+              </span>
+            </label>
+            <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:'.72rem',color:'var(--text2)'}}>
+              <input type="checkbox" checked={isRecharge} onChange={e=>setIsRecharge(e.target.checked)}
+                style={{width:16,height:16,accentColor:'var(--blue)',cursor:'pointer'}}/>
+              <span>
+                <b style={{color:'var(--text)'}}>Rechargement DCA</b>
+                <span style={{color:'var(--muted)',marginLeft:6}}>— déduire du solde de rechargement disponible</span>
+              </span>
+            </label>
           </div>
 
           {/* ── Ligne 6 : Dashboard toggle ── */}

@@ -6,11 +6,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan } from '../lib/dcaRepository.js'
+import EntryForm from './EntryForm.jsx'
 import {
   computeBreakeven, computeAvgPrice, computeRechargement,
   computeSignal, generateTimeline, getEffectiveStart, getCurrentPeriodOps,
 } from '../hooks/useDcaStrategy.js'
-import { appendRow } from '../lib/repository.js'
+
 
 /* ── Defaults ────────────────────────────────────────────────────────────── */
 const DEFAULT_ACC_ZONES = [
@@ -60,102 +61,6 @@ function getOpKey(op, idx) { return `${op.date?.toISOString?.() || idx}_${idx}` 
 function nowLocal() {
   const d = new Date(); d.setSeconds(0, 0)
   return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-}
-
-/* ── Mini formulaire d'ajout journal DCA ─────────────────────────────────── */
-function DcaEntryModal({ pair, onClose, onSaved, isRecharge = false }) {
-  const [form, setForm]   = useState({ datetime: nowLocal(), cours: '', usdt: '', volume: '' })
-  const [busy, setBusy]   = useState(false)
-  const [err, setErr]     = useState('')
-
-  function setF(k, v) { setForm(f => ({ ...f, [k]: v })) }
-
-  async function save() {
-    if (!form.cours || !form.usdt) { setErr('Cours et montant USDT sont obligatoires.'); return }
-    setBusy(true)
-    try {
-      const notes = isRecharge ? 'RECHARGE_DCA' : 'DCA'
-      const row = [
-        form.datetime,         // 0  Date
-        pair,                  // 1  Paire
-        'Achat',               // 2  Sens
-        'Exécuté',             // 3  Statut
-        parseFloat(form.cours) || '', // 4 Cours
-        parseFloat(form.usdt)  || '', // 5 USDT
-        '', '', '', '',        // 6-9
-        parseFloat(form.volume) || '',// 10 Volume
-        notes,                 // 11 Notes (flag DCA / RECHARGE_DCA)
-        'true',                // 12 Dashboard
-      ]
-      await appendRow(row)
-      onSaved()
-    } catch (e) {
-      setErr('Erreur : ' + e.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.82)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div className="dca-card" style={{ maxWidth:380, width:'100%' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-          <div className="dca-card-title" style={{ margin:0 }}>
-            {isRecharge ? '⚡ Rechargement DCA' : '+ Ajouter au journal DCA'}
-          </div>
-          <button className="dca-del-btn" onClick={onClose}>✕</button>
-        </div>
-
-        {isRecharge && (
-          <div className="dca-banner dca-banner-info" style={{ marginBottom:12 }}>
-            Cette entrée sera comptabilisée comme un <b>rechargement DCA</b> et réduira le solde de rechargement disponible.
-          </div>
-        )}
-
-        <div style={{ fontSize:'.62rem', color:'var(--muted)', marginBottom:10 }}>
-          Paire : <b style={{ color:'var(--text)' }}>{pair}</b> · Achat exécuté · Dashboard: ✓ · {isRecharge ? 'Recharge: ✓' : 'DCA: ✓'}
-        </div>
-
-        <div className="dca-form-row">
-          <div className="dca-form-group">
-            <label>Date & heure</label>
-            <input className="dca-input" type="datetime-local" value={form.datetime} onChange={e => setF('datetime', e.target.value)} />
-          </div>
-        </div>
-        <div className="dca-form-row">
-          <div className="dca-form-group">
-            <label>Cours *</label>
-            <div className="dca-input-group">
-              <input className="dca-input" type="number" placeholder="ex: 83500" value={form.cours} onChange={e => setF('cours', e.target.value)} />
-              <span className="dca-input-sfx">$</span>
-            </div>
-          </div>
-          <div className="dca-form-group">
-            <label>Montant *</label>
-            <div className="dca-input-group">
-              <input className="dca-input" type="number" placeholder="ex: 10" value={form.usdt} onChange={e => setF('usdt', e.target.value)} />
-              <span className="dca-input-sfx">USDT</span>
-            </div>
-          </div>
-        </div>
-        <div className="dca-form-row">
-          <div className="dca-form-group">
-            <label>Volume <span style={{ color:'var(--muted)', fontWeight:'normal' }}>(optionnel)</span></label>
-            <input className="dca-input" type="number" placeholder="ex: 0.000119" value={form.volume} onChange={e => setF('volume', e.target.value)} />
-          </div>
-        </div>
-
-        {err && <div className="dca-banner dca-banner-danger" style={{ marginBottom:8 }}>{err}</div>}
-
-        <div style={{ display:'flex', gap:10, marginTop:4 }}>
-          <button className="dca-btn dca-btn-ghost" style={{ flex:1 }} onClick={onClose}>Annuler</button>
-          <button className="dca-btn dca-btn-success" style={{ flex:2 }} disabled={busy} onClick={save}>
-            {busy ? '⏳ Sauvegarde…' : isRecharge ? '⚡ Enregistrer rechargement' : "✓ Enregistrer l'achat"}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 /* ── Stepper ─────────────────────────────────────────────────────────────── */
@@ -488,7 +393,7 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving }) {
 }
 
 /* ═══ DASHBOARD ═══════════════════════════════════════════════════════════ */
-function DcaDashboard({ plan, rawRows, prices, onBack }) {
+function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
   const [showCal,      setShowCal]      = useState(false)
   const [showEntry,    setShowEntry]    = useState(false)   // achat normal
   const [showRecharge, setShowRecharge] = useState(false)   // rechargement DCA
@@ -498,7 +403,11 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
   const effectivePair = plan.pair || ''
   const ops = useMemo(() => filterOpsForPlan(rawRows, effectivePair, plan.startDate, plan.endDate), [rawRows, effectivePair, plan.startDate, plan.endDate])
   const pointed    = plan.pointedOps || []
-  const pointedOps = useMemo(() => ops.filter((op,i)=>pointed.includes(getOpKey(op,i))), [ops, pointed])
+  // Inclut ops du plan.pointedOps + ops ajoutées via boutons DCA (flaggées dans notes)
+  const pointedOps = useMemo(() => ops.filter((op, i) =>
+    pointed.includes(getOpKey(op, i)) ||
+    (op.notes && (op.notes.includes('[DCA]') || op.notes.includes('[RECHARGE_DCA]') || op.notes.includes('RECHARGE_DCA')))
+  ), [ops, pointed])
 
   const breakeven     = computeBreakeven(pointedOps)
   const rechargement  = computeRechargement(plan, pointedOps)
@@ -576,10 +485,14 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
   const profitZones = plan.profitZones || DEFAULT_PROFIT_ZONES
   const debtZones   = plan.debtZones   || []
 
-  function onSaved(isRecharge) {
+  function onSaved(isRechargeOp) {
     setShowEntry(false); setShowRecharge(false)
-    setSavedMsg(isRecharge ? '⚡ Rechargement enregistré. Le solde de rechargement sera mis à jour au prochain rechargement de données.' : '✓ Achat enregistré au journal.')
-    setTimeout(()=>setSavedMsg(''), 5000)
+    setSavedMsg(isRechargeOp
+      ? '⚡ Rechargement enregistré — données mises à jour.'
+      : '✓ Achat enregistré au journal — données mises à jour.')
+    setTimeout(()=>setSavedMsg(''), 4000)
+    // Recharger le journal pour que le dashboard se mette à jour
+    onRefresh?.()
   }
 
   return (
@@ -830,15 +743,31 @@ function DcaDashboard({ plan, rawRows, prices, onBack }) {
         <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Plans DCA</button>
       </div>
 
-      {/* Modals */}
-      {showEntry    && <DcaEntryModal pair={effectivePair} isRecharge={false} onClose={()=>setShowEntry(false)}    onSaved={()=>onSaved(false)}/>}
-      {showRecharge && <DcaEntryModal pair={effectivePair} isRecharge={true}  onClose={()=>setShowRecharge(false)} onSaved={()=>onSaved(true)}/>}
+      {/* Modals — EntryForm natif avec flags DCA pré-cochés */}
+      {showEntry && (
+        <EntryForm
+          onClose={()=>setShowEntry(false)}
+          onSaved={()=>onSaved(false)}
+          defaultPaire={effectivePair}
+          flagDca={true}
+          flagRecharge={false}
+        />
+      )}
+      {showRecharge && (
+        <EntryForm
+          onClose={()=>setShowRecharge(false)}
+          onSaved={()=>onSaved(true)}
+          defaultPaire={effectivePair}
+          flagDca={true}
+          flagRecharge={true}
+        />
+      )}
     </div>
   )
 }
 
 /* ═══ Orchestrateur ═══════════════════════════════════════════════════════ */
-export default function DcaView({ pairList = [], rawRows = [], prices = {} }) {
+export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRefresh }) {
   const [screen, setScreen]         = useState('list')
   const [plans, setPlans]           = useState([])
   const [loading, setLoading]       = useState(true)
@@ -911,7 +840,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {} }) {
       {screen===1           && <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')}/>}
       {screen===2           && <Step2 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={()=>setScreen(3)} onBack={()=>setScreen(1)}/>}
       {screen===3           && <Step3 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={step3Save} onBack={()=>setScreen(2)} saving={saving}/>}
-      {screen==='dashboard' && currentPlan && <DcaDashboard plan={currentPlan} rawRows={rawRows} prices={prices} onBack={()=>setScreen('list')}/>}
+      {screen==='dashboard' && currentPlan && <DcaDashboard plan={currentPlan} rawRows={rawRows} prices={prices} onBack={()=>setScreen('list')} onRefresh={onRefresh}/>}
     </div>
   )
 }
