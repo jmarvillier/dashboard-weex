@@ -43,17 +43,20 @@ export function getEffectiveStart(plan, pointedOps) {
 
 const PERIOD_MS = { day: 86400000, week: 604800000, month: 30 * 86400000 }
 
-/* ─── Rechargement DCA disponible ──────────────────────────────────────────
-   Logique simple : pour chaque période passée,
-   solde += max(0, baseAmount − montant réellement injecté ce cycle)
-   Les achats partiels (ex: injecté 2 sur 10) alimentent le solde (+8).
-   Les cycles manqués alimentent le solde (+10).
+/* ─── Solde de rechargement DCA ────────────────────────────────────────────
+   solde = Σ (baseAmount − injected) pour chaque cycle passé
+   Peut être positif (sous-investissement) ou négatif (sur-investissement).
+   Exemple : base 10 USDT
+     cycle 1 → injecté 2  → +8
+     cycle 2 → injecté 0  → +10
+     cycle 3 → injecté 30 → −20
+     solde cumulé = −2
    ─────────────────────────────────────────────────────────────────────────── */
 export function computeRechargement(plan, pointedOps) {
   const baseAmount = plan.baseAmount || 10
   const ms         = PERIOD_MS[plan.frequency || 'day'] || PERIOD_MS.day
   const start      = getEffectiveStart(plan, pointedOps)
-  if (!start) return { total: 0, missed: 0, brut: 0 }
+  if (!start) return { total: 0, missed: 0 }
 
   const now          = new Date()
   const totalPeriods = Math.max(0, Math.floor((now.getTime() - start.getTime()) / ms))
@@ -63,20 +66,14 @@ export function computeRechargement(plan, pointedOps) {
   for (let i = 0; i < totalPeriods; i++) {
     const pStart = new Date(start.getTime() + i * ms)
     const pEnd   = new Date(start.getTime() + (i + 1) * ms)
-
-    // Tous les achats exécutés dans cette période (DCA normaux + rechargements)
-    const buysInPeriod = pointedOps.filter(o =>
-      o.sens === 'Achat' && o.exec &&
-      o.date && o.date >= pStart && o.date < pEnd
-    )
-    const injected  = buysInPeriod.reduce((s, o) => s + (o.usdt || 0), 0)
-    const shortfall = Math.max(0, baseAmount - injected)
-
+    const injected = pointedOps
+      .filter(o => o.sens === 'Achat' && o.exec && o.date && o.date >= pStart && o.date < pEnd)
+      .reduce((s, o) => s + (o.usdt || 0), 0)
+    solde += baseAmount - injected           // peut être négatif
     if (injected === 0) missedPeriods++
-    solde += shortfall
   }
 
-  return { total: solde, missed: missedPeriods, brut: solde, deploye: 0 }
+  return { total: solde, missed: missedPeriods }
 }
 
 /* ─── Ops du cycle en cours ─────────────────────────────────────────────── */
@@ -179,8 +176,8 @@ export function computeSignal(plan, currentPrice, breakeven, rechargement) {
   })
 
   const base       = forceRecharge && !accZone ? (plan.baseAmount || 10) : (accZone ? accZone.amount : 0)
-  const rechargeInject = activeDebtZone && rechargeTotal > 0 ? rechargeTotal * ((parseFloat(activeDebtZone.debtPct) || 0) / 100) : 0
-  const deployAmount   = base + rechargeInject
+  const rechargeInject = 0  // rechargement géré via solde, pas injecté directement
+  const deployAmount   = base
 
   let label, description, zone
   if (activeDebtZone && rechargeInject > 0) {
