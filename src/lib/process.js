@@ -188,7 +188,9 @@ export function extractRawRows(rows) {
     const usdt   = parseN(r[5]) || parseN(r[6]) || parseN(r[7])
     const vol    = parseN(r[10])
     const date   = parseDate(r[0])
-    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat) })
+    const notes    = String(r[11] || '').trim()
+    const recharge = notes.includes('RECHARGE_DCA')
+    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat), notes, recharge })
   })
 
   return result
