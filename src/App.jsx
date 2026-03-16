@@ -89,6 +89,7 @@ export default function App() {
         <AppShell
           activePage={activePage}
           setActivePage={setActivePage}
+          onRefresh={openFromRepository}
           fileName={fileName}
           loadedAt={loadedAt}
           excluded={excluded}
