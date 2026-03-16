@@ -152,10 +152,9 @@ function PaireInput({ value, onChange }) {
 
 // ── Composant principal ───────────────────────────────────────────────────────
 
-export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca = false, flagRecharge = false }) {
+export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca = false }) {
   const [form, setForm]       = useState(() => makeInitial(defaultPaire))
   const [isDca, setIsDca]         = useState(flagDca)
-  const [isRecharge, setIsRecharge] = useState(flagRecharge)
   const [busy, setBusy]       = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError]     = useState(null)
@@ -176,8 +175,7 @@ export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca
   function toRow() {
     // Construit la note : texte libre + flags techniques
     const flags = []
-    if (isDca)      flags.push('[DCA]')
-    if (isRecharge) flags.push('[RECHARGE_DCA]')
+    if (isDca) flags.push('[DCA]')
     const notesValue = [form.notes.trim(), ...flags].filter(Boolean).join(' ')
     return [
       form.datetime,
@@ -377,22 +375,10 @@ export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca
               </div>
               Inclure dans le plan DCA
               <span className="ef-toggle-hint" style={{marginLeft:'auto'}}>
-                {isDca ? '✅ Compté dans le suivi DCA' : '⛔ Ignoré du suivi DCA'}
+                {isDca ? '✅ Inclus dans le suivi DCA' : '⛔ Ignoré du suivi DCA'}
               </span>
             </label>
-            <label className="ef-toggle-label">
-              <div
-                className={`ef-toggle${isRecharge ? ' on' : ''}`}
-                style={isRecharge ? {background:'rgba(74,128,168,.2)',borderColor:'rgba(74,128,168,.5)'} : {}}
-                onClick={() => setIsRecharge(v => !v)}
-              >
-                <div className="ef-toggle-thumb" style={isRecharge ? {left:18,background:'var(--blue)'} : {}} />
-              </div>
-              Rechargement DCA
-              <span className="ef-toggle-hint" style={{marginLeft:'auto'}}>
-                {isRecharge ? '⚡ Décompté du solde de rechargement' : '— Achat DCA standard'}
-              </span>
-            </label>
+
           </div>
 
           {/* ── Ligne 6 : Dashboard toggle ── */}
