@@ -1,7 +1,7 @@
 /**
  * useDcaStrategy.js — v3
  * Renommage dette → rechargement DCA.
- * Calcul rechargement : shortfalls par période (manquées + achats partiels) − remboursements.
+ * Calcul rechargement : shortfalls par période (manquées + achats partiels).
  */
 
 import { useMemo } from 'react'
@@ -44,44 +44,39 @@ export function getEffectiveStart(plan, pointedOps) {
 const PERIOD_MS = { day: 86400000, week: 604800000, month: 30 * 86400000 }
 
 /* ─── Rechargement DCA disponible ──────────────────────────────────────────
-   = Σ sur chaque période (max(0, baseAmount − acheté))
-   − Σ des remboursements (ops avec recharge=true)
-   Calcul inclut les achats partiels (ex: acheté 2 au lieu de 10 → +8)
+   Logique simple : pour chaque période passée,
+   solde += max(0, baseAmount − montant réellement injecté ce cycle)
+   Les achats partiels (ex: injecté 2 sur 10) alimentent le solde (+8).
+   Les cycles manqués alimentent le solde (+10).
    ─────────────────────────────────────────────────────────────────────────── */
 export function computeRechargement(plan, pointedOps) {
   const baseAmount = plan.baseAmount || 10
   const ms         = PERIOD_MS[plan.frequency || 'day'] || PERIOD_MS.day
   const start      = getEffectiveStart(plan, pointedOps)
-  if (!start) return { total: 0, missed: 0 }
+  if (!start) return { total: 0, missed: 0, brut: 0 }
 
-  const now           = new Date()
-  const totalPeriods  = Math.max(0, Math.floor((now.getTime() - start.getTime()) / ms))
-  let rechargeBrut    = 0
-  let missedPeriods   = 0
+  const now          = new Date()
+  const totalPeriods = Math.max(0, Math.floor((now.getTime() - start.getTime()) / ms))
+  let solde          = 0
+  let missedPeriods  = 0
 
   for (let i = 0; i < totalPeriods; i++) {
     const pStart = new Date(start.getTime() + i * ms)
     const pEnd   = new Date(start.getTime() + (i + 1) * ms)
 
-    // Achats normaux DCA (non-rechargement) dans cette période
+    // Tous les achats exécutés dans cette période (DCA normaux + rechargements)
     const buysInPeriod = pointedOps.filter(o =>
-      o.sens === 'Achat' && o.exec && !o.recharge &&
+      o.sens === 'Achat' && o.exec &&
       o.date && o.date >= pStart && o.date < pEnd
     )
-    const bought    = buysInPeriod.reduce((s, o) => s + (o.usdt || 0), 0)
-    const shortfall = Math.max(0, baseAmount - bought)
+    const injected  = buysInPeriod.reduce((s, o) => s + (o.usdt || 0), 0)
+    const shortfall = Math.max(0, baseAmount - injected)
 
-    if (bought === 0) missedPeriods++
-    rechargeBrut += shortfall
+    if (injected === 0) missedPeriods++
+    solde += shortfall
   }
 
-  // Remboursements déjà déployés (ops avec flag recharge=true)
-  const rechargeDeploye = pointedOps
-    .filter(o => o.recharge && o.sens === 'Achat' && o.exec)
-    .reduce((s, o) => s + (o.usdt || 0), 0)
-
-  const total = Math.max(0, rechargeBrut - rechargeDeploye)
-  return { total, missed: missedPeriods, brut: rechargeBrut, deploye: rechargeDeploye }
+  return { total: solde, missed: missedPeriods, brut: solde, deploye: 0 }
 }
 
 /* ─── Ops du cycle en cours ─────────────────────────────────────────────── */

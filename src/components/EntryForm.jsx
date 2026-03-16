@@ -366,22 +366,31 @@ export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca
             />
           </div>
 
-          {/* ── DCA flags ── */}
-          <div className="ef-toggle-row" style={{flexDirection:'column',alignItems:'flex-start',gap:10}}>
-            <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:'.72rem',color:'var(--text2)'}}>
-              <input type="checkbox" checked={isDca} onChange={e=>setIsDca(e.target.checked)}
-                style={{width:16,height:16,accentColor:'var(--green)',cursor:'pointer'}}/>
-              <span>
-                <b style={{color:'var(--text)'}}>Inclure dans le plan DCA</b>
-                <span style={{color:'var(--muted)',marginLeft:6}}>— cette entrée sera comptabilisée dans le suivi DCA</span>
+          {/* ── DCA flags — même style que le toggle Dashboard ── */}
+          <div className="ef-toggle-row" style={{flexDirection:'column',alignItems:'stretch',gap:8}}>
+            <label className="ef-toggle-label">
+              <div
+                className={`ef-toggle${isDca ? ' on' : ''}`}
+                onClick={() => setIsDca(v => !v)}
+              >
+                <div className="ef-toggle-thumb" />
+              </div>
+              Inclure dans le plan DCA
+              <span className="ef-toggle-hint" style={{marginLeft:'auto'}}>
+                {isDca ? '✅ Compté dans le suivi DCA' : '⛔ Ignoré du suivi DCA'}
               </span>
             </label>
-            <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',fontSize:'.72rem',color:'var(--text2)'}}>
-              <input type="checkbox" checked={isRecharge} onChange={e=>setIsRecharge(e.target.checked)}
-                style={{width:16,height:16,accentColor:'var(--blue)',cursor:'pointer'}}/>
-              <span>
-                <b style={{color:'var(--text)'}}>Rechargement DCA</b>
-                <span style={{color:'var(--muted)',marginLeft:6}}>— déduire du solde de rechargement disponible</span>
+            <label className="ef-toggle-label">
+              <div
+                className={`ef-toggle${isRecharge ? ' on' : ''}`}
+                style={isRecharge ? {background:'rgba(74,128,168,.2)',borderColor:'rgba(74,128,168,.5)'} : {}}
+                onClick={() => setIsRecharge(v => !v)}
+              >
+                <div className="ef-toggle-thumb" style={isRecharge ? {left:18,background:'var(--blue)'} : {}} />
+              </div>
+              Rechargement DCA
+              <span className="ef-toggle-hint" style={{marginLeft:'auto'}}>
+                {isRecharge ? '⚡ Décompté du solde de rechargement' : '— Achat DCA standard'}
               </span>
             </label>
           </div>
