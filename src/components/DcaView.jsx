@@ -642,7 +642,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
               <div className="dca-signal-amt">{signal.deployAmount>0?`${signal.deployAmount.toFixed(2)} USDT`:'—'}</div>
               <div className="dca-signal-amt-lbl">
                 {signal.deployAmount>0
-                  `à investir · cycle du ${cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}`
+                  ? `à investir · cycle du ${cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}`
                   : 'aucune action ce cycle'}
               </div>
             </>)}
