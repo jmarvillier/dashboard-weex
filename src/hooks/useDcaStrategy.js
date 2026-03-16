@@ -1,81 +1,118 @@
 /**
- * useDcaStrategy.js — v2
- * Logique métier DCA : breakeven, dette, signal, timeline
+ * useDcaStrategy.js — v3
+ * Renommage dette → rechargement DCA.
+ * Calcul rechargement : shortfalls par période (manquées + achats partiels) − remboursements.
  */
 
 import { useMemo } from 'react'
 
-/* ─── Breakeven (coût de revient réel après ventes partielles) ────────────── */
+/* ─── Breakeven ─────────────────────────────────────────────────────────── */
 export function computeBreakeven(pointedOps) {
   const buys  = pointedOps.filter(o => o.sens === 'Achat' && o.exec)
   const sells = pointedOps.filter(o => o.sens === 'Vente' && o.exec)
-  const totalVolBought = buys.reduce((s, o) => s + (o.vol || 0), 0)
-  const totalVolSold   = sells.reduce((s, o) => s + (o.vol || 0), 0)
-  const netPosition    = totalVolBought - totalVolSold
-  const totalInvested  = buys.reduce((s, o) => s + (o.usdt || 0), 0)
-  const sellRevenue    = sells.reduce((s, o) => s + (o.usdt || 0), 0)
-  const netInvested    = Math.max(0, totalInvested - sellRevenue)
-  if (netPosition > 0) return netInvested / netPosition
-  if (totalVolBought > 0) return totalInvested / totalVolBought
+  const volBought  = buys.reduce((s, o)  => s + (o.vol  || 0), 0)
+  const volSold    = sells.reduce((s, o) => s + (o.vol  || 0), 0)
+  const netPos     = volBought - volSold
+  const totalInv   = buys.reduce((s, o)  => s + (o.usdt || 0), 0)
+  const sellRev    = sells.reduce((s, o) => s + (o.usdt || 0), 0)
+  const netInv     = Math.max(0, totalInv - sellRev)
+  if (netPos > 0) return netInv / netPos
+  if (volBought > 0) return totalInv / volBought
   return 0
 }
 
-/* ─── Prix moyen d'achat pondéré (sans tenir compte des ventes) ──────────── */
+/* ─── Prix moyen d'achat ────────────────────────────────────────────────── */
 export function computeAvgPrice(pointedOps) {
-  const buys     = pointedOps.filter(o => o.sens === 'Achat' && o.exec && o.vol > 0)
-  const totalVol  = buys.reduce((s, o) => s + o.vol,  0)
-  const totalUsdt = buys.reduce((s, o) => s + o.usdt, 0)
-  return totalVol > 0 ? totalUsdt / totalVol : 0
+  const buys    = pointedOps.filter(o => o.sens === 'Achat' && o.exec && o.vol > 0)
+  const vol     = buys.reduce((s, o) => s + o.vol,  0)
+  const usdt    = buys.reduce((s, o) => s + o.usdt, 0)
+  return vol > 0 ? usdt / vol : 0
 }
 
-/* ─── Date de début effective ────────────────────────────────────────────── */
+/* ─── Date de début effective ───────────────────────────────────────────── */
 export function getEffectiveStart(plan, pointedOps) {
   if (plan.startDate) {
     const d = new Date(plan.startDate)
     if (!isNaN(d.getTime())) return d
   }
-  // Fallback : première opération d'achat pointée
   const buyOps = pointedOps.filter(o => o.sens === 'Achat' && o.exec && o.date)
-  if (buyOps.length > 0) {
+  if (buyOps.length > 0)
     return new Date(Math.min(...buyOps.map(o => o.date.getTime())))
-  }
   return null
 }
 
-/* ─── Calcul de la dette (périodes manquées × montant de base) ───────────── */
-export function computeDebt(plan, pointedOps) {
+const PERIOD_MS = { day: 86400000, week: 604800000, month: 30 * 86400000 }
+
+/* ─── Rechargement DCA disponible ──────────────────────────────────────────
+   = Σ sur chaque période (max(0, baseAmount − acheté))
+   − Σ des remboursements (ops avec recharge=true)
+   Calcul inclut les achats partiels (ex: acheté 2 au lieu de 10 → +8)
+   ─────────────────────────────────────────────────────────────────────────── */
+export function computeRechargement(plan, pointedOps) {
   const baseAmount = plan.baseAmount || 10
-  const frequency  = plan.frequency || 'day'
-  const PERIOD_MS  = { day: 86400000, week: 604800000, month: 30 * 86400000 }
-  const ms         = PERIOD_MS[frequency] || PERIOD_MS.day
+  const ms         = PERIOD_MS[plan.frequency || 'day'] || PERIOD_MS.day
+  const start      = getEffectiveStart(plan, pointedOps)
+  if (!start) return { total: 0, missed: 0 }
 
-  const start = getEffectiveStart(plan, pointedOps)
-  if (!start) return 0
+  const now           = new Date()
+  const totalPeriods  = Math.max(0, Math.floor((now.getTime() - start.getTime()) / ms))
+  let rechargeBrut    = 0
+  let missedPeriods   = 0
 
-  const now             = new Date()
-  const expectedPeriods = Math.max(0, Math.floor((now.getTime() - start.getTime()) / ms))
+  for (let i = 0; i < totalPeriods; i++) {
+    const pStart = new Date(start.getTime() + i * ms)
+    const pEnd   = new Date(start.getTime() + (i + 1) * ms)
 
-  // Compter les périodes distinctes où un achat a eu lieu
-  const boughtPeriods = new Set()
-  pointedOps
-    .filter(o => o.sens === 'Achat' && o.exec && o.date)
-    .forEach(op => {
-      const idx = Math.floor((op.date.getTime() - start.getTime()) / ms)
-      if (idx >= 0 && idx < expectedPeriods) boughtPeriods.add(idx)
-    })
+    // Achats normaux DCA (non-rechargement) dans cette période
+    const buysInPeriod = pointedOps.filter(o =>
+      o.sens === 'Achat' && o.exec && !o.recharge &&
+      o.date && o.date >= pStart && o.date < pEnd
+    )
+    const bought    = buysInPeriod.reduce((s, o) => s + (o.usdt || 0), 0)
+    const shortfall = Math.max(0, baseAmount - bought)
 
-  const missed = Math.max(0, expectedPeriods - boughtPeriods.size)
-  return missed * baseAmount
+    if (bought === 0) missedPeriods++
+    rechargeBrut += shortfall
+  }
+
+  // Remboursements déjà déployés (ops avec flag recharge=true)
+  const rechargeDeploye = pointedOps
+    .filter(o => o.recharge && o.sens === 'Achat' && o.exec)
+    .reduce((s, o) => s + (o.usdt || 0), 0)
+
+  const total = Math.max(0, rechargeBrut - rechargeDeploye)
+  return { total, missed: missedPeriods, brut: rechargeBrut, deploye: rechargeDeploye }
 }
 
-/* ─── Timeline : dernières N périodes avec statut ────────────────────────── */
+/* ─── Ops du cycle en cours ─────────────────────────────────────────────── */
+export function getCurrentPeriodOps(plan, pointedOps) {
+  const ms    = PERIOD_MS[plan.frequency || 'day'] || PERIOD_MS.day
+  const start = getEffectiveStart(plan, pointedOps)
+  if (!start) return { buys: [], sells: [], totalBought: 0, totalSold: 0 }
+  const now          = new Date()
+  const elapsed      = now.getTime() - start.getTime()
+  const currentIdx   = Math.max(0, Math.floor(elapsed / ms))
+  const periodStart  = new Date(start.getTime() + currentIdx * ms)
+  const periodEnd    = new Date(periodStart.getTime() + ms)
+
+  const ops   = pointedOps.filter(o => o.exec && o.date && o.date >= periodStart && o.date < periodEnd)
+  const buys  = ops.filter(o => o.sens === 'Achat')
+  const sells = ops.filter(o => o.sens === 'Vente')
+  return {
+    buys,
+    sells,
+    totalBought : buys.reduce((s, o)  => s + (o.usdt || 0), 0),
+    totalSold   : sells.reduce((s, o) => s + (o.usdt || 0), 0),
+    periodStart,
+    periodEnd,
+  }
+}
+
+/* ─── Timeline ───────────────────────────────────────────────────────────── */
 export function generateTimeline(plan, pointedOps, slots = 15) {
   const baseAmount = plan.baseAmount || 10
-  const frequency  = plan.frequency || 'day'
-  const PERIOD_MS  = { day: 86400000, week: 604800000, month: 30 * 86400000 }
-  const ms         = PERIOD_MS[frequency] || PERIOD_MS.day
-
-  const start = getEffectiveStart(plan, pointedOps)
+  const ms         = PERIOD_MS[plan.frequency || 'day'] || PERIOD_MS.day
+  const start      = getEffectiveStart(plan, pointedOps)
   if (!start) return []
 
   const now           = new Date()
@@ -84,117 +121,114 @@ export function generateTimeline(plan, pointedOps, slots = 15) {
   const result        = []
 
   for (let i = firstIdx; i < totalExpected; i++) {
-    const periodStart = new Date(start.getTime() + i * ms)
-    const periodEnd   = new Date(start.getTime() + (i + 1) * ms)
-    const isFuture    = periodEnd > now
+    const pStart  = new Date(start.getTime() + i * ms)
+    const pEnd    = new Date(start.getTime() + (i + 1) * ms)
+    const isFuture = pEnd > now
 
-    const opsInPeriod = pointedOps.filter(o => {
-      if (!o.date || !o.exec) return false
-      return o.date >= periodStart && o.date < periodEnd
-    })
-
-    const buysInPeriod  = opsInPeriod.filter(o => o.sens === 'Achat')
-    const sellsInPeriod = opsInPeriod.filter(o => o.sens === 'Vente')
+    const opsInPeriod = pointedOps.filter(o =>
+      o.exec && o.date && o.date >= pStart && o.date < pEnd
+    )
+    const buys  = opsInPeriod.filter(o => o.sens === 'Achat')
+    const sells = opsInPeriod.filter(o => o.sens === 'Vente')
 
     if (isFuture) {
-      result.push({ type: 'future', date: periodStart, idx: i })
-    } else if (buysInPeriod.length > 0) {
-      const total = buysInPeriod.reduce((s, o) => s + (o.usdt || 0), 0)
-      const pct   = baseAmount > 0 ? Math.round(total / baseAmount * 100) : 100
-      result.push({ type: 'bought', date: periodStart, pct, amount: total, idx: i })
-    } else if (sellsInPeriod.length > 0 && buysInPeriod.length === 0) {
-      result.push({ type: 'sell', date: periodStart, idx: i })
+      result.push({ type: 'future', date: pStart, idx: i })
+    } else if (buys.length > 0) {
+      const amount = buys.reduce((s, o) => s + (o.usdt || 0), 0)
+      const pct    = baseAmount > 0 ? Math.round(amount / baseAmount * 100) : 100
+      result.push({ type: 'bought', date: pStart, pct, amount, idx: i })
+    } else if (sells.length > 0) {
+      result.push({ type: 'sell', date: pStart, idx: i })
     } else {
-      result.push({ type: 'missed', date: periodStart, idx: i })
+      result.push({ type: 'missed', date: pStart, idx: i })
     }
   }
-
   return result
 }
 
-/* ─── Signal du jour ────────────────────────────────────────────────────────── */
-export function computeSignal(plan, currentPrice, breakeven, debt) {
+/* ─── Signal ─────────────────────────────────────────────────────────────── */
+export function computeSignal(plan, currentPrice, breakeven, rechargement) {
+  const rechargeTotal = rechargement?.total ?? 0
   if (!currentPrice || !breakeven) {
-    return { zone: 'UNKNOWN', action: 'hold', deployAmount: 0, label: 'Cours non disponible', description: 'Cours live indisponible pour cette paire.', sellPct: null, forceDebt: false }
+    return { zone: 'UNKNOWN', action: 'hold', deployAmount: 0, label: 'Cours non disponible', description: 'Cours live indisponible.', sellPct: null, forceRecharge: false }
   }
 
   const delta = (currentPrice - breakeven) / breakeven * 100
 
-  // ── Mode distribution (bull run) ─────────────────────────────────────────
+  // ── Bull run / Distribution ──────────────────────────────────────────────
   if (plan.bullThreshold && delta >= plan.bullThreshold) {
-    const reached    = (plan.profitZones || []).filter(z => delta >= z.ecartThreshold).sort((a, b) => b.ecartThreshold - a.ecartThreshold)
-    const totalSell  = reached.reduce((s, z) => s + z.positionPct, 0)
-    const labels     = reached.map(z => z.label).join(', ')
+    const reached   = (plan.profitZones || []).filter(z => delta >= (parseFloat(z.ecartThreshold) || 0)).sort((a, b) => b.ecartThreshold - a.ecartThreshold)
+    const totalSell = reached.reduce((s, z) => s + (z.positionPct || 0), 0)
+    const labels    = reached.map(z => z.label).join(', ')
     return {
       zone: 'PROFIT', action: 'sell', deployAmount: 0,
       label: reached.length ? `Prise de profits — ${labels}` : `Bull run +${delta.toFixed(1)}%`,
-      description: `Prix ${delta.toFixed(1)}% au-dessus du breakeven. DCA suspendu.${reached.length ? ` Vendre ${totalSell}% de la position (${labels}).` : ''}`,
-      sellPct: totalSell, delta, forceDebt: false,
+      description: `Prix ${delta.toFixed(1)}% au-dessus du breakeven. DCA suspendu.${reached.length ? ` Vendre ${totalSell}% de la position.` : ''}`,
+      sellPct: totalSell, delta, forceRecharge: false,
     }
   }
 
-  // ── Forçage si plafond de dette dépassé ─────────────────────────────────
-  const forceDebt = plan.debtCeiling && debt >= plan.debtCeiling
+  // ── Forçage si rechargement DCA max dépassé ──────────────────────────────
+  const forceRecharge = plan.debtCeiling && rechargeTotal >= plan.debtCeiling
 
-  // ── Redistribution de dette ─────────────────────────────────────────────
+  // ── Zone de redistribution de rechargement ───────────────────────────────
   const activeDebtZone = (plan.debtZones || [])
-    .filter(z => delta <= z.ecartThreshold)
-    .sort((a, b) => a.ecartThreshold - b.ecartThreshold)[0] || null
+    .filter(z => delta <= (parseFloat(z.ecartThreshold) || 0))
+    .sort((a, b) => (parseFloat(a.ecartThreshold) || 0) - (parseFloat(b.ecartThreshold) || 0))[0] || null
 
-  // ── Zone d'accumulation ─────────────────────────────────────────────────
+  // ── Zone d'accumulation ──────────────────────────────────────────────────
   const accZone = (plan.accZones || []).find(z => {
-    const above = delta >= (z.ecartMin ?? -Infinity)
-    const below = z.ecartMax == null || delta < z.ecartMax
-    return above && below
+    const min = z.ecartMin == null || z.ecartMin === '' ? -Infinity : parseFloat(z.ecartMin)
+    const max = z.ecartMax == null || z.ecartMax === '' ? Infinity  : parseFloat(z.ecartMax)
+    return delta >= min && delta < max
   })
 
-  const base       = forceDebt && !accZone ? (plan.baseAmount || 10) : (accZone ? accZone.amount : 0)
-  const debtInject = activeDebtZone && debt > 0 ? debt * (activeDebtZone.debtPct / 100) : 0
-  const deployAmount = base + debtInject
+  const base       = forceRecharge && !accZone ? (plan.baseAmount || 10) : (accZone ? accZone.amount : 0)
+  const rechargeInject = activeDebtZone && rechargeTotal > 0 ? rechargeTotal * ((parseFloat(activeDebtZone.debtPct) || 0) / 100) : 0
+  const deployAmount   = base + rechargeInject
 
   let label, description, zone
-  if (activeDebtZone && debtInject > 0) {
-    zone        = 'DEBT'
-    label       = `${activeDebtZone.label} — Redistribution dette`
-    description = `Prix ${Math.abs(delta).toFixed(1)}% sous le breakeven. Injecter ${base.toFixed(2)} USDT + ${debtInject.toFixed(2)} USDT de dette (${activeDebtZone.debtPct}%).`
+  if (activeDebtZone && rechargeInject > 0) {
+    zone        = 'RECHARGE'
+    label       = `${activeDebtZone.label} — Redistribution rechargement`
+    description = `Prix ${Math.abs(delta).toFixed(1)}% sous le breakeven. Injecter ${base.toFixed(2)} USDT + ${rechargeInject.toFixed(2)} USDT de rechargement (${activeDebtZone.debtPct}%).`
   } else if (accZone) {
-    const pct = plan.baseAmount > 0 ? Math.round(accZone.amount / plan.baseAmount * 100) : 100
+    const pctAmt = plan.baseAmount > 0 ? Math.round(accZone.amount / plan.baseAmount * 100) : 100
     zone        = accZone.label
-    label       = `Acheter ${pct}% — ${accZone.label}`
+    label       = `Acheter ${pctAmt}% — ${accZone.label}`
     description = delta < 0
       ? `Prix ${Math.abs(delta).toFixed(1)}% sous le breakeven. Zone optimale — déployer ${deployAmount.toFixed(2)} USDT.`
       : `Prix +${delta.toFixed(1)}% au-dessus du breakeven. Zone ${accZone.label} — déployer ${deployAmount.toFixed(2)} USDT.`
-  } else if (forceDebt) {
+  } else if (forceRecharge) {
     zone        = 'FORCE'
-    label       = 'Achat forcé — plafond de dette atteint'
-    description = `Plafond de ${plan.debtCeiling} USDT dépassé. Forçage d'achat : ${deployAmount.toFixed(2)} USDT.`
+    label       = 'Achat forcé — plafond de rechargement atteint'
+    description = `Plafond de ${plan.debtCeiling} USDT atteint. Forçage d'achat : ${deployAmount.toFixed(2)} USDT.`
   } else {
     zone        = 'HOLD'
-    label       = 'Accumuler la dette'
-    description = `Prix +${delta.toFixed(1)}% au-dessus du breakeven et hors zones actives. Aucune injection ce cycle.`
+    label       = 'Alimenter le rechargement DCA'
+    description = `Prix +${delta.toFixed(1)}% au-dessus du breakeven. Aucune injection ce cycle — rechargement en cours d'accumulation.`
   }
 
-  return { zone, action: deployAmount > 0 ? 'buy' : 'hold', deployAmount, base, debtInject, label, description, sellPct: null, delta, forceDebt, activeDebtZone }
+  return { zone, action: deployAmount > 0 ? 'buy' : 'hold', deployAmount, base, rechargeInject, label, description, sellPct: null, delta, forceRecharge, activeDebtZone }
 }
 
-/* ─── Hook React ──────────────────────────────────────────────────────────── */
+/* ─── Hook React ─────────────────────────────────────────────────────────── */
 export function useDcaStrategy(plan, currentPrice, pointedOps) {
   return useMemo(() => {
     if (!plan) return null
-    const ops           = pointedOps || []
-    const breakeven     = computeBreakeven(ops)
-    const avgPrice      = computeAvgPrice(ops)
-    const debt          = computeDebt(plan, ops)
-    const signal        = computeSignal(plan, currentPrice, breakeven, debt)
-    const buys          = ops.filter(o => o.sens === 'Achat' && o.exec)
-    const sells         = ops.filter(o => o.sens === 'Vente' && o.exec)
-    const totalInvested = buys.reduce((s, o) => s + o.usdt, 0)
-    const totalVolBought = buys.reduce((s, o) => s + (o.vol || 0), 0)
-    const totalVolSold   = sells.reduce((s, o) => s + (o.vol || 0), 0)
-    const position       = totalVolBought - totalVolSold
-    const pnlLatent      = currentPrice && position > 0 && breakeven > 0
-      ? position * (currentPrice - breakeven) : 0
-    const debtPct        = plan.debtCeiling ? Math.min(100, (debt / plan.debtCeiling) * 100) : 0
-    return { signal, breakeven, avgPrice, debt, debtPct, totalInvested, position, pnlLatent }
+    const ops         = pointedOps || []
+    const breakeven   = computeBreakeven(ops)
+    const avgPrice    = computeAvgPrice(ops)
+    const rechargement = computeRechargement(plan, ops)
+    const signal      = computeSignal(plan, currentPrice, breakeven, rechargement)
+    const buys        = ops.filter(o => o.sens === 'Achat' && o.exec)
+    const sells       = ops.filter(o => o.sens === 'Vente' && o.exec)
+    const totalInvested  = buys.reduce((s, o) => s + o.usdt, 0)
+    const volBought      = buys.reduce((s, o) => s + (o.vol || 0), 0)
+    const volSold        = sells.reduce((s, o) => s + (o.vol || 0), 0)
+    const position       = volBought - volSold
+    const pnlLatent      = currentPrice && position > 0 && breakeven > 0 ? position * (currentPrice - breakeven) : 0
+    const rechargePct    = plan.debtCeiling ? Math.min(100, (rechargement.total / plan.debtCeiling) * 100) : 0
+    return { signal, breakeven, avgPrice, rechargement, rechargePct, totalInvested, position, pnlLatent }
   }, [plan, currentPrice, pointedOps])
 }
