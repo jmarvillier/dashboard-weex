@@ -27,7 +27,6 @@ const ACTIONS = [
     desc: 'Voir, modifier et supprimer les entrées du journal',
     color: 'green',
     pill: '🔍 Gérer',
-    requiresData: true,
   },
   {
     id: 'import',
@@ -44,7 +43,6 @@ const ACTIONS = [
     desc: 'Télécharger tout le journal au format Excel',
     color: 'purple',
     pill: '📤 Exporter',
-    requiresData: true,
   },
 ]
 
@@ -205,10 +203,7 @@ export default function DataPanel({
   const [activeAction, setActiveAction] = useState(null)
 
   function handleBack() { setActiveAction(null); setDriveErr(null) }
-  function handleItemClick(item) {
-    if (item.requiresData && !repoAvailable) return
-    setActiveAction(item.id)
-  }
+  function handleItemClick(item) { setActiveAction(item.id) }
 
   if (activeAction === 'entry') {
     return (
@@ -256,17 +251,13 @@ export default function DataPanel({
 
         <div className="dp-action-grid dp-action-grid--main">
           {ACTIONS.map(item => {
-            const locked = item.requiresData && !repoAvailable
             return (
               <button
                 key={item.id}
-                className={`dp-action-card dp-action-card--${item.color}${locked ? ' dp-action-card--locked' : ''}`}
+                className={`dp-action-card dp-action-card--${item.color}`}
                 onClick={() => handleItemClick(item)}
-                title={locked ? "Importez d'abord des données." : undefined}
-                disabled={locked}
               >
                 <span className="dp-action-pill">{item.pill}</span>
-                {locked && <span className="dp-action-locked-badge">🔒 vide</span>}
                 <span className="dp-action-icon">{item.icon}</span>
                 <span className="dp-action-label">{item.label}</span>
                 <span className="dp-action-desc">{item.desc}</span>
