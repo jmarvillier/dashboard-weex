@@ -27,7 +27,7 @@ const COLUMNS = [
   { key: 6,  label: 'USDC',      type: 'number',         width: '100px' },
   { key: 7,  label: 'EUR',       type: 'number',         width: '90px'  },
   { key: 10, label: 'Volume',    type: 'number',         width: '100px' },
-  { key: 11, label: 'Notes',     type: 'text',           width: '160px' },
+  { key: 11, label: 'Notes',     type: 'text',           width: '220px' },
   { key: 12, label: 'Dashboard', type: 'select',         width: '100px',
     options: ['true', 'false'] },
 ]
@@ -162,6 +162,8 @@ function EditRow({ entry, onSave, onCancel, saving }) {
             </select>
           ) : col.type === 'datetime-local' ? (
             <input className="db-input" type="datetime-local" value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
+          ) : col.key === 11 ? (
+            <textarea className="db-input" rows={2} style={{resize:'vertical',minHeight:32,fontFamily:'inherit',fontSize:'inherit'}} value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
           ) : (
             <input className="db-input" type={col.type} step="any" value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
           )}
