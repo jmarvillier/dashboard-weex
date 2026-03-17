@@ -698,34 +698,88 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
       </div>
 
       {/* ── Zones de stratégie ────────────────────────────────────────────── */}
-      <div className="dca-card">
-        <div className="dca-card-title">
-          Zones de stratégie
-          <KpiTooltip id="dca-zones" title="Zones de stratégie" description="Accum. : cours sous le breakeven → injecter le montant USDT défini. Ralent. : cours légèrement au-dessus → injecter un montant réduit. Profit : cours au-delà du seuil → vendre le % de position défini." openId={openTip} setOpenId={setOpenTip}/>
-        </div>
-        {[...allZones].sort((a,b)=>(parseFloat(a.ecart??a.ecartThreshold??a.ecartMin??0)||0)-(parseFloat(b.ecart??b.ecartThreshold??b.ecartMin??0)||0)).map((z,i) => {
-          const ecartNum  = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
-          const isProfit  = z.type==='profit'
-          const isSlow    = z.type==='ralent'||z.type==='slow'
-          const actionVal = z.action??z.amount??z.positionPct??z.debtPct??''
-          const tp        = breakeven>0 ? breakeven*(1+ecartNum/100) : null
-          let active = false
-          if (delta!=null) active = isProfit ? delta>=ecartNum : delta<=ecartNum
-          const col = z.color||(isProfit?'#E24B4A':isSlow?'#c8a020':'#3dbf90')
-          return (
-            <div key={i} className={`dca-pal-row${active?(isProfit?' active-profit':' active-debt'):''}`}>
-              <span className="dca-zdot" style={{background:col}}/>
-              <span className="dca-pal-lbl" style={{color:TYPE_COLORS[z.type]||'var(--text2)'}}>{z.label}</span>
-              <span style={{fontSize:'.58rem',color:'var(--muted)',minWidth:36,textAlign:'center'}}>{ecartNum>=0?'+':''}{ecartNum}%</span>
-              <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
-              <span className="dca-pal-action">
-                {active?(isProfit?'✓ ':'⚡ '):''}
-                {isProfit?`${actionVal}% pos.`:`${actionVal} USDT`}
-              </span>
+      {(() => {
+        const sorted = [...allZones].sort((a,b)=>(parseFloat(a.ecart??a.ecartThreshold??a.ecartMin??0)||0)-(parseFloat(b.ecart??b.ecartThreshold??b.ecartMin??0)||0))
+        // Trouver la zone active (la plus haute dont le seuil est atteint côté achat,
+        // ou la plus basse côté profit atteint)
+        let activeIdx = -1
+        if (delta != null) {
+          // Zone active = la plus précise correspondant à delta
+          // Pour accum/ralent : la zone dont l'écart est >= delta (zone d'achat courante)
+          // Pour profit : la première zone profit déclenchée
+          const profitIdx = sorted.findIndex(z => z.type==='profit' && delta >= (parseFloat(z.ecart??z.ecartThreshold??0)||0))
+          if (profitIdx >= 0) {
+            // Prendre la dernière zone profit atteinte
+            activeIdx = sorted.reduce((best, z, i) => {
+              if (z.type==='profit' && delta >= (parseFloat(z.ecart??z.ecartThreshold??0)||0)) return i
+              return best
+            }, profitIdx)
+          } else {
+            // Zone d'achat : la plus haute dont ecart >= delta
+            activeIdx = sorted.reduce((best, z, i) => {
+              const e = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
+              if (z.type!=='profit' && delta <= e) return i
+              return best
+            }, -1)
+            // Si aucune trouvée côté achat, prendre la plus basse
+            if (activeIdx < 0) activeIdx = sorted.findIndex(z=>z.type!=='profit')
+          }
+        }
+        // Afficher : zone active + voisines immédiates (idx-1, idx, idx+1)
+        const lo   = activeIdx > 0 ? activeIdx - 1 : 0
+        const hi   = activeIdx >= 0 ? Math.min(activeIdx + 1, sorted.length - 1) : Math.min(1, sorted.length - 1)
+        const visible = new Set([lo, activeIdx >= 0 ? activeIdx : 0, hi])
+        return (
+          <div className="dca-card">
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+              <div className="dca-card-title" style={{marginBottom:0}}>
+                Zones de stratégie
+                <KpiTooltip id="dca-zones" title="Zones de stratégie" description="Accum. : cours sous le breakeven → injecter le montant USDT défini. Ralent. : cours légèrement au-dessus → injecter un montant réduit. Profit : cours au-delà du seuil → vendre le % de position défini." openId={openTip} setOpenId={setOpenTip}/>
+              </div>
+              <button
+                onClick={()=>setOpenTip(openTip==='dca-zones-expand'?null:'dca-zones-expand')}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:'.75rem',color:'var(--muted)',padding:'2px 6px',borderRadius:4,lineHeight:1}}
+                title={openTip==='dca-zones-expand'?'Réduire':'Tout afficher'}
+              >
+                {openTip==='dca-zones-expand'?'▲':'▼'}
+              </button>
             </div>
-          )
-        })}
-      </div>
+
+            {sorted.map((z, i) => {
+              const ecartNum  = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
+              const isProfit  = z.type==='profit'
+              const isSlow    = z.type==='ralent'||z.type==='slow'
+              const actionVal = z.action??z.amount??z.positionPct??z.debtPct??''
+              const tp        = breakeven>0 ? breakeven*(1+ecartNum/100) : null
+              const isActive  = i === activeIdx
+              const col       = z.color||(isProfit?'#E24B4A':isSlow?'#c8a020':'#3dbf90')
+              const isShown   = openTip==='dca-zones-expand' || visible.has(i)
+              if (!isShown) return null
+              return (
+                <div key={i} className={`dca-pal-row${isActive?(isProfit?' active-profit':' active-debt'):''}`}
+                  style={{opacity: isActive ? 1 : openTip==='dca-zones-expand' ? 0.7 : 0.55}}>
+                  <span className="dca-zdot" style={{background:col}}/>
+                  <span className="dca-pal-lbl" style={{color: isActive ? (TYPE_COLORS[z.type]||'var(--text)') : 'var(--text2)', fontWeight: isActive ? '600' : '400'}}>
+                    {z.label}
+                    {isActive && <span style={{marginLeft:6,fontSize:'.5rem',fontWeight:'400',color:'var(--muted)'}}>← position actuelle</span>}
+                  </span>
+                  <span style={{fontSize:'.58rem',color:'var(--muted)',minWidth:36,textAlign:'center'}}>{ecartNum>=0?'+':''}{ecartNum}%</span>
+                  <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
+                  <span className="dca-pal-action">
+                    {isProfit?`${actionVal}% pos.`:`${actionVal} USDT`}
+                  </span>
+                </div>
+              )
+            })}
+
+            {openTip!=='dca-zones-expand' && sorted.length > 3 && (
+              <div style={{fontSize:'.54rem',color:'var(--muted)',textAlign:'center',paddingTop:4,opacity:.6}}>
+                {sorted.length - [...visible].length} zone{sorted.length - [...visible].length > 1 ? 's' : ''} masquée{sorted.length - [...visible].length > 1 ? 's' : ''} · ▼ pour tout voir
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── Timeline ─────────────────────────────────────────────────────── */}
       <div className="dca-card">
