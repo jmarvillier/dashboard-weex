@@ -303,7 +303,15 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
         ))}
         {(!templates || templates.length === 0) && <span style={{fontSize:'.56rem',color:'var(--muted)',opacity:.6}}>Aucun template enregistré</span>}
         <button className="dca-ops-btn" style={{marginLeft:'auto',borderColor:'var(--gold)',color:'var(--gold)',fontSize:'.58rem',padding:'3px 10px'}}
-          onClick={()=>{ const name=prompt('Nom du template :'); if(name?.trim()) onSaveTpl?.(name.trim()) }}>
+          onClick={()=>{
+            const name=prompt('Nom du template :')
+            if (!name?.trim()) return
+            if (templates?.some(t=>t.name.trim().toLowerCase()===name.trim().toLowerCase())) {
+              alert(`Un template "${name}" existe déjà. Choisissez un autre nom.`)
+              return
+            }
+            onSaveTpl?.(name.trim())
+          }}>
           ✦ Sauvegarder template
         </button>
       </div>
@@ -741,6 +749,11 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   async function deleteTemplate(id) { await deleteDcaTemplate(id); setTemplates(t=>t.filter(x=>x.id!==id)) }
 
   async function saveTemplate(name) {
+    // Empêcher les doublons de nom
+    if (templates.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase())) {
+      alert(`Un template nommé "${name}" existe déjà. Choisissez un autre nom.`)
+      return
+    }
     const p = wizard.params || {}
     const tpl = { name, baseAmount: p.baseAmount??10, frequency: p.frequency??'day', zones: p.zones||DEFAULT_ZONES }
     const id = await saveDcaTemplate(tpl)
