@@ -221,20 +221,6 @@ function Step2({ wizard, setWizard, rawRows, onNext, onBack, onFlagOps }) {
       <div className="dca-btm"><button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button><button className="dca-btn dca-btn-primary" onClick={onNext}>Paramétrer →</button></div>
     </div>
   )
-  async function saveTpl() {
-    const name = tplName.trim()
-    if (!name) return
-    if (templates?.some(t => t.name.trim().toLowerCase() === name.toLowerCase())) {
-      setTplError(`"${name}" existe déjà`)
-      return
-    }
-    setTplSaving(true)
-    await onSaveTpl?.(name)
-    setTplName('')
-    setTplError('')
-    setTplSaving(false)
-  }
-
   return (
     <div className="dca-scroll">
       <div style={{fontSize:'.58rem',color:'var(--muted)',paddingBottom:4}}><button className="dca-back-btn" style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'inherit',fontFamily:'inherit'}} onClick={onBack}>← Plans DCA</button></div>
@@ -311,6 +297,20 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
     const count = zones.filter(z=>z.type===type).length
     // Nouvelle zone ajoutée en bas, sans tri immédiat
     setP('zones', [...zones, { type, label:`${TYPE_LABELS[type]} ${count+1}`, ...defs[type] }])
+  }
+
+  async function saveTpl() {
+    const name = tplName.trim()
+    if (!name) return
+    if (templates?.some(t => t.name.trim().toLowerCase() === name.toLowerCase())) {
+      setTplError(`"${name}" existe déjà`)
+      return
+    }
+    setTplSaving(true)
+    await onSaveTpl?.(name)
+    setTplName('')
+    setTplError('')
+    setTplSaving(false)
   }
 
   return (
