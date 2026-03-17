@@ -58,10 +58,12 @@ export function computeRechargement(plan, pointedOps) {
   const start      = getEffectiveStart(plan, pointedOps)
   if (!start) return { total: 0, missed: 0 }
 
-  const now          = new Date()
-  const totalPeriods = Math.max(0, Math.floor((now.getTime() - start.getTime()) / ms))
-  let solde          = 0
-  let missedPeriods  = 0
+  const now = new Date()
+  // +1 pour inclure la période en cours — ainsi un achat aujourd'hui
+  // réduit immédiatement le solde, et une vente (hors DCA) n'a pas d'effet
+  const totalPeriods = Math.max(1, Math.floor((now.getTime() - start.getTime()) / ms) + 1)
+  let solde         = 0
+  let missedPeriods = 0
 
   for (let i = 0; i < totalPeriods; i++) {
     const pStart = new Date(start.getTime() + i * ms)
@@ -69,7 +71,7 @@ export function computeRechargement(plan, pointedOps) {
     const injected = pointedOps
       .filter(o => o.sens === 'Achat' && o.exec && o.date && o.date >= pStart && o.date < pEnd)
       .reduce((s, o) => s + (o.usdt || 0), 0)
-    solde += baseAmount - injected           // peut être négatif
+    solde += baseAmount - injected  // négatif si sur-investi ce cycle
     if (injected === 0) missedPeriods++
   }
 

@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../lib/dcaRepository.js'
 import { saveSnapshot, loadSnapshot } from '../lib/repository.js'
+import { normPair } from '../lib/parser.js'
 import EntryForm from './EntryForm.jsx'
 import KpiTooltip from './KpiTooltip.jsx'
 import {
@@ -285,9 +286,11 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
 
   function updateZone(i, field, val) { const nz=[...zones]; nz[i]={...nz[i],[field]:val}; setP('zones',nz) }
   function removeZone(i) { if(zones.length<=1) return; setP('zones',zones.filter((_,j)=>j!==i)) }
+  function sortZones() { setP('zones', [...zones].sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0))) }
   function addZone(type) {
     const defs = { accum:{ecart:'0',action:'10',color:'#3dbf90'}, ralent:{ecart:'10',action:'5',color:'#c8a020'}, profit:{ecart:'25',action:'25',color:'#E24B4A'} }
     const count = zones.filter(z=>z.type===type).length
+    // Nouvelle zone ajoutée en bas, sans tri immédiat
     setP('zones', [...zones, { type, label:`${TYPE_LABELS[type]} ${count+1}`, ...defs[type] }])
   }
 
@@ -370,13 +373,13 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
             </tr>
           </thead>
           <tbody>
-            {[...zones].sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0)).map((z,i) => {
-              const ecartNum   = parseFloat(z.ecart)||0
-              const isProfit   = z.type==='profit'
+            {zones.map((z,i) => {
+              const ecartNum    = parseFloat(z.ecart)||0
+              const isProfit    = z.type==='profit'
               const targetPrice = breakeven>0 ? breakeven*(1+ecartNum/100) : null
-              const unitLabel  = isProfit ? '%' : 'USDT'
-              const sign       = ecartNum>=0 ? '+' : ''
-              const typeColor  = TYPE_COLORS[z.type] || 'var(--text)'
+              const unitLabel   = isProfit ? '%' : 'USDT'
+              const sign        = ecartNum>=0 ? '+' : ''
+              const typeColor   = TYPE_COLORS[z.type] || 'var(--text)'
               return (
                 <tr key={i}>
                   <td><span className="dca-zdot" style={{background:z.color||'var(--muted)'}}/></td>
@@ -394,7 +397,10 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
                   <td><input className="dca-pi" value={z.label||''} style={{width:90}} onChange={e=>updateZone(i,'label',e.target.value)}/></td>
                   <td>
                     <div className="dca-pi-group">
-                      <input className="dca-pi" type="number" step="any" value={z.ecart??''} style={{width:60}} onChange={e=>updateZone(i,'ecart',e.target.value)} placeholder={isProfit?'+20':'-10'}/>
+                      <input className="dca-pi" type="number" step="any" value={z.ecart??''} style={{width:60}}
+                        onChange={e=>updateZone(i,'ecart',e.target.value)}
+                        onBlur={sortZones}
+                        placeholder={isProfit?'+20':'-10'}/>
                       <span className="dca-pi-sfx">%</span>
                     </div>
                   </td>
@@ -597,37 +603,53 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
       {/* ── Signal ────────────────────────────────────────────────────────── */}
       <div className={`dca-signal ${signalClass()}`}>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
-          <div>
+        {/* Ligne principale : label + montant */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:0}}>
             <div className="dca-signal-title">{signal.label}</div>
-            <div className="dca-signal-desc" style={{marginTop:4}}>{signal.description}</div>
           </div>
-          <div className="dca-signal-amount" style={{textAlign:'right',flexShrink:0}}>
-            {signal.action==='sell'?(<>
-              <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
-              <div className="dca-signal-amt-lbl">de la position</div>
-            </>):(<>
-              <div className="dca-signal-amt">{signal.deployAmount>0?`${signal.deployAmount.toFixed(2)} USDT`:'—'}</div>
-              <div className="dca-signal-amt-lbl">{signal.deployAmount>0?`à investir · cycle du ${cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}`:'aucune action ce cycle'}</div>
-            </>)}
+          <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0,flexWrap:'wrap'}}>
+            {/* Cycle stats inline */}
+            <div style={{display:'flex',gap:12,fontSize:'.6rem',opacity:.85}}>
+              {cyclePeriod.totalBought>0 && <span><span style={{opacity:.7}}>Achats : </span><b>${cyclePeriod.totalBought.toFixed(0)}</b></span>}
+              {cyclePeriod.totalSold>0   && <span><span style={{opacity:.7}}>Ventes : </span><b>${cyclePeriod.totalSold.toFixed(0)}</b></span>}
+              {signal.deployAmount>0&&signal.action!=='sell' && <span><span style={{opacity:.7}}>Reste : </span><b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(0)}</b></span>}
+            </div>
+            {/* Montant + bouton */}
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              {signal.action==='sell' ? (
+                <div className="dca-signal-amount" style={{textAlign:'right'}}>
+                  <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
+                  <div className="dca-signal-amt-lbl">de la position</div>
+                </div>
+              ) : signal.deployAmount>0 ? (
+                <div className="dca-signal-amount" style={{textAlign:'right'}}>
+                  <div className="dca-signal-amt">{signal.deployAmount.toFixed(2)} USDT</div>
+                  <div className="dca-signal-amt-lbl">cycle du {cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}</div>
+                </div>
+              ) : null}
+              {signal.action!=='sell' && (
+                <button className="dca-btn dca-btn-primary" style={{fontSize:'.6rem',padding:'5px 12px',whiteSpace:'nowrap'}} onClick={()=>setShowEntry(true)}>+ Journal</button>
+              )}
+            </div>
           </div>
-        </div>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:10,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.08)',flexWrap:'wrap',gap:8}}>
-          <div style={{display:'flex',gap:16,fontSize:'.6rem',flexWrap:'wrap'}}>
-            <span><span style={{opacity:.7}}>Achats ce {freqLabel} : </span><b>{cyclePeriod.totalBought>0?`$${cyclePeriod.totalBought.toFixed(2)}`:'—'}</b></span>
-            <span><span style={{opacity:.7}}>Ventes : </span><b>{cyclePeriod.totalSold>0?`$${cyclePeriod.totalSold.toFixed(2)}`:'—'}</b></span>
-            {signal.deployAmount>0&&signal.action!=='sell'&&<span><span style={{opacity:.7}}>Reste : </span><b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(2)}</b></span>}
-          </div>
-          {signal.action!=='sell' && (
-            <button className="dca-btn dca-btn-primary" style={{fontSize:'.6rem',padding:'5px 12px',whiteSpace:'nowrap'}} onClick={()=>setShowEntry(true)}>+ Ajouter au journal</button>
-          )}
         </div>
       </div>
 
-      {/* ── KPIs ──────────────────────────────────────────────────────────── */}
+      {/* ── KPIs : PnL latent | Total investi | Total réalisé | Solde rechargement ── */}
       <div className="dca-kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
 
-        {/* Investi + prix moyen d'achat */}
+        {/* 1. PnL latent */}
+        <div className="dca-kpi">
+          <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
+          <div className="dca-kpi-lbl">
+            PnL latent
+            <KpiTooltip id="dca-pnl" title="PnL latent" description="Gain ou perte non réalisée sur la position ouverte, calculée par rapport au breakeven." formula="Position × (cours actuel − breakeven)" openId={openTip} setOpenId={setOpenTip}/>
+          </div>
+          <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
+        </div>
+
+        {/* 2. Total investi + prix moyen d'achat */}
         <div className="dca-kpi">
           <div className="dca-kpi-val">{totalInvested>0?`$${totalInvested.toFixed(0)}`:'—'}</div>
           <div className="dca-kpi-lbl">
@@ -646,21 +668,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           )}
         </div>
 
-        {/* Solde rechargement */}
-        <div className="dca-kpi">
-          <div className="dca-kpi-val" style={{color:rechargement.total>0?'var(--gold)':rechargement.total<0?'var(--green)':'var(--muted)'}}>
-            {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
-          </div>
-          <div className="dca-kpi-lbl">
-            Solde rechargement
-            <KpiTooltip id="dca-rech" title="Solde de rechargement" description={`Cumul cycle par cycle de la différence entre le montant de base (${plan.baseAmount} USDT) et le montant réellement injecté. Positif = capital à redéployer. Négatif = sur-investissement.`} formula={`Σ (${plan.baseAmount} USDT − injecté) par cycle`} openId={openTip} setOpenId={setOpenTip}/>
-          </div>
-          <div className="dca-kpi-sub">
-            {rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}
-          </div>
-        </div>
-
-        {/* Total réalisé + prix moyen de vente */}
+        {/* 3. Total réalisé + prix moyen de vente */}
         <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:totalSold>0?'var(--green)':'var(--muted)'}}>{totalSold>0?`$${totalSold.toFixed(0)}`:'—'}</div>
           <div className="dca-kpi-lbl">
@@ -679,47 +687,105 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           )}
         </div>
 
-        {/* PnL latent */}
+        {/* 4. Solde rechargement */}
         <div className="dca-kpi">
-          <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
-          <div className="dca-kpi-lbl">
-            PnL latent
-            <KpiTooltip id="dca-pnl" title="PnL latent" description="Gain ou perte non réalisée sur la position ouverte, calculée par rapport au breakeven." formula="Position × (cours actuel − breakeven)" openId={openTip} setOpenId={setOpenTip}/>
+          <div className="dca-kpi-val" style={{color:rechargement.total>0?'var(--gold)':rechargement.total<0?'var(--green)':'var(--muted)'}}>
+            {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
           </div>
-          <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
+          <div className="dca-kpi-lbl">
+            Solde rechargement
+            <KpiTooltip id="dca-rech" title="Solde de rechargement" description={`Cumul cycle par cycle de la différence entre le montant de base (${plan.baseAmount} USDT) et le montant réellement injecté. Positif = capital à redéployer. Négatif = sur-investissement.`} formula={`Σ (${plan.baseAmount} USDT − injecté) par cycle`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
+          <div className="dca-kpi-sub">
+            {rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}
+          </div>
         </div>
 
       </div>
 
       {/* ── Zones de stratégie ────────────────────────────────────────────── */}
-      <div className="dca-card">
-        <div className="dca-card-title">
-          Zones de stratégie
-          <KpiTooltip id="dca-zones" title="Zones de stratégie" description="Accum. : cours sous le breakeven → injecter le montant USDT défini. Ralent. : cours légèrement au-dessus → injecter un montant réduit. Profit : cours au-delà du seuil → vendre le % de position défini." openId={openTip} setOpenId={setOpenTip}/>
-        </div>
-        {[...allZones].sort((a,b)=>(parseFloat(a.ecart??a.ecartThreshold??a.ecartMin??0)||0)-(parseFloat(b.ecart??b.ecartThreshold??b.ecartMin??0)||0)).map((z,i) => {
-          const ecartNum  = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
-          const isProfit  = z.type==='profit'
-          const isSlow    = z.type==='ralent'||z.type==='slow'
-          const actionVal = z.action??z.amount??z.positionPct??z.debtPct??''
-          const tp        = breakeven>0 ? breakeven*(1+ecartNum/100) : null
-          let active = false
-          if (delta!=null) active = isProfit ? delta>=ecartNum : delta<=ecartNum
-          const col = z.color||(isProfit?'#E24B4A':isSlow?'#c8a020':'#3dbf90')
-          return (
-            <div key={i} className={`dca-pal-row${active?(isProfit?' active-profit':' active-debt'):''}`}>
-              <span className="dca-zdot" style={{background:col}}/>
-              <span className="dca-pal-lbl" style={{color:TYPE_COLORS[z.type]||'var(--text2)'}}>{z.label}</span>
-              <span style={{fontSize:'.58rem',color:'var(--muted)',minWidth:36,textAlign:'center'}}>{ecartNum>=0?'+':''}{ecartNum}%</span>
-              <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
-              <span className="dca-pal-action">
-                {active?(isProfit?'✓ ':'⚡ '):''}
-                {isProfit?`${actionVal}% pos.`:`${actionVal} USDT`}
-              </span>
+      {(() => {
+        const sorted = [...allZones].sort((a,b)=>(parseFloat(a.ecart??a.ecartThreshold??a.ecartMin??0)||0)-(parseFloat(b.ecart??b.ecartThreshold??b.ecartMin??0)||0))
+        // Trouver la zone active (la plus haute dont le seuil est atteint côté achat,
+        // ou la plus basse côté profit atteint)
+        let activeIdx = -1
+        if (delta != null) {
+          // Zone active = la plus précise correspondant à delta
+          // Pour accum/ralent : la zone dont l'écart est >= delta (zone d'achat courante)
+          // Pour profit : la première zone profit déclenchée
+          const profitIdx = sorted.findIndex(z => z.type==='profit' && delta >= (parseFloat(z.ecart??z.ecartThreshold??0)||0))
+          if (profitIdx >= 0) {
+            // Prendre la dernière zone profit atteinte
+            activeIdx = sorted.reduce((best, z, i) => {
+              if (z.type==='profit' && delta >= (parseFloat(z.ecart??z.ecartThreshold??0)||0)) return i
+              return best
+            }, profitIdx)
+          } else {
+            // Zone d'achat : la plus haute dont ecart >= delta
+            activeIdx = sorted.reduce((best, z, i) => {
+              const e = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
+              if (z.type!=='profit' && delta <= e) return i
+              return best
+            }, -1)
+            // Si aucune trouvée côté achat, prendre la plus basse
+            if (activeIdx < 0) activeIdx = sorted.findIndex(z=>z.type!=='profit')
+          }
+        }
+        // Afficher : zone active + voisines immédiates (idx-1, idx, idx+1)
+        const lo   = activeIdx > 0 ? activeIdx - 1 : 0
+        const hi   = activeIdx >= 0 ? Math.min(activeIdx + 1, sorted.length - 1) : Math.min(1, sorted.length - 1)
+        const visible = new Set([lo, activeIdx >= 0 ? activeIdx : 0, hi])
+        return (
+          <div className="dca-card">
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+              <div className="dca-card-title" style={{marginBottom:0}}>
+                Zones de stratégie
+                <KpiTooltip id="dca-zones" title="Zones de stratégie" description="Accum. : cours sous le breakeven → injecter le montant USDT défini. Ralent. : cours légèrement au-dessus → injecter un montant réduit. Profit : cours au-delà du seuil → vendre le % de position défini." openId={openTip} setOpenId={setOpenTip}/>
+              </div>
+              <button
+                onClick={()=>setOpenTip(openTip==='dca-zones-expand'?null:'dca-zones-expand')}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:'.75rem',color:'var(--muted)',padding:'2px 6px',borderRadius:4,lineHeight:1}}
+                title={openTip==='dca-zones-expand'?'Réduire':'Tout afficher'}
+              >
+                {openTip==='dca-zones-expand'?'▲':'▼'}
+              </button>
             </div>
-          )
-        })}
-      </div>
+
+            {sorted.map((z, i) => {
+              const ecartNum  = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
+              const isProfit  = z.type==='profit'
+              const isSlow    = z.type==='ralent'||z.type==='slow'
+              const actionVal = z.action??z.amount??z.positionPct??z.debtPct??''
+              const tp        = breakeven>0 ? breakeven*(1+ecartNum/100) : null
+              const isActive  = i === activeIdx
+              const col       = z.color||(isProfit?'#E24B4A':isSlow?'#c8a020':'#3dbf90')
+              const isShown   = openTip==='dca-zones-expand' || visible.has(i)
+              if (!isShown) return null
+              return (
+                <div key={i} className={`dca-pal-row${isActive?(isProfit?' active-profit':' active-debt'):''}`}
+                  style={{opacity: isActive ? 1 : openTip==='dca-zones-expand' ? 0.7 : 0.55}}>
+                  <span className="dca-zdot" style={{background:col}}/>
+                  <span className="dca-pal-lbl" style={{color: isActive ? (TYPE_COLORS[z.type]||'var(--text)') : 'var(--text2)', fontWeight: isActive ? '600' : '400'}}>
+                    {z.label}
+                    {isActive && <span style={{marginLeft:6,fontSize:'.5rem',fontWeight:'400',color:'var(--muted)'}}>← position actuelle</span>}
+                  </span>
+                  <span style={{fontSize:'.58rem',color:'var(--muted)',minWidth:36,textAlign:'center'}}>{ecartNum>=0?'+':''}{ecartNum}%</span>
+                  <span className="dca-pal-price">{tp?fmt(tp):'—'}</span>
+                  <span className="dca-pal-action">
+                    {isProfit?`${actionVal}% pos.`:`${actionVal} USDT`}
+                  </span>
+                </div>
+              )
+            })}
+
+            {openTip!=='dca-zones-expand' && sorted.length > 3 && (
+              <div style={{fontSize:'.54rem',color:'var(--muted)',textAlign:'center',paddingTop:4,opacity:.6}}>
+                {sorted.length - [...visible].length} zone{sorted.length - [...visible].length > 1 ? 's' : ''} masquée{sorted.length - [...visible].length > 1 ? 's' : ''} · ▼ pour tout voir
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── Timeline ─────────────────────────────────────────────────────── */}
       <div className="dca-card">
@@ -851,13 +917,14 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
         const op        = ops[i]
         const isPointed = pointed.includes(getOpKey(op, i))
 
-        // Trouver la ligne dans le snapshot (correspondance date + paire + montant)
+        // Trouver la ligne dans le snapshot (correspondance paire normalisée + date + montant)
         const rowIdx = rows.findIndex((r, ri) => {
           if (ri === 0) return false                          // skip header
           if (!r[1]) return false
-          const pairMatch = String(r[1]||'').trim() === op.pair
+          // Normaliser la paire stockée comme le fait extractRawRows
+          const pairMatch = normPair(String(r[1]||'').trim()) === op.pair
           if (!pairMatch) return false
-          // Date : tolérance ±1 jour
+          // Date : tolérance ±1.5 jour (décalages de fuseau horaire)
           const snapDate = r[0] ? new Date(String(r[0])) : null
           const dateMatch = snapDate && op.date &&
             Math.abs(snapDate.getTime() - op.date.getTime()) < 86400000 * 1.5
