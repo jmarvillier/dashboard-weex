@@ -603,37 +603,53 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
       {/* ── Signal ────────────────────────────────────────────────────────── */}
       <div className={`dca-signal ${signalClass()}`}>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
-          <div>
+        {/* Ligne principale : label + montant */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:0}}>
             <div className="dca-signal-title">{signal.label}</div>
-            <div className="dca-signal-desc" style={{marginTop:4}}>{signal.description}</div>
           </div>
-          <div className="dca-signal-amount" style={{textAlign:'right',flexShrink:0}}>
-            {signal.action==='sell'?(<>
-              <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
-              <div className="dca-signal-amt-lbl">de la position</div>
-            </>):(<>
-              <div className="dca-signal-amt">{signal.deployAmount>0?`${signal.deployAmount.toFixed(2)} USDT`:'—'}</div>
-              <div className="dca-signal-amt-lbl">{signal.deployAmount>0?`à investir · cycle du ${cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}`:'aucune action ce cycle'}</div>
-            </>)}
+          <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0,flexWrap:'wrap'}}>
+            {/* Cycle stats inline */}
+            <div style={{display:'flex',gap:12,fontSize:'.6rem',opacity:.85}}>
+              {cyclePeriod.totalBought>0 && <span><span style={{opacity:.7}}>Achats : </span><b>${cyclePeriod.totalBought.toFixed(0)}</b></span>}
+              {cyclePeriod.totalSold>0   && <span><span style={{opacity:.7}}>Ventes : </span><b>${cyclePeriod.totalSold.toFixed(0)}</b></span>}
+              {signal.deployAmount>0&&signal.action!=='sell' && <span><span style={{opacity:.7}}>Reste : </span><b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(0)}</b></span>}
+            </div>
+            {/* Montant + bouton */}
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              {signal.action==='sell' ? (
+                <div className="dca-signal-amount" style={{textAlign:'right'}}>
+                  <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
+                  <div className="dca-signal-amt-lbl">de la position</div>
+                </div>
+              ) : signal.deployAmount>0 ? (
+                <div className="dca-signal-amount" style={{textAlign:'right'}}>
+                  <div className="dca-signal-amt">{signal.deployAmount.toFixed(2)} USDT</div>
+                  <div className="dca-signal-amt-lbl">cycle du {cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}</div>
+                </div>
+              ) : null}
+              {signal.action!=='sell' && (
+                <button className="dca-btn dca-btn-primary" style={{fontSize:'.6rem',padding:'5px 12px',whiteSpace:'nowrap'}} onClick={()=>setShowEntry(true)}>+ Journal</button>
+              )}
+            </div>
           </div>
-        </div>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:10,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.08)',flexWrap:'wrap',gap:8}}>
-          <div style={{display:'flex',gap:16,fontSize:'.6rem',flexWrap:'wrap'}}>
-            <span><span style={{opacity:.7}}>Achats ce {freqLabel} : </span><b>{cyclePeriod.totalBought>0?`$${cyclePeriod.totalBought.toFixed(2)}`:'—'}</b></span>
-            <span><span style={{opacity:.7}}>Ventes : </span><b>{cyclePeriod.totalSold>0?`$${cyclePeriod.totalSold.toFixed(2)}`:'—'}</b></span>
-            {signal.deployAmount>0&&signal.action!=='sell'&&<span><span style={{opacity:.7}}>Reste : </span><b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(2)}</b></span>}
-          </div>
-          {signal.action!=='sell' && (
-            <button className="dca-btn dca-btn-primary" style={{fontSize:'.6rem',padding:'5px 12px',whiteSpace:'nowrap'}} onClick={()=>setShowEntry(true)}>+ Ajouter au journal</button>
-          )}
         </div>
       </div>
 
-      {/* ── KPIs ──────────────────────────────────────────────────────────── */}
+      {/* ── KPIs : PnL latent | Total investi | Total réalisé | Solde rechargement ── */}
       <div className="dca-kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
 
-        {/* Investi + prix moyen d'achat */}
+        {/* 1. PnL latent */}
+        <div className="dca-kpi">
+          <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
+          <div className="dca-kpi-lbl">
+            PnL latent
+            <KpiTooltip id="dca-pnl" title="PnL latent" description="Gain ou perte non réalisée sur la position ouverte, calculée par rapport au breakeven." formula="Position × (cours actuel − breakeven)" openId={openTip} setOpenId={setOpenTip}/>
+          </div>
+          <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
+        </div>
+
+        {/* 2. Total investi + prix moyen d'achat */}
         <div className="dca-kpi">
           <div className="dca-kpi-val">{totalInvested>0?`$${totalInvested.toFixed(0)}`:'—'}</div>
           <div className="dca-kpi-lbl">
@@ -652,21 +668,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           )}
         </div>
 
-        {/* Solde rechargement */}
-        <div className="dca-kpi">
-          <div className="dca-kpi-val" style={{color:rechargement.total>0?'var(--gold)':rechargement.total<0?'var(--green)':'var(--muted)'}}>
-            {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
-          </div>
-          <div className="dca-kpi-lbl">
-            Solde rechargement
-            <KpiTooltip id="dca-rech" title="Solde de rechargement" description={`Cumul cycle par cycle de la différence entre le montant de base (${plan.baseAmount} USDT) et le montant réellement injecté. Positif = capital à redéployer. Négatif = sur-investissement.`} formula={`Σ (${plan.baseAmount} USDT − injecté) par cycle`} openId={openTip} setOpenId={setOpenTip}/>
-          </div>
-          <div className="dca-kpi-sub">
-            {rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}
-          </div>
-        </div>
-
-        {/* Total réalisé + prix moyen de vente */}
+        {/* 3. Total réalisé + prix moyen de vente */}
         <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:totalSold>0?'var(--green)':'var(--muted)'}}>{totalSold>0?`$${totalSold.toFixed(0)}`:'—'}</div>
           <div className="dca-kpi-lbl">
@@ -685,14 +687,18 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           )}
         </div>
 
-        {/* PnL latent */}
+        {/* 4. Solde rechargement */}
         <div className="dca-kpi">
-          <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
-          <div className="dca-kpi-lbl">
-            PnL latent
-            <KpiTooltip id="dca-pnl" title="PnL latent" description="Gain ou perte non réalisée sur la position ouverte, calculée par rapport au breakeven." formula="Position × (cours actuel − breakeven)" openId={openTip} setOpenId={setOpenTip}/>
+          <div className="dca-kpi-val" style={{color:rechargement.total>0?'var(--gold)':rechargement.total<0?'var(--green)':'var(--muted)'}}>
+            {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
           </div>
-          <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
+          <div className="dca-kpi-lbl">
+            Solde rechargement
+            <KpiTooltip id="dca-rech" title="Solde de rechargement" description={`Cumul cycle par cycle de la différence entre le montant de base (${plan.baseAmount} USDT) et le montant réellement injecté. Positif = capital à redéployer. Négatif = sur-investissement.`} formula={`Σ (${plan.baseAmount} USDT − injecté) par cycle`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
+          <div className="dca-kpi-sub">
+            {rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}
+          </div>
         </div>
 
       </div>
