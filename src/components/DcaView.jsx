@@ -5,8 +5,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../lib/dcaRepository.js'
-import { updateRow, loadSnapshot } from '../lib/repository.js'
+import { saveSnapshot, loadSnapshot } from '../lib/repository.js'
 import EntryForm from './EntryForm.jsx'
+import KpiTooltip from './KpiTooltip.jsx'
 import {
   computeBreakeven, computeAvgPrice, computeRechargement,
   computeSignal, generateTimeline, getCurrentPeriodOps,
@@ -303,7 +304,15 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
         ))}
         {(!templates || templates.length === 0) && <span style={{fontSize:'.56rem',color:'var(--muted)',opacity:.6}}>Aucun template enregistré</span>}
         <button className="dca-ops-btn" style={{marginLeft:'auto',borderColor:'var(--gold)',color:'var(--gold)',fontSize:'.58rem',padding:'3px 10px'}}
-          onClick={()=>{ const name=prompt('Nom du template :'); if(name?.trim()) onSaveTpl?.(name.trim()) }}>
+          onClick={()=>{
+            const name=prompt('Nom du template :')
+            if (!name?.trim()) return
+            if (templates?.some(t=>t.name.trim().toLowerCase()===name.trim().toLowerCase())) {
+              alert(`Un template "${name}" existe déjà. Choisissez un autre nom.`)
+              return
+            }
+            onSaveTpl?.(name.trim())
+          }}>
           ✦ Sauvegarder template
         </button>
       </div>
@@ -333,7 +342,6 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
         <div className="dca-form-row">
           <div className="dca-form-group"><label>Montant de base *</label><div className="dca-input-group"><input className="dca-input" type="number" value={p.baseAmount??10} onChange={e=>setP('baseAmount',parseFloat(e.target.value)||0)}/><span className="dca-input-sfx">USDT</span></div></div>
           <div className="dca-form-group"><label>Fréquence *</label><select className="dca-select" value={p.frequency||'day'} onChange={e=>setP('frequency',e.target.value)}><option value="day">Tous les jours</option><option value="week">Toutes les semaines</option><option value="month">Tous les mois</option></select></div>
-          <div className="dca-form-group"><label>Seuil bull run <span className="dca-tag dca-tag-opt">opt.</span></label><div className="dca-input-group"><input className="dca-input" type="number" value={p.bullThreshold??20} onChange={e=>setP('bullThreshold',parseFloat(e.target.value)||null)}/><span className="dca-input-sfx">%</span></div></div>
         </div>
         {breakeven>0 && <div style={{fontSize:'.6rem',color:'var(--muted)',marginTop:2}}>Breakeven : <b style={{color:'var(--gold)'}}>{fmt(breakeven)}</b> — référence des prix cibles</div>}
       </div>
@@ -362,7 +370,7 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
             </tr>
           </thead>
           <tbody>
-            {zones.map((z,i) => {
+            {[...zones].sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0)).map((z,i) => {
               const ecartNum   = parseFloat(z.ecart)||0
               const isProfit   = z.type==='profit'
               const targetPrice = breakeven>0 ? breakeven*(1+ecartNum/100) : null
@@ -436,6 +444,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
   const [showEntry,   setShowEntry]   = useState(false)
   const [savedMsg,    setSavedMsg]    = useState('')
   const [manualPrice, setManualPrice] = useState('')
+  const [openTip,     setOpenTip]     = useState(null)
 
   const effectivePair = plan.pair || ''
   const freqLabel     = PERIOD_LABEL[plan.frequency||'day'] || 'jour'
@@ -455,17 +464,24 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
     pointed.includes(getOpKey(op,i)) || (op.notes && op.notes.includes('[DCA]'))
   ), [ops, pointed])
 
-  const breakeven    = computeBreakeven(pointedOps)
-  const rechargement = computeRechargement(plan, pointedOps)
+  const breakeven    = useMemo(() => computeBreakeven(pointedOps),        [pointedOps])
+  const rechargement = useMemo(() => computeRechargement(plan, pointedOps), [plan, pointedOps])
 
   const currentPrice = prices[effectivePair] || (manualPrice ? parseFloat(manualPrice) : null)
   const signal       = useMemo(() => computeSignal(plan, currentPrice, breakeven, rechargement), [plan, currentPrice, breakeven, rechargement])
   const delta        = currentPrice && breakeven ? (currentPrice-breakeven)/breakeven*100 : null
 
-  const buys          = pointedOps.filter(o=>o.sens==='Achat')
-  const sells         = pointedOps.filter(o=>o.sens==='Vente')
-  const totalInvested = buys.reduce((s,o)=>s+o.usdt,0)
-  const position      = buys.reduce((s,o)=>s+(o.vol||0),0) - sells.reduce((s,o)=>s+(o.vol||0),0)
+  const buys          = useMemo(() => pointedOps.filter(o=>o.sens==='Achat' && o.exec), [pointedOps])
+  const sells         = useMemo(() => pointedOps.filter(o=>o.sens==='Vente' && o.exec), [pointedOps])
+  const totalInvested = useMemo(() => buys.reduce((s,o)=>s+o.usdt,0),  [buys])
+  const totalSold     = useMemo(() => sells.reduce((s,o)=>s+o.usdt,0), [sells])
+  const avgBuyPrice   = useMemo(() => computeAvgPrice(pointedOps), [pointedOps])
+  const avgSellPrice  = useMemo(() => {
+    const vol = sells.reduce((s,o)=>s+(o.vol||0),0)
+    return vol > 0 ? totalSold / vol : 0
+  }, [sells, totalSold])
+  const totalVolSold  = useMemo(() => sells.reduce((s,o)=>s+(o.vol||0),0), [sells])
+  const position      = buys.reduce((s,o)=>s+(o.vol||0),0) - totalVolSold
   const pnlLatent     = currentPrice && position>0 && breakeven>0 ? position*(currentPrice-breakeven) : 0
 
   const cyclePeriod  = getCurrentPeriodOps(plan, pointedOps)
@@ -484,7 +500,12 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
     return days
   }, [timeline])
 
-  const bull=plan.bullThreshold||20, MIN_D=-25, MAX_D=bull*1.5
+  // Seuil bull run = écart de la 1ère zone profit
+  const bull = useMemo(() => {
+    const profitEcarts = allZones.filter(z=>z.type==='profit').map(z=>parseFloat(z.ecart)||0)
+    return profitEcarts.length > 0 ? Math.min(...profitEcarts) : 25
+  }, [allZones])
+  const MIN_D=-25, MAX_D=bull*1.5
   const needlePct=delta!=null?Math.min(98,Math.max(2,(delta-MIN_D)/(MAX_D-MIN_D)*100)):50
 
   function signalClass() {
@@ -535,7 +556,10 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
         <div className="dca-hero-prices">
           <div className="dca-hero-block">
-            <div className="dca-hero-lbl">Breakeven</div>
+            <div className="dca-hero-lbl">
+              Breakeven
+              <KpiTooltip id="dca-be" title="Breakeven" description="Coût de revient net : prix auquel la position est à l'équilibre après toutes les ventes partielles." formula="(Σ achats − Σ recettes ventes) / volume net" openId={openTip} setOpenId={setOpenTip}/>
+            </div>
             <div className="dca-hero-val dca-hero-val-main">{breakeven>0?fmt(breakeven):'—'}</div>
             <div className="dca-hero-sub">coût de revient net</div>
           </div>
@@ -567,7 +591,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
             <div className="dca-zone-seg z0">Vente</div>
             <div className="dca-zone-needle" style={{left:`${needlePct}%`}}/>
           </div>
-          <div className="dca-zone-labels"><span>&lt; 0%</span><span>0–5%</span><span>5–10%</span><span>10–{bull}%</span><span>&gt; {bull}%</span></div>
+          <div className="dca-zone-labels"><span>&lt; 0%</span><span>0–5%</span><span>5–10%</span><span>10–{bull}%</span><span>&gt; {bull}% profit</span></div>
         </div>
       </div>
 
@@ -601,30 +625,79 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
       </div>
 
       {/* ── KPIs ──────────────────────────────────────────────────────────── */}
-      <div className="dca-kpi-grid">
+      <div className="dca-kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+
+        {/* Investi + prix moyen d'achat */}
         <div className="dca-kpi">
-          <div className="dca-kpi-val">{totalInvested>0?fmt(totalInvested,2):'—'}</div>
-          <div className="dca-kpi-lbl">Total investi</div>
-          <div className="dca-kpi-sub">{buys.length} opérations pointées</div>
+          <div className="dca-kpi-val">{totalInvested>0?`$${totalInvested.toFixed(0)}`:'—'}</div>
+          <div className="dca-kpi-lbl">
+            Total investi
+            <KpiTooltip id="dca-invested" title="Total investi" description="Somme de tous les achats exécutés pointés dans ce plan DCA." formula={`Σ montants USDT des ${buys.length} achats`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
+          <div className="dca-kpi-sub">{buys.length} achats pointés</div>
+          {avgBuyPrice>0 && (
+            <div style={{marginTop:6,paddingTop:6,borderTop:'0.5px solid var(--border)'}}>
+              <div style={{fontFamily:"'Space Mono',monospace",fontWeight:'700',fontSize:'.7rem',color:'var(--text)'}}>{fmt(avgBuyPrice)}</div>
+              <div className="dca-kpi-lbl" style={{fontSize:'.5rem',marginTop:2}}>
+                Prix moy. d'achat
+                <KpiTooltip id="dca-avgbuy" title="Prix moyen d'achat" description="Prix moyen pondéré par le volume de toutes les positions d'achat pointées." formula="Σ(montant) / Σ(volume)" openId={openTip} setOpenId={setOpenTip}/>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="dca-kpi" title={`Solde = Σ(${plan.baseAmount} USDT − injecté) par cycle. Positif = capital disponible. Négatif = sur-investissement.`}>
+
+        {/* Solde rechargement */}
+        <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:rechargement.total>0?'var(--gold)':rechargement.total<0?'var(--green)':'var(--muted)'}}>
             {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
           </div>
-          <div className="dca-kpi-lbl">Solde rechargement ⓘ</div>
-          <div className="dca-kpi-sub">{rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}</div>
+          <div className="dca-kpi-lbl">
+            Solde rechargement
+            <KpiTooltip id="dca-rech" title="Solde de rechargement" description={`Cumul cycle par cycle de la différence entre le montant de base (${plan.baseAmount} USDT) et le montant réellement injecté. Positif = capital à redéployer. Négatif = sur-investissement.`} formula={`Σ (${plan.baseAmount} USDT − injecté) par cycle`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
+          <div className="dca-kpi-sub">
+            {rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}
+          </div>
         </div>
+
+        {/* Total réalisé + prix moyen de vente */}
+        <div className="dca-kpi">
+          <div className="dca-kpi-val" style={{color:totalSold>0?'var(--green)':'var(--muted)'}}>{totalSold>0?`$${totalSold.toFixed(0)}`:'—'}</div>
+          <div className="dca-kpi-lbl">
+            Total réalisé
+            <KpiTooltip id="dca-sold" title="Total réalisé" description="Somme des ventes exécutées dans ce plan DCA." formula={`Σ montants USDT des ${sells.length} vente${sells.length!==1?'s':''}`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
+          <div className="dca-kpi-sub">{sells.length} vente{sells.length!==1?'s':''} exécutée{sells.length!==1?'s':''}</div>
+          {avgSellPrice>0 && (
+            <div style={{marginTop:6,paddingTop:6,borderTop:'0.5px solid var(--border)'}}>
+              <div style={{fontFamily:"'Space Mono',monospace",fontWeight:'700',fontSize:'.7rem',color:'var(--text)'}}>{fmt(avgSellPrice)}</div>
+              <div className="dca-kpi-lbl" style={{fontSize:'.5rem',marginTop:2}}>
+                Prix moy. de vente
+                <KpiTooltip id="dca-avgsell" title="Prix moyen de vente" description="Prix moyen pondéré par le volume de toutes les ventes exécutées pointées." formula="Σ(montant vendu) / Σ(volume vendu)" openId={openTip} setOpenId={setOpenTip}/>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* PnL latent */}
         <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
-          <div className="dca-kpi-lbl">PnL latent</div>
+          <div className="dca-kpi-lbl">
+            PnL latent
+            <KpiTooltip id="dca-pnl" title="PnL latent" description="Gain ou perte non réalisée sur la position ouverte, calculée par rapport au breakeven." formula="Position × (cours actuel − breakeven)" openId={openTip} setOpenId={setOpenTip}/>
+          </div>
           <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
         </div>
+
       </div>
 
       {/* ── Zones de stratégie ────────────────────────────────────────────── */}
       <div className="dca-card">
-        <div className="dca-card-title">Zones de stratégie</div>
-        {allZones.map((z,i) => {
+        <div className="dca-card-title">
+          Zones de stratégie
+          <KpiTooltip id="dca-zones" title="Zones de stratégie" description="Accum. : cours sous le breakeven → injecter le montant USDT défini. Ralent. : cours légèrement au-dessus → injecter un montant réduit. Profit : cours au-delà du seuil → vendre le % de position défini." openId={openTip} setOpenId={setOpenTip}/>
+        </div>
+        {[...allZones].sort((a,b)=>(parseFloat(a.ecart??a.ecartThreshold??a.ecartMin??0)||0)-(parseFloat(b.ecart??b.ecartThreshold??b.ecartMin??0)||0)).map((z,i) => {
           const ecartNum  = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
           const isProfit  = z.type==='profit'
           const isSlow    = z.type==='ralent'||z.type==='slow'
@@ -720,7 +793,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   const INIT_WIZARD = () => ({
     pair: pairList[0]?.name||'', customPair:'', startDate:'', endDate:'',
     pointedOps: undefined,
-    params: { baseAmount:10, frequency:'day', bullThreshold:20, zones:[...DEFAULT_ZONES] }
+    params: { baseAmount:10, frequency:'day', zones:[...DEFAULT_ZONES] }
   })
   const [wizard, setWizard] = useState(INIT_WIZARD)
 
@@ -737,8 +810,13 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   async function deleteTemplate(id) { await deleteDcaTemplate(id); setTemplates(t=>t.filter(x=>x.id!==id)) }
 
   async function saveTemplate(name) {
+    // Empêcher les doublons de nom
+    if (templates.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase())) {
+      alert(`Un template nommé "${name}" existe déjà. Choisissez un autre nom.`)
+      return
+    }
     const p = wizard.params || {}
-    const tpl = { name, baseAmount: p.baseAmount??10, frequency: p.frequency??'day', bullThreshold: p.bullThreshold??20, zones: p.zones||DEFAULT_ZONES }
+    const tpl = { name, baseAmount: p.baseAmount??10, frequency: p.frequency??'day', zones: p.zones||DEFAULT_ZONES }
     const id = await saveDcaTemplate(tpl)
     setTemplates(prev => { const ex=prev.find(t=>t.id===id); return ex?prev.map(t=>t.id===id?{...tpl,id}:t):[...prev,{...tpl,id}] })
   }
@@ -746,12 +824,17 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   function loadTemplate(tpl) {
     setWizard(w => ({
       ...w,
-      params: { baseAmount: tpl.baseAmount, frequency: tpl.frequency, bullThreshold: tpl.bullThreshold, zones: tpl.zones||DEFAULT_ZONES }
+      params: { baseAmount: tpl.baseAmount, frequency: tpl.frequency, zones: tpl.zones||DEFAULT_ZONES }
     }))
   }
 
   function step1Next() {
     const pair = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
+    // Un seul plan par paire
+    if (plans.some(p => p.pair === pair)) {
+      alert(`Un plan DCA existe déjà pour ${pair}. Supprimez-le avant d'en créer un nouveau.`)
+      return
+    }
     const hasOps = rawRows.some(r=>r.pair===pair&&r.exec)
     setScreen(hasOps ? 2 : 3)
   }
@@ -760,23 +843,52 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
     try {
       const snap = await loadSnapshot()
       if (!snap?.rows) return
+      // Travailler sur une copie en mémoire — une seule sauvegarde à la fin
+      const rows = snap.rows.map(r => [...r])
+      let changed = false
+
       for (let i = 0; i < ops.length; i++) {
-        if (!pointed.includes(getOpKey(ops[i], i))) continue
-        const op = ops[i]
-        const rowIdx = snap.rows.findIndex((r, ri) => {
-          if (ri === 0) return false
-          const dateMatch = r[0] && op.date && Math.abs(new Date(String(r[0])).getTime()-op.date.getTime()) < 86400000
+        const op        = ops[i]
+        const isPointed = pointed.includes(getOpKey(op, i))
+
+        // Trouver la ligne dans le snapshot (correspondance date + paire + montant)
+        const rowIdx = rows.findIndex((r, ri) => {
+          if (ri === 0) return false                          // skip header
+          if (!r[1]) return false
           const pairMatch = String(r[1]||'').trim() === op.pair
-          const amtMatch  = Math.abs((parseFloat(r[5])||0) - op.usdt) < 0.01
-          return dateMatch && pairMatch && amtMatch
+          if (!pairMatch) return false
+          // Date : tolérance ±1 jour
+          const snapDate = r[0] ? new Date(String(r[0])) : null
+          const dateMatch = snapDate && op.date &&
+            Math.abs(snapDate.getTime() - op.date.getTime()) < 86400000 * 1.5
+          if (!dateMatch) return false
+          // Montant : tester r[5], r[6], r[7] (USDT / USDC / EUR)
+          const snapAmt = (parseFloat(r[5])||0) || (parseFloat(r[6])||0) || (parseFloat(r[7])||0)
+          const amtMatch = op.usdt > 0
+            ? Math.abs(snapAmt - op.usdt) < 0.10
+            : true
+          return amtMatch
         })
+
         if (rowIdx < 0) continue
-        const row = [...snap.rows[rowIdx]]
-        while (row.length <= 12) row.push('')
-        const notes = String(row[11]||'')
-        if (!notes.includes('[DCA]')) { row[11] = notes ? notes+' [DCA]' : '[DCA]'; await updateRow(rowIdx, row) }
+        while (rows[rowIdx].length <= 12) rows[rowIdx].push('')
+        const notes  = String(rows[rowIdx][11] || '')
+        const hasDca = notes.includes('[DCA]')
+
+        if (isPointed && !hasDca) {
+          rows[rowIdx][11] = notes.trim() ? notes.trim() + ' [DCA]' : '[DCA]'
+          changed = true
+        } else if (!isPointed && hasDca) {
+          rows[rowIdx][11] = notes.replace(/\[DCA\]/g, '').trim()
+          changed = true
+        }
       }
-    } catch(e) { console.warn('step2FlagOps:', e) }
+
+      // Sauvegarder en une seule écriture si des changements ont eu lieu
+      if (changed) await saveSnapshot(rows, snap.source)
+    } catch(e) {
+      console.warn('step2FlagOps error:', e)
+    }
   }
 
   async function step3Save() {
@@ -794,7 +906,6 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
         pointedOps: pointed,
         baseAmount:    p.baseAmount??10,
         frequency:     p.frequency??'day',
-        bullThreshold: p.bullThreshold??20,
         zones:         p.zones||DEFAULT_ZONES,
       }
       const id   = await saveDcaPlan(planData)

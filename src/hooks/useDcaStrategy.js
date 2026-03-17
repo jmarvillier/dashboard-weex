@@ -147,61 +147,53 @@ export function computeSignal(plan, currentPrice, breakeven, rechargement) {
 
   const delta = (currentPrice - breakeven) / breakeven * 100
 
+  // ── Lire les zones unifiées (nouveau format) ou l'ancien format ──────────
+  const zones = plan.zones || []
+  const profitZones  = zones.filter(z => z.type === 'profit').sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0))
+  const accumZones   = zones.filter(z => z.type === 'accum' || z.type === 'ralent').sort((a,b)=>(parseFloat(b.ecart)||0)-(parseFloat(a.ecart)||0))
+
   // ── Bull run / Distribution ──────────────────────────────────────────────
-  if (plan.bullThreshold && delta >= plan.bullThreshold) {
-    const reached   = (plan.profitZones || []).filter(z => delta >= (parseFloat(z.ecartThreshold) || 0)).sort((a, b) => b.ecartThreshold - a.ecartThreshold)
-    const totalSell = reached.reduce((s, z) => s + (z.positionPct || 0), 0)
-    const labels    = reached.map(z => z.label).join(', ')
+  // Seuil bull run = écart de la première zone profit (la plus basse)
+  const firstProfitEcart = profitZones.length > 0
+    ? Math.min(...profitZones.map(z => parseFloat(z.ecart) || 0))
+    : Infinity
+  const bullZones = profitZones.filter(z => delta >= (parseFloat(z.ecart) || 0))
+  if (delta >= firstProfitEcart && bullZones.length > 0) {
+    const totalSell = bullZones.reduce((s, z) => s + (parseFloat(z.action) || 0), 0)
+    const labels    = bullZones.map(z => z.label).join(', ')
     return {
       zone: 'PROFIT', action: 'sell', deployAmount: 0,
-      label: reached.length ? `Prise de profits — ${labels}` : `Bull run +${delta.toFixed(1)}%`,
-      description: `Prix ${delta.toFixed(1)}% au-dessus du breakeven. DCA suspendu.${reached.length ? ` Vendre ${totalSell}% de la position.` : ''}`,
-      sellPct: totalSell, delta, forceRecharge: false,
+      label: `Prise de profits — ${labels}`,
+      description: `Prix +${delta.toFixed(1)}% vs breakeven. DCA suspendu. Vendre ${totalSell}% de la position.`,
+      sellPct: totalSell, delta, forceRecharge: false, activeZone: null,
     }
   }
 
-  // ── Forçage si rechargement DCA max dépassé ──────────────────────────────
-  const forceRecharge = plan.debtCeiling && rechargeTotal >= plan.debtCeiling
+  // ── Zone d'accumulation/ralentissement ───────────────────────────────────
+  // Trouver la zone dont l'écart max est la borne inférieure
+  // zones triées par écart décroissant → prend la 1ère dont ecart >= delta
+  const activeZone = accumZones.find(z => delta <= (parseFloat(z.ecart) || 0)) || accumZones[accumZones.length - 1] || null
 
-  // ── Zone de redistribution de rechargement ───────────────────────────────
-  const activeDebtZone = (plan.debtZones || [])
-    .filter(z => delta <= (parseFloat(z.ecartThreshold) || 0))
-    .sort((a, b) => (parseFloat(a.ecartThreshold) || 0) - (parseFloat(b.ecartThreshold) || 0))[0] || null
-
-  // ── Zone d'accumulation ──────────────────────────────────────────────────
-  const accZone = (plan.accZones || []).find(z => {
-    const min = z.ecartMin == null || z.ecartMin === '' ? -Infinity : parseFloat(z.ecartMin)
-    const max = z.ecartMax == null || z.ecartMax === '' ? Infinity  : parseFloat(z.ecartMax)
-    return delta >= min && delta < max
-  })
-
-  const base       = forceRecharge && !accZone ? (plan.baseAmount || 10) : (accZone ? accZone.amount : 0)
-  const rechargeInject = 0  // rechargement géré via solde, pas injecté directement
+  const base       = activeZone ? (parseFloat(activeZone.action) || 0) : 0
+  const rechargeInject = 0
   const deployAmount   = base
 
   let label, description, zone
-  if (activeDebtZone && rechargeInject > 0) {
-    zone        = 'RECHARGE'
-    label       = `${activeDebtZone.label} — Redistribution rechargement`
-    description = `Prix ${Math.abs(delta).toFixed(1)}% sous le breakeven. Injecter ${base.toFixed(2)} USDT + ${rechargeInject.toFixed(2)} USDT de rechargement (${activeDebtZone.debtPct}%).`
-  } else if (accZone) {
-    const pctAmt = plan.baseAmount > 0 ? Math.round(accZone.amount / plan.baseAmount * 100) : 100
-    zone        = accZone.label
-    label       = `Acheter ${pctAmt}% — ${accZone.label}`
-    description = delta < 0
-      ? `Prix ${Math.abs(delta).toFixed(1)}% sous le breakeven. Zone optimale — déployer ${deployAmount.toFixed(2)} USDT.`
-      : `Prix +${delta.toFixed(1)}% au-dessus du breakeven. Zone ${accZone.label} — déployer ${deployAmount.toFixed(2)} USDT.`
-  } else if (forceRecharge) {
-    zone        = 'FORCE'
-    label       = 'Achat forcé — plafond de rechargement atteint'
-    description = `Plafond de ${plan.debtCeiling} USDT atteint. Forçage d'achat : ${deployAmount.toFixed(2)} USDT.`
+  if (activeZone && deployAmount > 0) {
+    const typeLabel = activeZone.type === 'ralent' ? 'Ralentissement' : 'Accumulation'
+    const pctAmt    = plan.baseAmount > 0 ? Math.round(deployAmount / plan.baseAmount * 100) : 100
+    zone        = activeZone.type
+    label       = `${typeLabel} — ${activeZone.label} (${pctAmt}%)`
+    description = delta <= 0
+      ? `Prix ${Math.abs(delta).toFixed(1)}% sous le breakeven. Déployer ${deployAmount.toFixed(2)} USDT (${activeZone.label}).`
+      : `Prix +${delta.toFixed(1)}% au-dessus du breakeven. Zone ${activeZone.label} active — déployer ${deployAmount.toFixed(2)} USDT.`
   } else {
     zone        = 'HOLD'
-    label       = 'Alimenter le rechargement DCA'
-    description = `Prix +${delta.toFixed(1)}% au-dessus du breakeven. Aucune injection ce cycle — rechargement en cours d'accumulation.`
+    label       = 'Aucune zone active'
+    description = `Prix +${delta.toFixed(1)}% au-dessus du breakeven — au-delà des zones configurées. Aucune injection ce cycle.`
   }
 
-  return { zone, action: deployAmount > 0 ? 'buy' : 'hold', deployAmount, base, rechargeInject, label, description, sellPct: null, delta, forceRecharge, activeDebtZone }
+  return { zone, action: deployAmount > 0 ? 'buy' : 'hold', deployAmount, base, rechargeInject, label, description, sellPct: null, delta, forceRecharge: false, activeZone }
 }
 
 /* ─── Hook React ─────────────────────────────────────────────────────────── */
