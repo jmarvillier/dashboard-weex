@@ -7,6 +7,7 @@ import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../lib/dcaRepository.js'
 import { saveSnapshot, loadSnapshot } from '../lib/repository.js'
 import EntryForm from './EntryForm.jsx'
+import KpiTooltip from './KpiTooltip.jsx'
 import {
   computeBreakeven, computeAvgPrice, computeRechargement,
   computeSignal, generateTimeline, getCurrentPeriodOps,
@@ -443,6 +444,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
   const [showEntry,   setShowEntry]   = useState(false)
   const [savedMsg,    setSavedMsg]    = useState('')
   const [manualPrice, setManualPrice] = useState('')
+  const [openTip,     setOpenTip]     = useState(null)
 
   const effectivePair = plan.pair || ''
   const freqLabel     = PERIOD_LABEL[plan.frequency||'day'] || 'jour'
@@ -554,7 +556,10 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
         <div className="dca-hero-prices">
           <div className="dca-hero-block">
-            <div className="dca-hero-lbl">Breakeven</div>
+            <div className="dca-hero-lbl">
+              Breakeven
+              <KpiTooltip id="dca-be" title="Breakeven" description="Coût de revient net : prix auquel la position est à l'équilibre après toutes les ventes partielles." formula="(Σ achats − Σ recettes ventes) / volume net" openId={openTip} setOpenId={setOpenTip}/>
+            </div>
             <div className="dca-hero-val dca-hero-val-main">{breakeven>0?fmt(breakeven):'—'}</div>
             <div className="dca-hero-sub">coût de revient net</div>
           </div>
@@ -625,12 +630,18 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
         {/* Investi + prix moyen d'achat */}
         <div className="dca-kpi">
           <div className="dca-kpi-val">{totalInvested>0?`$${totalInvested.toFixed(0)}`:'—'}</div>
-          <div className="dca-kpi-lbl">Total investi</div>
+          <div className="dca-kpi-lbl">
+            Total investi
+            <KpiTooltip id="dca-invested" title="Total investi" description="Somme de tous les achats exécutés pointés dans ce plan DCA." formula={`Σ montants USDT des ${buys.length} achats`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
           <div className="dca-kpi-sub">{buys.length} achats pointés</div>
           {avgBuyPrice>0 && (
             <div style={{marginTop:6,paddingTop:6,borderTop:'0.5px solid var(--border)'}}>
               <div style={{fontFamily:"'Space Mono',monospace",fontWeight:'700',fontSize:'.7rem',color:'var(--text)'}}>{fmt(avgBuyPrice)}</div>
-              <div style={{fontSize:'.5rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.07em'}}>Prix moy. d'achat</div>
+              <div className="dca-kpi-lbl" style={{fontSize:'.5rem',marginTop:2}}>
+                Prix moy. d'achat
+                <KpiTooltip id="dca-avgbuy" title="Prix moyen d'achat" description="Prix moyen pondéré par le volume de toutes les positions d'achat pointées." formula="Σ(montant) / Σ(volume)" openId={openTip} setOpenId={setOpenTip}/>
+              </div>
             </div>
           )}
         </div>
@@ -640,24 +651,30 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           <div className="dca-kpi-val" style={{color:rechargement.total>0?'var(--gold)':rechargement.total<0?'var(--green)':'var(--muted)'}}>
             {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
           </div>
-          <div className="dca-kpi-lbl">Solde rechargement</div>
+          <div className="dca-kpi-lbl">
+            Solde rechargement
+            <KpiTooltip id="dca-rech" title="Solde de rechargement" description={`Cumul cycle par cycle de la différence entre le montant de base (${plan.baseAmount} USDT) et le montant réellement injecté. Positif = capital à redéployer. Négatif = sur-investissement.`} formula={`Σ (${plan.baseAmount} USDT − injecté) par cycle`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
           <div className="dca-kpi-sub">
             {rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}
           </div>
-          <div style={{marginTop:6,fontSize:'.52rem',color:'var(--muted)',lineHeight:1.5}}>
-            Σ({plan.baseAmount} USDT − injecté) par cycle
-          </div>
         </div>
 
-        {/* Total profits + prix moyen de vente */}
+        {/* Total réalisé + prix moyen de vente */}
         <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:totalSold>0?'var(--green)':'var(--muted)'}}>{totalSold>0?`$${totalSold.toFixed(0)}`:'—'}</div>
-          <div className="dca-kpi-lbl">Total réalisé</div>
+          <div className="dca-kpi-lbl">
+            Total réalisé
+            <KpiTooltip id="dca-sold" title="Total réalisé" description="Somme des ventes exécutées dans ce plan DCA." formula={`Σ montants USDT des ${sells.length} vente${sells.length!==1?'s':''}`} openId={openTip} setOpenId={setOpenTip}/>
+          </div>
           <div className="dca-kpi-sub">{sells.length} vente{sells.length!==1?'s':''} exécutée{sells.length!==1?'s':''}</div>
           {avgSellPrice>0 && (
             <div style={{marginTop:6,paddingTop:6,borderTop:'0.5px solid var(--border)'}}>
               <div style={{fontFamily:"'Space Mono',monospace",fontWeight:'700',fontSize:'.7rem',color:'var(--text)'}}>{fmt(avgSellPrice)}</div>
-              <div style={{fontSize:'.5rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.07em'}}>Prix moy. de vente</div>
+              <div className="dca-kpi-lbl" style={{fontSize:'.5rem',marginTop:2}}>
+                Prix moy. de vente
+                <KpiTooltip id="dca-avgsell" title="Prix moyen de vente" description="Prix moyen pondéré par le volume de toutes les ventes exécutées pointées." formula="Σ(montant vendu) / Σ(volume vendu)" openId={openTip} setOpenId={setOpenTip}/>
+              </div>
             </div>
           )}
         </div>
@@ -665,7 +682,10 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
         {/* PnL latent */}
         <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
-          <div className="dca-kpi-lbl">PnL latent</div>
+          <div className="dca-kpi-lbl">
+            PnL latent
+            <KpiTooltip id="dca-pnl" title="PnL latent" description="Gain ou perte non réalisée sur la position ouverte, calculée par rapport au breakeven." formula="Position × (cours actuel − breakeven)" openId={openTip} setOpenId={setOpenTip}/>
+          </div>
           <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
         </div>
 
@@ -673,7 +693,10 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
       {/* ── Zones de stratégie ────────────────────────────────────────────── */}
       <div className="dca-card">
-        <div className="dca-card-title">Zones de stratégie</div>
+        <div className="dca-card-title">
+          Zones de stratégie
+          <KpiTooltip id="dca-zones" title="Zones de stratégie" description="Accum. : cours sous le breakeven → injecter le montant USDT défini. Ralent. : cours légèrement au-dessus → injecter un montant réduit. Profit : cours au-delà du seuil → vendre le % de position défini." openId={openTip} setOpenId={setOpenTip}/>
+        </div>
         {[...allZones].sort((a,b)=>(parseFloat(a.ecart??a.ecartThreshold??a.ecartMin??0)||0)-(parseFloat(b.ecart??b.ecartThreshold??b.ecartMin??0)||0)).map((z,i) => {
           const ecartNum  = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
           const isProfit  = z.type==='profit'
@@ -807,6 +830,11 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
 
   function step1Next() {
     const pair = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
+    // Un seul plan par paire
+    if (plans.some(p => p.pair === pair)) {
+      alert(`Un plan DCA existe déjà pour ${pair}. Supprimez-le avant d'en créer un nouveau.`)
+      return
+    }
     const hasOps = rawRows.some(r=>r.pair===pair&&r.exec)
     setScreen(hasOps ? 2 : 3)
   }
