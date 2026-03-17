@@ -61,9 +61,14 @@ export default function PairCard({ p, excluded, onToggle, index }) {
   const dSellPct = p.deltaVsAvgSellPct ?? null
   const dBePct   = p.deltaVsBreakevenPct ?? null
 
-  const tot   = (p.buyOrders || 0) + (p.sellOrders || 0)
-  const buyW  = tot > 0 ? p.buyOrders  / tot * 100 : 100
-  const sellW = tot > 0 ? p.sellOrders / tot * 100 : 0
+  const tot          = (p.buyOrders || 0) + (p.sellOrders || 0)
+  const buyW         = tot > 0 ? p.buyOrders  / tot * 100 : 100
+  const sellW        = tot > 0 ? p.sellOrders / tot * 100 : 0
+  const volBuy       = p.usdt_investi || 0
+  const volSell      = p.usdt_recu    || 0
+  const volTot       = volBuy + volSell
+  const volumeBuyW   = volTot > 0 ? volBuy  / volTot * 100 : 100
+  const volumeSellW  = volTot > 0 ? volSell / volTot * 100 : 0
 
   // ── Dépôt ────────────────────────────────────────────────────────────────
   if (p.is_depot) {
@@ -253,21 +258,50 @@ export default function PairCard({ p, excluded, onToggle, index }) {
         </div>
       </div>
 
-      {/* ── ORDRES ── */}
+      {/* ── ORDRES — Achats vs Ventes ── */}
       <div className="pc2-section">
-        <div className="pc2-slabel">ORDRES</div>
-        <div className="pc2-chips">
-          <span className="pc2-chip"><b>{p.totalOrders ?? p.nb_total}</b> au total</span>
-          <span className="pc2-chip"><b>{p.executedOrders ?? p.nb_exec}</b> exécutés</span>
-          <span className="pc2-chip"><b>{p.cancelledOrders ?? p.nb_annule}</b> annulés</span>
+        <div className="pc2-slabel">ACHATS VS VENTES</div>
+
+        {/* Barre 1 : nombre d'ordres */}
+        <div className="v5-bar-row">
+          <div className="v5-bar-sublabel">Nombre d'ordres</div>
+          <div className="v5-bar-labels">
+            <span className="v5-bar-side v5-bar-side--buy">
+              <strong>{p.buyOrders ?? p.nb_achat}</strong>
+              <strong>{(p.buyOrders ?? p.nb_achat) > 1 ? 'achats' : 'achat'}</strong>
+              <span className="v5-bar-pct v5-bar-pct--pill">{buyW > 0 ? Math.round(buyW) + ' %' : '—'}</span>
+            </span>
+            <span className="v5-bar-side v5-bar-side--sell">
+              <span className="v5-bar-pct v5-bar-pct--pill">{sellW > 0 ? Math.round(sellW) + ' %' : '—'}</span>
+              <strong>{(p.sellOrders ?? p.nb_vente) > 1 ? 'ventes' : 'vente'}</strong>
+              <strong>{p.sellOrders ?? p.nb_vente}</strong>
+            </span>
+          </div>
+          <div className="v5-bar-track">
+            <div className="v5-bar-buy"  style={{width: buyW  + '%'}} />
+            <div className="v5-bar-sell" style={{width: sellW + '%'}} />
+          </div>
         </div>
-        <div className="pc2-bar-lbls">
-          <span>{p.buyOrders ?? p.nb_achat} achats</span>
-          <span>{p.sellOrders ?? p.nb_vente} ventes</span>
-        </div>
-        <div className="pc2-bar">
-          <div className="pc2-bar-buy"  style={{width:`${buyW}%`}} />
-          <div className="pc2-bar-sell" style={{width:`${sellW}%`}} />
+
+        {/* Barre 2 : volume USDT */}
+        <div className="v5-bar-row v5-bar-row--volume">
+          <div className="v5-bar-sublabel">Volume USDT</div>
+          <div className="v5-bar-labels">
+            <span className="v5-bar-side v5-bar-side--buy">
+              <strong>{Math.round(volBuy)}</strong>
+              <strong className="v5-bar-unit-bold">USDT</strong>
+              <span className="v5-bar-pct v5-bar-pct--pill">{volumeBuyW > 0 ? Math.round(volumeBuyW) + ' %' : '—'}</span>
+            </span>
+            <span className="v5-bar-side v5-bar-side--sell">
+              <span className="v5-bar-pct v5-bar-pct--pill">{volumeSellW > 0 ? Math.round(volumeSellW) + ' %' : '—'}</span>
+              <strong className="v5-bar-unit-bold">USDT</strong>
+              <strong>{Math.round(volSell)}</strong>
+            </span>
+          </div>
+          <div className="v5-bar-track">
+            <div className="v5-bar-buy"  style={{width: volumeBuyW  + '%'}} />
+            <div className="v5-bar-sell" style={{width: volumeSellW + '%'}} />
+          </div>
         </div>
       </div>
 
