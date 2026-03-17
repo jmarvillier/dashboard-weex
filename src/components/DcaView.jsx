@@ -603,36 +603,46 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
       {/* ── Signal ────────────────────────────────────────────────────────── */}
       <div className={`dca-signal ${signalClass()}`}>
-        {/* Ligne principale : label + montant */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
-          <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+
+          {/* Label zone */}
+          <div style={{flex:1,minWidth:160}}>
             <div className="dca-signal-title">{signal.label}</div>
+            {(cyclePeriod.totalBought>0 || cyclePeriod.totalSold>0) && (
+              <div style={{display:'flex',gap:10,marginTop:5,fontSize:'.58rem',opacity:.75}}>
+                {cyclePeriod.totalBought>0 && <span>Achats <b>${cyclePeriod.totalBought.toFixed(0)}</b></span>}
+                {cyclePeriod.totalSold>0   && <span>Ventes <b>${cyclePeriod.totalSold.toFixed(0)}</b></span>}
+                {signal.deployAmount>0&&signal.action!=='sell'&&cyclePeriod.totalBought<signal.deployAmount && (
+                  <span>Reste <b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(0)}</b></span>
+                )}
+              </div>
+            )}
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0,flexWrap:'wrap'}}>
-            {/* Cycle stats inline */}
-            <div style={{display:'flex',gap:12,fontSize:'.6rem',opacity:.85}}>
-              {cyclePeriod.totalBought>0 && <span><span style={{opacity:.7}}>Achats : </span><b>${cyclePeriod.totalBought.toFixed(0)}</b></span>}
-              {cyclePeriod.totalSold>0   && <span><span style={{opacity:.7}}>Ventes : </span><b>${cyclePeriod.totalSold.toFixed(0)}</b></span>}
-              {signal.deployAmount>0&&signal.action!=='sell' && <span><span style={{opacity:.7}}>Reste : </span><b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(0)}</b></span>}
+
+          {/* Séparateur */}
+          <div style={{width:'0.5px',height:36,background:'rgba(255,255,255,.12)',flexShrink:0}}/>
+
+          {/* Montant à déployer */}
+          {signal.action==='sell' ? (
+            <div style={{textAlign:'right'}}>
+              <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
+              <div className="dca-signal-amt-lbl">de la position</div>
             </div>
-            {/* Montant + bouton */}
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              {signal.action==='sell' ? (
-                <div className="dca-signal-amount" style={{textAlign:'right'}}>
-                  <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
-                  <div className="dca-signal-amt-lbl">de la position</div>
-                </div>
-              ) : signal.deployAmount>0 ? (
-                <div className="dca-signal-amount" style={{textAlign:'right'}}>
-                  <div className="dca-signal-amt">{signal.deployAmount.toFixed(2)} USDT</div>
-                  <div className="dca-signal-amt-lbl">cycle du {cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}</div>
-                </div>
-              ) : null}
-              {signal.action!=='sell' && (
-                <button className="dca-btn dca-btn-primary" style={{fontSize:'.6rem',padding:'5px 12px',whiteSpace:'nowrap'}} onClick={()=>setShowEntry(true)}>+ Journal</button>
-              )}
+          ) : signal.deployAmount>0 ? (
+            <div style={{textAlign:'right'}}>
+              <div className="dca-signal-amt">{signal.deployAmount.toFixed(2)} <span style={{fontSize:'.65em',opacity:.7}}>USDT</span></div>
+              <div className="dca-signal-amt-lbl">cycle du {cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}</div>
             </div>
-          </div>
+          ) : (
+            <div style={{fontSize:'.62rem',opacity:.6,fontStyle:'italic'}}>Aucune action ce cycle</div>
+          )}
+
+          {/* Bouton */}
+          {signal.action!=='sell' && (
+            <button className="dca-btn dca-btn-primary" style={{fontSize:'.62rem',padding:'7px 14px',whiteSpace:'nowrap',flexShrink:0}} onClick={()=>setShowEntry(true)}>
+              + Journal
+            </button>
+          )}
         </div>
       </div>
 
@@ -778,11 +788,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
               )
             })}
 
-            {openTip!=='dca-zones-expand' && sorted.length > 3 && (
-              <div style={{fontSize:'.54rem',color:'var(--muted)',textAlign:'center',paddingTop:4,opacity:.6}}>
-                {sorted.length - [...visible].length} zone{sorted.length - [...visible].length > 1 ? 's' : ''} masquée{sorted.length - [...visible].length > 1 ? 's' : ''} · ▼ pour tout voir
-              </div>
-            )}
+
           </div>
         )
       })()}
@@ -833,9 +839,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           </div>
         )}
 
-        <div style={{fontSize:'.56rem',color:'var(--muted)',marginTop:8,borderTop:'1px solid var(--border)',paddingTop:8}}>
-          {buys.length} achats · {sells.length} ventes · {missedCount} cycle{missedCount!==1?'s':''} incomplet{missedCount!==1?'s':''} · Solde rechargement : {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
-        </div>
+
       </div>
 
       <div style={{height:16}}/>
