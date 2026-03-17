@@ -333,7 +333,6 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
         <div className="dca-form-row">
           <div className="dca-form-group"><label>Montant de base *</label><div className="dca-input-group"><input className="dca-input" type="number" value={p.baseAmount??10} onChange={e=>setP('baseAmount',parseFloat(e.target.value)||0)}/><span className="dca-input-sfx">USDT</span></div></div>
           <div className="dca-form-group"><label>Fréquence *</label><select className="dca-select" value={p.frequency||'day'} onChange={e=>setP('frequency',e.target.value)}><option value="day">Tous les jours</option><option value="week">Toutes les semaines</option><option value="month">Tous les mois</option></select></div>
-          <div className="dca-form-group"><label>Seuil bull run <span className="dca-tag dca-tag-opt">opt.</span></label><div className="dca-input-group"><input className="dca-input" type="number" value={p.bullThreshold??20} onChange={e=>setP('bullThreshold',parseFloat(e.target.value)||null)}/><span className="dca-input-sfx">%</span></div></div>
         </div>
         {breakeven>0 && <div style={{fontSize:'.6rem',color:'var(--muted)',marginTop:2}}>Breakeven : <b style={{color:'var(--gold)'}}>{fmt(breakeven)}</b> — référence des prix cibles</div>}
       </div>
@@ -362,7 +361,7 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
             </tr>
           </thead>
           <tbody>
-            {zones.map((z,i) => {
+            {[...zones].sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0)).map((z,i) => {
               const ecartNum   = parseFloat(z.ecart)||0
               const isProfit   = z.type==='profit'
               const targetPrice = breakeven>0 ? breakeven*(1+ecartNum/100) : null
@@ -624,7 +623,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
       {/* ── Zones de stratégie ────────────────────────────────────────────── */}
       <div className="dca-card">
         <div className="dca-card-title">Zones de stratégie</div>
-        {allZones.map((z,i) => {
+        {[...allZones].sort((a,b)=>(parseFloat(a.ecart??a.ecartThreshold??a.ecartMin??0)||0)-(parseFloat(b.ecart??b.ecartThreshold??b.ecartMin??0)||0)).map((z,i) => {
           const ecartNum  = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
           const isProfit  = z.type==='profit'
           const isSlow    = z.type==='ralent'||z.type==='slow'
