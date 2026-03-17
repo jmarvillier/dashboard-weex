@@ -1,6 +1,6 @@
 import { normPair, parseN, isExec, isAnnul, isUsdPair } from './parser.js'
 
-function parseDate(raw) {
+export function parseDate(raw) {
   if (!raw) return null
   const n = Number(raw)
   if (!isNaN(n) && n > 40000 && n < 60000) {
@@ -188,9 +188,7 @@ export function extractRawRows(rows) {
     const usdt   = parseN(r[5]) || parseN(r[6]) || parseN(r[7])
     const vol    = parseN(r[10])
     const date   = parseDate(r[0])
-    const notes    = String(r[11] || '').trim()
-    const recharge = notes.includes('RECHARGE_DCA')
-    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat), notes, recharge })
+    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat) })
   })
 
   return result

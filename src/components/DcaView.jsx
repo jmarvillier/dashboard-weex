@@ -7,6 +7,7 @@ import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../lib/dcaRepository.js'
 import { saveSnapshot, loadSnapshot } from '../lib/repository.js'
 import { normPair } from '../lib/parser.js'
+import { parseDate } from '../lib/process.js'
 import EntryForm from './EntryForm.jsx'
 import KpiTooltip from './KpiTooltip.jsx'
 import {
@@ -147,7 +148,7 @@ function DcaList({ onNew, onOpen, plans, loading, onDelete, templates, onDeleteT
 }
 
 /* ═══ STEP 1 — Paire ══════════════════════════════════════════════════════ */
-function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack }) {
+function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack, wizardErr }) {
   const pairs = pairList.map(p => p.name).filter(n => !n.startsWith('USD'))
   const effectivePair = wizard.pair === 'NEW' ? (wizard.customPair||'') : wizard.pair
   const opsCount = useMemo(() => filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate).length, [rawRows, effectivePair, wizard.startDate, wizard.endDate])
@@ -185,6 +186,7 @@ function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack }) {
           <div className="dca-form-group"><label>Date de fin <span style={{color:'var(--muted)',fontWeight:'normal'}}>(vide = aujourd'hui)</span></label><input className="dca-input" type="date" value={wizard.endDate||''} onChange={e=>setWizard(w=>({...w,endDate:e.target.value}))}/></div>
         </div>
       </div>
+      {wizardErr && <div className="dca-banner dca-banner-danger" style={{marginBottom:4}}>{wizardErr}</div>}
       <div className="dca-btm">
         <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button>
         <span className="dca-step-hint">Étape 1 / 3</span>
@@ -219,6 +221,20 @@ function Step2({ wizard, setWizard, rawRows, onNext, onBack, onFlagOps }) {
       <div className="dca-btm"><button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button><button className="dca-btn dca-btn-primary" onClick={onNext}>Paramétrer →</button></div>
     </div>
   )
+  async function saveTpl() {
+    const name = tplName.trim()
+    if (!name) return
+    if (templates?.some(t => t.name.trim().toLowerCase() === name.toLowerCase())) {
+      setTplError(`"${name}" existe déjà`)
+      return
+    }
+    setTplSaving(true)
+    await onSaveTpl?.(name)
+    setTplName('')
+    setTplError('')
+    setTplSaving(false)
+  }
+
   return (
     <div className="dca-scroll">
       <div style={{fontSize:'.58rem',color:'var(--muted)',paddingBottom:4}}><button className="dca-back-btn" style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'inherit',fontFamily:'inherit'}} onClick={onBack}>← Plans DCA</button></div>
@@ -265,6 +281,9 @@ function Step2({ wizard, setWizard, rawRows, onNext, onBack, onFlagOps }) {
 /* ═══ STEP 3 — Paramétrage ════════════════════════════════════════════════ */
 function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, onSaveTpl, onLoadTpl }) {
   const [showConfirm, setShowConfirm] = useState(false)
+  const [tplName, setTplName]         = useState('')
+  const [tplSaving, setTplSaving]     = useState(false)
+  const [tplError, setTplError]       = useState('')
   const effectivePair = wizard.pair==='NEW' ? (wizard.customPair||'') : wizard.pair
   const ops        = useMemo(() => filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate), [rawRows, effectivePair, wizard.startDate, wizard.endDate])
   const pointedOps = useMemo(() => { const p=wizard.pointedOps||[]; return ops.filter((op,i)=>p.includes(getOpKey(op,i))) }, [ops, wizard.pointedOps])
@@ -306,18 +325,33 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
           <button key={t.id} className="dca-ops-btn" style={{fontSize:'.58rem',padding:'3px 10px'}} onClick={()=>onLoadTpl?.(t)}>{t.name}</button>
         ))}
         {(!templates || templates.length === 0) && <span style={{fontSize:'.56rem',color:'var(--muted)',opacity:.6}}>Aucun template enregistré</span>}
-        <button className="dca-ops-btn" style={{marginLeft:'auto',borderColor:'var(--gold)',color:'var(--gold)',fontSize:'.58rem',padding:'3px 10px'}}
-          onClick={()=>{
-            const name=prompt('Nom du template :')
-            if (!name?.trim()) return
-            if (templates?.some(t=>t.name.trim().toLowerCase()===name.trim().toLowerCase())) {
-              alert(`Un template "${name}" existe déjà. Choisissez un autre nom.`)
-              return
-            }
-            onSaveTpl?.(name.trim())
-          }}>
-          ✦ Sauvegarder template
-        </button>
+        {/* Sauvegarde inline — sans popup navigateur */}
+        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto',flexShrink:0}}>
+          <div style={{position:'relative'}}>
+            <input
+              className="dca-input"
+              placeholder="Nom du template…"
+              value={tplName}
+              onChange={e=>{ setTplName(e.target.value); setTplError('') }}
+              onKeyDown={e=>{ if(e.key==='Enter') saveTpl() }}
+              style={{fontSize:'.58rem',padding:'3px 8px',width:140,
+                borderColor: tplError ? 'var(--red)' : tplName.trim() ? 'var(--gold)' : undefined}}
+            />
+            {tplError && (
+              <div style={{position:'absolute',top:'100%',left:0,zIndex:10,
+                background:'var(--bg2)',border:'1px solid var(--red)',borderRadius:4,
+                padding:'4px 8px',fontSize:'.52rem',color:'var(--red)',whiteSpace:'nowrap',marginTop:2}}>
+                {tplError}
+              </div>
+            )}
+          </div>
+          <button className="dca-ops-btn"
+            style={{borderColor:'var(--gold)',color:'var(--gold)',fontSize:'.58rem',padding:'3px 10px',flexShrink:0,opacity:tplName.trim()?1:.5}}
+            disabled={!tplName.trim()||tplSaving}
+            onClick={saveTpl}>
+            {tplSaving ? '…' : '✦ Sauvegarder'}
+          </button>
+        </div>
       </div>
 
       {showConfirm && (
@@ -603,36 +637,46 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
       {/* ── Signal ────────────────────────────────────────────────────────── */}
       <div className={`dca-signal ${signalClass()}`}>
-        {/* Ligne principale : label + montant */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
-          <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+
+          {/* Label zone */}
+          <div style={{flex:1,minWidth:160}}>
             <div className="dca-signal-title">{signal.label}</div>
+            {(cyclePeriod.totalBought>0 || cyclePeriod.totalSold>0) && (
+              <div style={{display:'flex',gap:10,marginTop:5,fontSize:'.58rem',opacity:.75}}>
+                {cyclePeriod.totalBought>0 && <span>Achats <b>${cyclePeriod.totalBought.toFixed(0)}</b></span>}
+                {cyclePeriod.totalSold>0   && <span>Ventes <b>${cyclePeriod.totalSold.toFixed(0)}</b></span>}
+                {signal.deployAmount>0&&signal.action!=='sell'&&cyclePeriod.totalBought<signal.deployAmount && (
+                  <span>Reste <b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(0)}</b></span>
+                )}
+              </div>
+            )}
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:14,flexShrink:0,flexWrap:'wrap'}}>
-            {/* Cycle stats inline */}
-            <div style={{display:'flex',gap:12,fontSize:'.6rem',opacity:.85}}>
-              {cyclePeriod.totalBought>0 && <span><span style={{opacity:.7}}>Achats : </span><b>${cyclePeriod.totalBought.toFixed(0)}</b></span>}
-              {cyclePeriod.totalSold>0   && <span><span style={{opacity:.7}}>Ventes : </span><b>${cyclePeriod.totalSold.toFixed(0)}</b></span>}
-              {signal.deployAmount>0&&signal.action!=='sell' && <span><span style={{opacity:.7}}>Reste : </span><b>${Math.max(0,signal.deployAmount-cyclePeriod.totalBought).toFixed(0)}</b></span>}
+
+          {/* Séparateur */}
+          <div style={{width:'0.5px',height:36,background:'rgba(255,255,255,.12)',flexShrink:0}}/>
+
+          {/* Montant à déployer */}
+          {signal.action==='sell' ? (
+            <div style={{textAlign:'right'}}>
+              <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
+              <div className="dca-signal-amt-lbl">de la position</div>
             </div>
-            {/* Montant + bouton */}
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
-              {signal.action==='sell' ? (
-                <div className="dca-signal-amount" style={{textAlign:'right'}}>
-                  <div className="dca-signal-amt">Vendre {signal.sellPct}%</div>
-                  <div className="dca-signal-amt-lbl">de la position</div>
-                </div>
-              ) : signal.deployAmount>0 ? (
-                <div className="dca-signal-amount" style={{textAlign:'right'}}>
-                  <div className="dca-signal-amt">{signal.deployAmount.toFixed(2)} USDT</div>
-                  <div className="dca-signal-amt-lbl">cycle du {cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}</div>
-                </div>
-              ) : null}
-              {signal.action!=='sell' && (
-                <button className="dca-btn dca-btn-primary" style={{fontSize:'.6rem',padding:'5px 12px',whiteSpace:'nowrap'}} onClick={()=>setShowEntry(true)}>+ Journal</button>
-              )}
+          ) : signal.deployAmount>0 ? (
+            <div style={{textAlign:'right'}}>
+              <div className="dca-signal-amt">{signal.deployAmount.toFixed(2)} <span style={{fontSize:'.65em',opacity:.7}}>USDT</span></div>
+              <div className="dca-signal-amt-lbl">cycle du {cyclePeriod.periodStart?.toLocaleDateString('fr-FR')||'—'}</div>
             </div>
-          </div>
+          ) : (
+            <div style={{fontSize:'.62rem',opacity:.6,fontStyle:'italic'}}>Aucune action ce cycle</div>
+          )}
+
+          {/* Bouton */}
+          {signal.action!=='sell' && (
+            <button className="dca-btn dca-btn-primary" style={{fontSize:'.62rem',padding:'7px 14px',whiteSpace:'nowrap',flexShrink:0}} onClick={()=>setShowEntry(true)}>
+              + Journal
+            </button>
+          )}
         </div>
       </div>
 
@@ -778,11 +822,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
               )
             })}
 
-            {openTip!=='dca-zones-expand' && sorted.length > 3 && (
-              <div style={{fontSize:'.54rem',color:'var(--muted)',textAlign:'center',paddingTop:4,opacity:.6}}>
-                {sorted.length - [...visible].length} zone{sorted.length - [...visible].length > 1 ? 's' : ''} masquée{sorted.length - [...visible].length > 1 ? 's' : ''} · ▼ pour tout voir
-              </div>
-            )}
+
           </div>
         )
       })()}
@@ -833,9 +873,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           </div>
         )}
 
-        <div style={{fontSize:'.56rem',color:'var(--muted)',marginTop:8,borderTop:'1px solid var(--border)',paddingTop:8}}>
-          {buys.length} achats · {sells.length} ventes · {missedCount} cycle{missedCount!==1?'s':''} incomplet{missedCount!==1?'s':''} · Solde rechargement : {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
-        </div>
+
       </div>
 
       <div style={{height:16}}/>
@@ -856,6 +894,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   const [saving, setSaving]         = useState(false)
   const [currentPlan, setCurrentPlan] = useState(null)
 
+  const [wizardErr, setWizardErr] = useState('')
   const INIT_WIZARD = () => ({
     pair: pairList[0]?.name||'', customPair:'', startDate:'', endDate:'',
     pointedOps: undefined,
@@ -872,14 +911,18 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
 
   function openPlan(plan) { setCurrentPlan(plan); setScreen('dashboard') }
   function startNewWizard() { setWizard(INIT_WIZARD()); setCurrentPlan(null); setScreen(1) }
-  async function deletePlan(id) { await deleteDcaPlan(id); setPlans(p=>p.filter(x=>x.id!==id)) }
+  async function deletePlan(id) {
+    const plan = plans.find(p => p.id === id)
+    await deleteDcaPlan(id)
+    setPlans(p => p.filter(x => x.id !== id))
+    if (plan) await unFlagPlanOps(plan)
+  }
   async function deleteTemplate(id) { await deleteDcaTemplate(id); setTemplates(t=>t.filter(x=>x.id!==id)) }
 
   async function saveTemplate(name) {
     // Empêcher les doublons de nom
     if (templates.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase())) {
-      alert(`Un template nommé "${name}" existe déjà. Choisissez un autre nom.`)
-      return
+      return  // doublon géré dans l'UI Step3
     }
     const p = wizard.params || {}
     const tpl = { name, baseAmount: p.baseAmount??10, frequency: p.frequency??'day', zones: p.zones||DEFAULT_ZONES }
@@ -896,11 +939,11 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
 
   function step1Next() {
     const pair = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
-    // Un seul plan par paire
     if (plans.some(p => p.pair === pair)) {
-      alert(`Un plan DCA existe déjà pour ${pair}. Supprimez-le avant d'en créer un nouveau.`)
+      setWizardErr(`Un plan DCA existe déjà pour ${pair}. Supprimez-le avant d'en créer un nouveau.`)
       return
     }
+    setWizardErr('')
     const hasOps = rawRows.some(r=>r.pair===pair&&r.exec)
     setScreen(hasOps ? 2 : 3)
   }
@@ -924,8 +967,8 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
           // Normaliser la paire stockée comme le fait extractRawRows
           const pairMatch = normPair(String(r[1]||'').trim()) === op.pair
           if (!pairMatch) return false
-          // Date : tolérance ±1.5 jour (décalages de fuseau horaire)
-          const snapDate = r[0] ? new Date(String(r[0])) : null
+          // Date : utiliser parseDate (gère DD/MM/YYYY, YYYY-MM-DD, serial Excel…)
+          const snapDate = parseDate(r[0])
           const dateMatch = snapDate && op.date &&
             Math.abs(snapDate.getTime() - op.date.getTime()) < 86400000 * 1.5
           if (!dateMatch) return false
@@ -958,6 +1001,28 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
     }
   }
 
+  // Retire le flag [DCA] de toutes les lignes du journal correspondant à ce plan
+  async function unFlagPlanOps(plan) {
+    try {
+      const snap = await loadSnapshot()
+      if (!snap?.rows) return
+      const rows = snap.rows.map(r => [...r])
+      let changed = false
+      for (let ri = 1; ri < rows.length; ri++) {
+        const r = rows[ri]
+        if (!r[1]) continue
+        if (normPair(String(r[1]||'').trim()) !== plan.pair) continue
+        const notes  = String(r[11] || '')
+        const hasDca = notes.includes('[DCA]')
+        if (hasDca) {
+          rows[ri][11] = notes.replace(/\[DCA\]/g, '').trim()
+          changed = true
+        }
+      }
+      if (changed) await saveSnapshot(rows, snap.source)
+    } catch(e) { console.warn('unFlagPlanOps error:', e) }
+  }
+
   async function step3Save() {
     setSaving(true)
     try {
@@ -980,14 +1045,14 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
       setCurrentPlan(saved)
       setPlans(prev => { const ex=prev.find(x=>x.id===id); return ex?prev.map(x=>x.id===id?saved:x):[...prev,saved] })
       setScreen('dashboard')
-    } catch(e) { alert('Erreur : '+e.message) }
+    } catch(e) { console.error('step3Save:', e) }
     finally { setSaving(false) }
   }
 
   return (
     <div className="dca-page">
       {screen==='list'      && <DcaList plans={plans} loading={loading} onNew={startNewWizard} onOpen={openPlan} onDelete={deletePlan} templates={templates} onDeleteTpl={deleteTemplate}/>}
-      {screen===1           && <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')}/>}
+      {screen===1           && <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')} wizardErr={wizardErr}/>}
       {screen===2           && <Step2 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={()=>setScreen(3)} onBack={()=>setScreen(1)} onFlagOps={step2FlagOps}/>}
       {screen===3           && <Step3 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={step3Save} onBack={()=>setScreen(2)} saving={saving} templates={templates} onSaveTpl={saveTemplate} onLoadTpl={loadTemplate}/>}
       {screen==='dashboard' && currentPlan && <DcaDashboard plan={currentPlan} rawRows={rawRows} prices={prices} onBack={()=>setScreen('list')} onRefresh={onRefresh}/>}
