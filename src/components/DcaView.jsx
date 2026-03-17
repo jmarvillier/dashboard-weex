@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../lib/dcaRepository.js'
 import { saveSnapshot, loadSnapshot } from '../lib/repository.js'
+import { normPair } from '../lib/parser.js'
 import EntryForm from './EntryForm.jsx'
 import KpiTooltip from './KpiTooltip.jsx'
 import {
@@ -856,13 +857,14 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
         const op        = ops[i]
         const isPointed = pointed.includes(getOpKey(op, i))
 
-        // Trouver la ligne dans le snapshot (correspondance date + paire + montant)
+        // Trouver la ligne dans le snapshot (correspondance paire normalisée + date + montant)
         const rowIdx = rows.findIndex((r, ri) => {
           if (ri === 0) return false                          // skip header
           if (!r[1]) return false
-          const pairMatch = String(r[1]||'').trim() === op.pair
+          // Normaliser la paire stockée comme le fait extractRawRows
+          const pairMatch = normPair(String(r[1]||'').trim()) === op.pair
           if (!pairMatch) return false
-          // Date : tolérance ±1 jour
+          // Date : tolérance ±1.5 jour (décalages de fuseau horaire)
           const snapDate = r[0] ? new Date(String(r[0])) : null
           const dateMatch = snapDate && op.date &&
             Math.abs(snapDate.getTime() - op.date.getTime()) < 86400000 * 1.5
