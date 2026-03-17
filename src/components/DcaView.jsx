@@ -148,7 +148,7 @@ function DcaList({ onNew, onOpen, plans, loading, onDelete, templates, onDeleteT
 }
 
 /* ═══ STEP 1 — Paire ══════════════════════════════════════════════════════ */
-function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack }) {
+function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack, wizardErr }) {
   const pairs = pairList.map(p => p.name).filter(n => !n.startsWith('USD'))
   const effectivePair = wizard.pair === 'NEW' ? (wizard.customPair||'') : wizard.pair
   const opsCount = useMemo(() => filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate).length, [rawRows, effectivePair, wizard.startDate, wizard.endDate])
@@ -186,6 +186,7 @@ function Step1({ wizard, setWizard, pairList, rawRows, onNext, onBack }) {
           <div className="dca-form-group"><label>Date de fin <span style={{color:'var(--muted)',fontWeight:'normal'}}>(vide = aujourd'hui)</span></label><input className="dca-input" type="date" value={wizard.endDate||''} onChange={e=>setWizard(w=>({...w,endDate:e.target.value}))}/></div>
         </div>
       </div>
+      {wizardErr && <div className="dca-banner dca-banner-danger" style={{marginBottom:4}}>{wizardErr}</div>}
       <div className="dca-btm">
         <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button>
         <span className="dca-step-hint">Étape 1 / 3</span>
@@ -220,6 +221,20 @@ function Step2({ wizard, setWizard, rawRows, onNext, onBack, onFlagOps }) {
       <div className="dca-btm"><button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button><button className="dca-btn dca-btn-primary" onClick={onNext}>Paramétrer →</button></div>
     </div>
   )
+  async function saveTpl() {
+    const name = tplName.trim()
+    if (!name) return
+    if (templates?.some(t => t.name.trim().toLowerCase() === name.toLowerCase())) {
+      setTplError(`"${name}" existe déjà`)
+      return
+    }
+    setTplSaving(true)
+    await onSaveTpl?.(name)
+    setTplName('')
+    setTplError('')
+    setTplSaving(false)
+  }
+
   return (
     <div className="dca-scroll">
       <div style={{fontSize:'.58rem',color:'var(--muted)',paddingBottom:4}}><button className="dca-back-btn" style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'inherit',fontFamily:'inherit'}} onClick={onBack}>← Plans DCA</button></div>
@@ -266,6 +281,9 @@ function Step2({ wizard, setWizard, rawRows, onNext, onBack, onFlagOps }) {
 /* ═══ STEP 3 — Paramétrage ════════════════════════════════════════════════ */
 function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, onSaveTpl, onLoadTpl }) {
   const [showConfirm, setShowConfirm] = useState(false)
+  const [tplName, setTplName]         = useState('')
+  const [tplSaving, setTplSaving]     = useState(false)
+  const [tplError, setTplError]       = useState('')
   const effectivePair = wizard.pair==='NEW' ? (wizard.customPair||'') : wizard.pair
   const ops        = useMemo(() => filterOpsForPlan(rawRows, effectivePair, wizard.startDate, wizard.endDate), [rawRows, effectivePair, wizard.startDate, wizard.endDate])
   const pointedOps = useMemo(() => { const p=wizard.pointedOps||[]; return ops.filter((op,i)=>p.includes(getOpKey(op,i))) }, [ops, wizard.pointedOps])
@@ -307,18 +325,33 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
           <button key={t.id} className="dca-ops-btn" style={{fontSize:'.58rem',padding:'3px 10px'}} onClick={()=>onLoadTpl?.(t)}>{t.name}</button>
         ))}
         {(!templates || templates.length === 0) && <span style={{fontSize:'.56rem',color:'var(--muted)',opacity:.6}}>Aucun template enregistré</span>}
-        <button className="dca-ops-btn" style={{marginLeft:'auto',borderColor:'var(--gold)',color:'var(--gold)',fontSize:'.58rem',padding:'3px 10px'}}
-          onClick={()=>{
-            const name=prompt('Nom du template :')
-            if (!name?.trim()) return
-            if (templates?.some(t=>t.name.trim().toLowerCase()===name.trim().toLowerCase())) {
-              alert(`Un template "${name}" existe déjà. Choisissez un autre nom.`)
-              return
-            }
-            onSaveTpl?.(name.trim())
-          }}>
-          ✦ Sauvegarder template
-        </button>
+        {/* Sauvegarde inline — sans popup navigateur */}
+        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto',flexShrink:0}}>
+          <div style={{position:'relative'}}>
+            <input
+              className="dca-input"
+              placeholder="Nom du template…"
+              value={tplName}
+              onChange={e=>{ setTplName(e.target.value); setTplError('') }}
+              onKeyDown={e=>{ if(e.key==='Enter') saveTpl() }}
+              style={{fontSize:'.58rem',padding:'3px 8px',width:140,
+                borderColor: tplError ? 'var(--red)' : tplName.trim() ? 'var(--gold)' : undefined}}
+            />
+            {tplError && (
+              <div style={{position:'absolute',top:'100%',left:0,zIndex:10,
+                background:'var(--bg2)',border:'1px solid var(--red)',borderRadius:4,
+                padding:'4px 8px',fontSize:'.52rem',color:'var(--red)',whiteSpace:'nowrap',marginTop:2}}>
+                {tplError}
+              </div>
+            )}
+          </div>
+          <button className="dca-ops-btn"
+            style={{borderColor:'var(--gold)',color:'var(--gold)',fontSize:'.58rem',padding:'3px 10px',flexShrink:0,opacity:tplName.trim()?1:.5}}
+            disabled={!tplName.trim()||tplSaving}
+            onClick={saveTpl}>
+            {tplSaving ? '…' : '✦ Sauvegarder'}
+          </button>
+        </div>
       </div>
 
       {showConfirm && (
@@ -861,6 +894,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   const [saving, setSaving]         = useState(false)
   const [currentPlan, setCurrentPlan] = useState(null)
 
+  const [wizardErr, setWizardErr] = useState('')
   const INIT_WIZARD = () => ({
     pair: pairList[0]?.name||'', customPair:'', startDate:'', endDate:'',
     pointedOps: undefined,
@@ -888,8 +922,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   async function saveTemplate(name) {
     // Empêcher les doublons de nom
     if (templates.some(t => t.name.trim().toLowerCase() === name.trim().toLowerCase())) {
-      alert(`Un template nommé "${name}" existe déjà. Choisissez un autre nom.`)
-      return
+      return  // doublon géré dans l'UI Step3
     }
     const p = wizard.params || {}
     const tpl = { name, baseAmount: p.baseAmount??10, frequency: p.frequency??'day', zones: p.zones||DEFAULT_ZONES }
@@ -906,11 +939,11 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
 
   function step1Next() {
     const pair = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
-    // Un seul plan par paire
     if (plans.some(p => p.pair === pair)) {
-      alert(`Un plan DCA existe déjà pour ${pair}. Supprimez-le avant d'en créer un nouveau.`)
+      setWizardErr(`Un plan DCA existe déjà pour ${pair}. Supprimez-le avant d'en créer un nouveau.`)
       return
     }
+    setWizardErr('')
     const hasOps = rawRows.some(r=>r.pair===pair&&r.exec)
     setScreen(hasOps ? 2 : 3)
   }
@@ -1012,14 +1045,14 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
       setCurrentPlan(saved)
       setPlans(prev => { const ex=prev.find(x=>x.id===id); return ex?prev.map(x=>x.id===id?saved:x):[...prev,saved] })
       setScreen('dashboard')
-    } catch(e) { alert('Erreur : '+e.message) }
+    } catch(e) { console.error('step3Save:', e) }
     finally { setSaving(false) }
   }
 
   return (
     <div className="dca-page">
       {screen==='list'      && <DcaList plans={plans} loading={loading} onNew={startNewWizard} onOpen={openPlan} onDelete={deletePlan} templates={templates} onDeleteTpl={deleteTemplate}/>}
-      {screen===1           && <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')}/>}
+      {screen===1           && <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')} wizardErr={wizardErr}/>}
       {screen===2           && <Step2 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={()=>setScreen(3)} onBack={()=>setScreen(1)} onFlagOps={step2FlagOps}/>}
       {screen===3           && <Step3 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={step3Save} onBack={()=>setScreen(2)} saving={saving} templates={templates} onSaveTpl={saveTemplate} onLoadTpl={loadTemplate}/>}
       {screen==='dashboard' && currentPlan && <DcaDashboard plan={currentPlan} rawRows={rawRows} prices={prices} onBack={()=>setScreen('list')} onRefresh={onRefresh}/>}
