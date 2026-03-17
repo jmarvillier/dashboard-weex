@@ -285,9 +285,11 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
 
   function updateZone(i, field, val) { const nz=[...zones]; nz[i]={...nz[i],[field]:val}; setP('zones',nz) }
   function removeZone(i) { if(zones.length<=1) return; setP('zones',zones.filter((_,j)=>j!==i)) }
+  function sortZones() { setP('zones', [...zones].sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0))) }
   function addZone(type) {
     const defs = { accum:{ecart:'0',action:'10',color:'#3dbf90'}, ralent:{ecart:'10',action:'5',color:'#c8a020'}, profit:{ecart:'25',action:'25',color:'#E24B4A'} }
     const count = zones.filter(z=>z.type===type).length
+    // Nouvelle zone ajoutée en bas, sans tri immédiat
     setP('zones', [...zones, { type, label:`${TYPE_LABELS[type]} ${count+1}`, ...defs[type] }])
   }
 
@@ -370,13 +372,13 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
             </tr>
           </thead>
           <tbody>
-            {[...zones].sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0)).map((z,i) => {
-              const ecartNum   = parseFloat(z.ecart)||0
-              const isProfit   = z.type==='profit'
+            {zones.map((z,i) => {
+              const ecartNum    = parseFloat(z.ecart)||0
+              const isProfit    = z.type==='profit'
               const targetPrice = breakeven>0 ? breakeven*(1+ecartNum/100) : null
-              const unitLabel  = isProfit ? '%' : 'USDT'
-              const sign       = ecartNum>=0 ? '+' : ''
-              const typeColor  = TYPE_COLORS[z.type] || 'var(--text)'
+              const unitLabel   = isProfit ? '%' : 'USDT'
+              const sign        = ecartNum>=0 ? '+' : ''
+              const typeColor   = TYPE_COLORS[z.type] || 'var(--text)'
               return (
                 <tr key={i}>
                   <td><span className="dca-zdot" style={{background:z.color||'var(--muted)'}}/></td>
@@ -394,7 +396,10 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
                   <td><input className="dca-pi" value={z.label||''} style={{width:90}} onChange={e=>updateZone(i,'label',e.target.value)}/></td>
                   <td>
                     <div className="dca-pi-group">
-                      <input className="dca-pi" type="number" step="any" value={z.ecart??''} style={{width:60}} onChange={e=>updateZone(i,'ecart',e.target.value)} placeholder={isProfit?'+20':'-10'}/>
+                      <input className="dca-pi" type="number" step="any" value={z.ecart??''} style={{width:60}}
+                        onChange={e=>updateZone(i,'ecart',e.target.value)}
+                        onBlur={sortZones}
+                        placeholder={isProfit?'+20':'-10'}/>
                       <span className="dca-pi-sfx">%</span>
                     </div>
                   </td>
