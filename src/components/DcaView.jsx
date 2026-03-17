@@ -462,17 +462,24 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
     pointed.includes(getOpKey(op,i)) || (op.notes && op.notes.includes('[DCA]'))
   ), [ops, pointed])
 
-  const breakeven    = computeBreakeven(pointedOps)
-  const rechargement = computeRechargement(plan, pointedOps)
+  const breakeven    = useMemo(() => computeBreakeven(pointedOps),        [pointedOps])
+  const rechargement = useMemo(() => computeRechargement(plan, pointedOps), [plan, pointedOps])
 
   const currentPrice = prices[effectivePair] || (manualPrice ? parseFloat(manualPrice) : null)
   const signal       = useMemo(() => computeSignal(plan, currentPrice, breakeven, rechargement), [plan, currentPrice, breakeven, rechargement])
   const delta        = currentPrice && breakeven ? (currentPrice-breakeven)/breakeven*100 : null
 
-  const buys          = pointedOps.filter(o=>o.sens==='Achat')
-  const sells         = pointedOps.filter(o=>o.sens==='Vente')
-  const totalInvested = buys.reduce((s,o)=>s+o.usdt,0)
-  const position      = buys.reduce((s,o)=>s+(o.vol||0),0) - sells.reduce((s,o)=>s+(o.vol||0),0)
+  const buys          = useMemo(() => pointedOps.filter(o=>o.sens==='Achat' && o.exec), [pointedOps])
+  const sells         = useMemo(() => pointedOps.filter(o=>o.sens==='Vente' && o.exec), [pointedOps])
+  const totalInvested = useMemo(() => buys.reduce((s,o)=>s+o.usdt,0),  [buys])
+  const totalSold     = useMemo(() => sells.reduce((s,o)=>s+o.usdt,0), [sells])
+  const avgBuyPrice   = useMemo(() => computeAvgPrice(pointedOps), [pointedOps])
+  const avgSellPrice  = useMemo(() => {
+    const vol = sells.reduce((s,o)=>s+(o.vol||0),0)
+    return vol > 0 ? totalSold / vol : 0
+  }, [sells, totalSold])
+  const totalVolSold  = useMemo(() => sells.reduce((s,o)=>s+(o.vol||0),0), [sells])
+  const position      = buys.reduce((s,o)=>s+(o.vol||0),0) - totalVolSold
   const pnlLatent     = currentPrice && position>0 && breakeven>0 ? position*(currentPrice-breakeven) : 0
 
   const cyclePeriod  = getCurrentPeriodOps(plan, pointedOps)
@@ -613,24 +620,55 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
       </div>
 
       {/* ── KPIs ──────────────────────────────────────────────────────────── */}
-      <div className="dca-kpi-grid">
+      <div className="dca-kpi-grid" style={{gridTemplateColumns:'repeat(4,1fr)'}}>
+
+        {/* Investi + prix moyen d'achat */}
         <div className="dca-kpi">
-          <div className="dca-kpi-val">{totalInvested>0?fmt(totalInvested,2):'—'}</div>
+          <div className="dca-kpi-val">{totalInvested>0?`$${totalInvested.toFixed(0)}`:'—'}</div>
           <div className="dca-kpi-lbl">Total investi</div>
-          <div className="dca-kpi-sub">{buys.length} opérations pointées</div>
+          <div className="dca-kpi-sub">{buys.length} achats pointés</div>
+          {avgBuyPrice>0 && (
+            <div style={{marginTop:6,paddingTop:6,borderTop:'0.5px solid var(--border)'}}>
+              <div style={{fontFamily:"'Space Mono',monospace",fontWeight:'700',fontSize:'.7rem',color:'var(--text)'}}>{fmt(avgBuyPrice)}</div>
+              <div style={{fontSize:'.5rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.07em'}}>Prix moy. d'achat</div>
+            </div>
+          )}
         </div>
-        <div className="dca-kpi" title={`Solde = Σ(${plan.baseAmount} USDT − injecté) par cycle. Positif = capital disponible. Négatif = sur-investissement.`}>
+
+        {/* Solde rechargement */}
+        <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:rechargement.total>0?'var(--gold)':rechargement.total<0?'var(--green)':'var(--muted)'}}>
             {rechargement.total>=0?'+':''}{rechargement.total.toFixed(0)} USDT
           </div>
-          <div className="dca-kpi-lbl">Solde rechargement ⓘ</div>
-          <div className="dca-kpi-sub">{rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}</div>
+          <div className="dca-kpi-lbl">Solde rechargement</div>
+          <div className="dca-kpi-sub">
+            {rechargement.missed} cycle{rechargement.missed!==1?'s':''} incomplet{rechargement.missed!==1?'s':''}
+          </div>
+          <div style={{marginTop:6,fontSize:'.52rem',color:'var(--muted)',lineHeight:1.5}}>
+            Σ({plan.baseAmount} USDT − injecté) par cycle
+          </div>
         </div>
+
+        {/* Total profits + prix moyen de vente */}
+        <div className="dca-kpi">
+          <div className="dca-kpi-val" style={{color:totalSold>0?'var(--green)':'var(--muted)'}}>{totalSold>0?`$${totalSold.toFixed(0)}`:'—'}</div>
+          <div className="dca-kpi-lbl">Total réalisé</div>
+          <div className="dca-kpi-sub">{sells.length} vente{sells.length!==1?'s':''} exécutée{sells.length!==1?'s':''}</div>
+          {avgSellPrice>0 && (
+            <div style={{marginTop:6,paddingTop:6,borderTop:'0.5px solid var(--border)'}}>
+              <div style={{fontFamily:"'Space Mono',monospace",fontWeight:'700',fontSize:'.7rem',color:'var(--text)'}}>{fmt(avgSellPrice)}</div>
+              <div style={{fontSize:'.5rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.07em'}}>Prix moy. de vente</div>
+            </div>
+          )}
+        </div>
+
+        {/* PnL latent */}
         <div className="dca-kpi">
           <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
           <div className="dca-kpi-lbl">PnL latent</div>
           <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
         </div>
+
       </div>
 
       {/* ── Zones de stratégie ────────────────────────────────────────────── */}
