@@ -483,7 +483,12 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
     return days
   }, [timeline])
 
-  const bull=plan.bullThreshold||20, MIN_D=-25, MAX_D=bull*1.5
+  // Seuil bull run = écart de la 1ère zone profit
+  const bull = useMemo(() => {
+    const profitEcarts = allZones.filter(z=>z.type==='profit').map(z=>parseFloat(z.ecart)||0)
+    return profitEcarts.length > 0 ? Math.min(...profitEcarts) : 25
+  }, [allZones])
+  const MIN_D=-25, MAX_D=bull*1.5
   const needlePct=delta!=null?Math.min(98,Math.max(2,(delta-MIN_D)/(MAX_D-MIN_D)*100)):50
 
   function signalClass() {
@@ -566,7 +571,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
             <div className="dca-zone-seg z0">Vente</div>
             <div className="dca-zone-needle" style={{left:`${needlePct}%`}}/>
           </div>
-          <div className="dca-zone-labels"><span>&lt; 0%</span><span>0–5%</span><span>5–10%</span><span>10–{bull}%</span><span>&gt; {bull}%</span></div>
+          <div className="dca-zone-labels"><span>&lt; 0%</span><span>0–5%</span><span>5–10%</span><span>10–{bull}%</span><span>&gt; {bull}% profit</span></div>
         </div>
       </div>
 
@@ -719,7 +724,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   const INIT_WIZARD = () => ({
     pair: pairList[0]?.name||'', customPair:'', startDate:'', endDate:'',
     pointedOps: undefined,
-    params: { baseAmount:10, frequency:'day', bullThreshold:20, zones:[...DEFAULT_ZONES] }
+    params: { baseAmount:10, frequency:'day', zones:[...DEFAULT_ZONES] }
   })
   const [wizard, setWizard] = useState(INIT_WIZARD)
 
@@ -737,7 +742,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
 
   async function saveTemplate(name) {
     const p = wizard.params || {}
-    const tpl = { name, baseAmount: p.baseAmount??10, frequency: p.frequency??'day', bullThreshold: p.bullThreshold??20, zones: p.zones||DEFAULT_ZONES }
+    const tpl = { name, baseAmount: p.baseAmount??10, frequency: p.frequency??'day', zones: p.zones||DEFAULT_ZONES }
     const id = await saveDcaTemplate(tpl)
     setTemplates(prev => { const ex=prev.find(t=>t.id===id); return ex?prev.map(t=>t.id===id?{...tpl,id}:t):[...prev,{...tpl,id}] })
   }
@@ -745,7 +750,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   function loadTemplate(tpl) {
     setWizard(w => ({
       ...w,
-      params: { baseAmount: tpl.baseAmount, frequency: tpl.frequency, bullThreshold: tpl.bullThreshold, zones: tpl.zones||DEFAULT_ZONES }
+      params: { baseAmount: tpl.baseAmount, frequency: tpl.frequency, zones: tpl.zones||DEFAULT_ZONES }
     }))
   }
 
@@ -793,7 +798,6 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
         pointedOps: pointed,
         baseAmount:    p.baseAmount??10,
         frequency:     p.frequency??'day',
-        bullThreshold: p.bullThreshold??20,
         zones:         p.zones||DEFAULT_ZONES,
       }
       const id   = await saveDcaPlan(planData)
