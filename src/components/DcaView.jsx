@@ -7,6 +7,7 @@ import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../lib/dcaRepository.js'
 import { saveSnapshot, loadSnapshot } from '../lib/repository.js'
 import { normPair } from '../lib/parser.js'
+import { parseDate } from '../lib/process.js'
 import EntryForm from './EntryForm.jsx'
 import KpiTooltip from './KpiTooltip.jsx'
 import {
@@ -876,7 +877,12 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
 
   function openPlan(plan) { setCurrentPlan(plan); setScreen('dashboard') }
   function startNewWizard() { setWizard(INIT_WIZARD()); setCurrentPlan(null); setScreen(1) }
-  async function deletePlan(id) { await deleteDcaPlan(id); setPlans(p=>p.filter(x=>x.id!==id)) }
+  async function deletePlan(id) {
+    const plan = plans.find(p => p.id === id)
+    await deleteDcaPlan(id)
+    setPlans(p => p.filter(x => x.id !== id))
+    if (plan) await unFlagPlanOps(plan)
+  }
   async function deleteTemplate(id) { await deleteDcaTemplate(id); setTemplates(t=>t.filter(x=>x.id!==id)) }
 
   async function saveTemplate(name) {
@@ -928,8 +934,8 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
           // Normaliser la paire stockée comme le fait extractRawRows
           const pairMatch = normPair(String(r[1]||'').trim()) === op.pair
           if (!pairMatch) return false
-          // Date : tolérance ±1.5 jour (décalages de fuseau horaire)
-          const snapDate = r[0] ? new Date(String(r[0])) : null
+          // Date : utiliser parseDate (gère DD/MM/YYYY, YYYY-MM-DD, serial Excel…)
+          const snapDate = parseDate(r[0])
           const dateMatch = snapDate && op.date &&
             Math.abs(snapDate.getTime() - op.date.getTime()) < 86400000 * 1.5
           if (!dateMatch) return false
@@ -960,6 +966,28 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
     } catch(e) {
       console.warn('step2FlagOps error:', e)
     }
+  }
+
+  // Retire le flag [DCA] de toutes les lignes du journal correspondant à ce plan
+  async function unFlagPlanOps(plan) {
+    try {
+      const snap = await loadSnapshot()
+      if (!snap?.rows) return
+      const rows = snap.rows.map(r => [...r])
+      let changed = false
+      for (let ri = 1; ri < rows.length; ri++) {
+        const r = rows[ri]
+        if (!r[1]) continue
+        if (normPair(String(r[1]||'').trim()) !== plan.pair) continue
+        const notes  = String(r[11] || '')
+        const hasDca = notes.includes('[DCA]')
+        if (hasDca) {
+          rows[ri][11] = notes.replace(/\[DCA\]/g, '').trim()
+          changed = true
+        }
+      }
+      if (changed) await saveSnapshot(rows, snap.source)
+    } catch(e) { console.warn('unFlagPlanOps error:', e) }
   }
 
   async function step3Save() {
