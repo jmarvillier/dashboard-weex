@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import '../styles/dca.css'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../lib/dcaRepository.js'
-import { updateRow, loadSnapshot } from '../lib/repository.js'
+import { saveSnapshot, loadSnapshot } from '../lib/repository.js'
 import EntryForm from './EntryForm.jsx'
 import {
   computeBreakeven, computeAvgPrice, computeRechargement,
@@ -764,23 +764,52 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
     try {
       const snap = await loadSnapshot()
       if (!snap?.rows) return
+      // Travailler sur une copie en mémoire — une seule sauvegarde à la fin
+      const rows = snap.rows.map(r => [...r])
+      let changed = false
+
       for (let i = 0; i < ops.length; i++) {
-        if (!pointed.includes(getOpKey(ops[i], i))) continue
-        const op = ops[i]
-        const rowIdx = snap.rows.findIndex((r, ri) => {
-          if (ri === 0) return false
-          const dateMatch = r[0] && op.date && Math.abs(new Date(String(r[0])).getTime()-op.date.getTime()) < 86400000
+        const op        = ops[i]
+        const isPointed = pointed.includes(getOpKey(op, i))
+
+        // Trouver la ligne dans le snapshot (correspondance date + paire + montant)
+        const rowIdx = rows.findIndex((r, ri) => {
+          if (ri === 0) return false                          // skip header
+          if (!r[1]) return false
           const pairMatch = String(r[1]||'').trim() === op.pair
-          const amtMatch  = Math.abs((parseFloat(r[5])||0) - op.usdt) < 0.01
-          return dateMatch && pairMatch && amtMatch
+          if (!pairMatch) return false
+          // Date : tolérance ±1 jour
+          const snapDate = r[0] ? new Date(String(r[0])) : null
+          const dateMatch = snapDate && op.date &&
+            Math.abs(snapDate.getTime() - op.date.getTime()) < 86400000 * 1.5
+          if (!dateMatch) return false
+          // Montant : tester r[5], r[6], r[7] (USDT / USDC / EUR)
+          const snapAmt = (parseFloat(r[5])||0) || (parseFloat(r[6])||0) || (parseFloat(r[7])||0)
+          const amtMatch = op.usdt > 0
+            ? Math.abs(snapAmt - op.usdt) < 0.10
+            : true
+          return amtMatch
         })
+
         if (rowIdx < 0) continue
-        const row = [...snap.rows[rowIdx]]
-        while (row.length <= 12) row.push('')
-        const notes = String(row[11]||'')
-        if (!notes.includes('[DCA]')) { row[11] = notes ? notes+' [DCA]' : '[DCA]'; await updateRow(rowIdx, row) }
+        while (rows[rowIdx].length <= 12) rows[rowIdx].push('')
+        const notes  = String(rows[rowIdx][11] || '')
+        const hasDca = notes.includes('[DCA]')
+
+        if (isPointed && !hasDca) {
+          rows[rowIdx][11] = notes.trim() ? notes.trim() + ' [DCA]' : '[DCA]'
+          changed = true
+        } else if (!isPointed && hasDca) {
+          rows[rowIdx][11] = notes.replace(/\[DCA\]/g, '').trim()
+          changed = true
+        }
       }
-    } catch(e) { console.warn('step2FlagOps:', e) }
+
+      // Sauvegarder en une seule écriture si des changements ont eu lieu
+      if (changed) await saveSnapshot(rows, snap.source)
+    } catch(e) {
+      console.warn('step2FlagOps error:', e)
+    }
   }
 
   async function step3Save() {
