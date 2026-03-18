@@ -485,6 +485,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
   const [savedMsg,    setSavedMsg]    = useState('')
   const [manualPrice, setManualPrice] = useState('')
   const [openTip,     setOpenTip]     = useState(null)
+  const [syncing,     setSyncing]     = useState(false)
 
   const effectivePair = plan.pair || ''
   const freqLabel     = PERIOD_LABEL[plan.frequency||'day'] || 'jour'
@@ -608,6 +609,37 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
   function onSaved() { setShowEntry(false); setSavedMsg('✓ Entrée ajoutée — données mises à jour.'); setTimeout(()=>setSavedMsg(''),4000); onRefresh?.() }
 
+  async function resyncPlanIds() {
+    setSyncing(true)
+    try {
+      const snap = await loadSnapshot()
+      if (!snap?.rows) return
+      const rows = snap.rows.map(r => [...r])
+      let changed = false
+      // Mettre planId sur toutes les lignes dont les dates correspondent aux pointedOps du plan
+      const legacy = plan.pointedOps || []
+      const legacyTs = legacy.map(key => {
+        const iso = key.split('_')[0]; const d = new Date(iso)
+        return isNaN(d.getTime()) ? null : d.getTime()
+      }).filter(Boolean)
+      for (let ri = 1; ri < rows.length; ri++) {
+        const r = rows[ri]
+        if (!r[1] || normPair(String(r[1]||'')) !== effectivePair) continue
+        while (rows[ri].length <= 12) rows[ri].push('')
+        const snapDate = parseDate(r[0])
+        if (!snapDate) continue
+        const matches = legacyTs.some(ts => Math.abs(snapDate.getTime() - ts) < 120000)
+        if (matches && String(rows[ri][8]||'') !== plan.id) {
+          rows[ri][8] = plan.id; changed = true
+        }
+      }
+      if (changed) { await saveSnapshot(rows, snap.source); onRefresh?.() }
+      setSavedMsg('✓ Lignes DCA synchronisées.')
+      setTimeout(()=>setSavedMsg(''), 4000)
+    } catch(e) { console.warn('resync:', e) }
+    finally { setSyncing(false) }
+  }
+
   return (
     <div className="dca-scroll">
       {savedMsg && <div className="dca-banner dca-banner-success">{savedMsg}</div>}
@@ -623,7 +655,15 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
               {plan.startDate?` · depuis ${new Date(plan.startDate).toLocaleDateString('fr-FR')}`:''} · {buys.length} achats
             </span>
           </div>
-          <div style={{fontSize:'.52rem',color:'var(--green)'}}>● Actif</div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <div style={{fontSize:'.52rem',color:'var(--green)'}}>● Actif</div>
+            {pointedOps.length === 0 && (
+              <button className="dca-btn" style={{fontSize:'.52rem',padding:'3px 8px',borderColor:'var(--gold)',color:'var(--gold)'}}
+                onClick={resyncPlanIds} disabled={syncing}>
+                {syncing ? '⏳' : '⟳ Sync lignes DCA'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="dca-hero-prices">
@@ -1047,22 +1087,25 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   async function step3Save() {
     setSaving(true)
     try {
-      const pair = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
-      const ops  = filterOpsForPlan(rawRows, pair, wizard.startDate, wizard.endDate)
-      const pointed = wizard.pointedOps||[]
-      const pOps = ops.filter((op,i)=>pointed.includes(getOpKey(op,i)))
+      const pair    = wizard.pair==='NEW' ? wizard.customPair : wizard.pair
+      const ops     = filterOpsForPlan(rawRows, pair, wizard.startDate, wizard.endDate)
+      const pointed = wizard.pointedOps || []
+      const pOps    = ops.filter((op,i) => pointed.includes(getOpKey(op,i)))
       const firstDate = pOps.filter(o=>o.sens==='Achat'&&o.date).sort((a,b)=>a.date-b.date)[0]?.date
-      const startDate = wizard.startDate || (firstDate?firstDate.toISOString().split('T')[0]:'')
-      const p = wizard.params||{}
+      const startDate = wizard.startDate || (firstDate ? firstDate.toISOString().split('T')[0] : '')
+      const planId  = wizard.planId || newPlanId(pair)
+      const p       = wizard.params || {}
       const planData = {
-        id: wizard.planId || newPlanId(pair),  // id stable depuis le début du wizard
-        pair, startDate, endDate: wizard.endDate||null,
-        baseAmount: p.baseAmount??10,
-        frequency:  p.frequency??'day',
-        zones:      p.zones||DEFAULT_ZONES,
+        id: planId, pair, startDate, endDate: wizard.endDate || null,
+        baseAmount: p.baseAmount ?? 10,
+        frequency:  p.frequency  ?? 'day',
+        zones:      p.zones      || DEFAULT_ZONES,
       }
-      const id   = await saveDcaPlan(planData)
-      const saved = {...planData, id}
+      // 1. Sauvegarder le plan en Firestore
+      const id = await saveDcaPlan(planData)
+      // 2. Écrire le planId en col 8 des lignes pointées (source de vérité)
+      await step2AssignPlan(ops, pointed, id)
+      const saved = { ...planData, id }
       setCurrentPlan(saved)
       setPlans(prev => { const ex=prev.find(x=>x.id===id); return ex?prev.map(x=>x.id===id?saved:x):[...prev,saved] })
       setScreen('dashboard')
