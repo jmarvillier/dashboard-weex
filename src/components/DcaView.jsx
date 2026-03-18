@@ -499,10 +499,10 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
   }, [plan])
 
   const ops = useMemo(() => filterOpsForPlan(rawRows, effectivePair, plan.startDate, plan.endDate), [rawRows, effectivePair, plan.startDate, plan.endDate])
-  const pointed = plan.pointedOps || []
-  const pointedOps = useMemo(() => ops.filter((op,i) =>
-    pointed.includes(getOpKey(op,i)) || (op.notes && op.notes.includes('[DCA]'))
-  ), [ops, pointed])
+  // Les ops du plan = celles dont col 8 contient l'id de ce plan
+  const pointedOps = useMemo(() =>
+    ops.filter(o => o.planId === plan.id)
+  , [ops, plan.id])
 
   const breakeven    = useMemo(() => computeBreakeven(pointedOps),        [pointedOps])
   const rechargement = useMemo(() => computeRechargement(plan, pointedOps), [plan, pointedOps])
@@ -879,7 +879,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
       <div style={{height:16}}/>
 
       {showEntry && (
-        <EntryForm onClose={()=>setShowEntry(false)} onSaved={onSaved} defaultPaire={effectivePair} flagDca={true}/>
+        <EntryForm onClose={()=>setShowEntry(false)} onSaved={onSaved} defaultPaire={effectivePair} activePlanId={plan.id}/>
       )}
     </div>
   )
@@ -895,9 +895,14 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   const [currentPlan, setCurrentPlan] = useState(null)
 
   const [wizardErr, setWizardErr] = useState('')
+  // Générer un planId stable dès le wizard (utilisé dès l'étape de pointage)
+  function newPlanId(pair) {
+    return `${(pair||'unknown').replace(/\//g,'_')}_${Date.now()}`
+  }
   const INIT_WIZARD = () => ({
     pair: pairList[0]?.name||'', customPair:'', startDate:'', endDate:'',
     pointedOps: undefined,
+    planId: newPlanId(pairList[0]?.name||'plan'),
     params: { baseAmount:10, frequency:'day', zones:[...DEFAULT_ZONES] }
   })
   const [wizard, setWizard] = useState(INIT_WIZARD)
@@ -912,10 +917,9 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
   function openPlan(plan) { setCurrentPlan(plan); setScreen('dashboard') }
   function startNewWizard() { setWizard(INIT_WIZARD()); setCurrentPlan(null); setScreen(1) }
   async function deletePlan(id) {
-    const plan = plans.find(p => p.id === id)
     await deleteDcaPlan(id)
     setPlans(p => p.filter(x => x.id !== id))
-    if (plan) await unFlagPlanOps(plan)
+    await unAssignPlanOps(id)
   }
   async function deleteTemplate(id) { await deleteDcaTemplate(id); setTemplates(t=>t.filter(x=>x.id!==id)) }
 
@@ -948,11 +952,11 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
     setScreen(hasOps ? 2 : 3)
   }
 
-  async function step2FlagOps(ops, pointed) {
+  // Affecte/retire le planId (col 8) sur les lignes du journal correspondantes
+  async function step2AssignPlan(ops, pointed, planId) {
     try {
       const snap = await loadSnapshot()
       if (!snap?.rows) return
-      // Travailler sur une copie en mémoire — une seule sauvegarde à la fin
       const rows = snap.rows.map(r => [...r])
       let changed = false
 
@@ -960,67 +964,52 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
         const op        = ops[i]
         const isPointed = pointed.includes(getOpKey(op, i))
 
-        // Trouver la ligne dans le snapshot (correspondance paire normalisée + date + montant)
         const rowIdx = rows.findIndex((r, ri) => {
-          if (ri === 0) return false                          // skip header
+          if (ri === 0) return false
           if (!r[1]) return false
-          // Normaliser la paire stockée comme le fait extractRawRows
-          const pairMatch = normPair(String(r[1]||'').trim()) === op.pair
-          if (!pairMatch) return false
-          // Date : utiliser parseDate (gère DD/MM/YYYY, YYYY-MM-DD, serial Excel…)
+          if (normPair(String(r[1]||'').trim()) !== op.pair) return false
           const snapDate = parseDate(r[0])
-          const dateMatch = snapDate && op.date &&
-            Math.abs(snapDate.getTime() - op.date.getTime()) < 86400000 * 1.5
-          if (!dateMatch) return false
-          // Montant : tester r[5], r[6], r[7] (USDT / USDC / EUR)
+          if (!snapDate || !op.date) return false
+          if (Math.abs(snapDate.getTime() - op.date.getTime()) > 86400000 * 1.5) return false
           const snapAmt = (parseFloat(r[5])||0) || (parseFloat(r[6])||0) || (parseFloat(r[7])||0)
-          const amtMatch = op.usdt > 0
-            ? Math.abs(snapAmt - op.usdt) < 0.10
-            : true
-          return amtMatch
+          return op.usdt > 0 ? Math.abs(snapAmt - op.usdt) < 0.10 : true
         })
 
         if (rowIdx < 0) continue
         while (rows[rowIdx].length <= 12) rows[rowIdx].push('')
-        const notes  = String(rows[rowIdx][11] || '')
-        const hasDca = notes.includes('[DCA]')
+        const currentPlanId = String(rows[rowIdx][8] || '')
 
-        if (isPointed && !hasDca) {
-          rows[rowIdx][11] = notes.trim() ? notes.trim() + ' [DCA]' : '[DCA]'
+        if (isPointed && currentPlanId !== planId) {
+          rows[rowIdx][8] = planId   // col 8 = planId
           changed = true
-        } else if (!isPointed && hasDca) {
-          rows[rowIdx][11] = notes.replace(/\[DCA\]/g, '').trim()
+        } else if (!isPointed && currentPlanId === planId) {
+          rows[rowIdx][8] = ''       // retirer l'affectation
           changed = true
         }
       }
 
-      // Sauvegarder en une seule écriture si des changements ont eu lieu
       if (changed) await saveSnapshot(rows, snap.source)
     } catch(e) {
-      console.warn('step2FlagOps error:', e)
+      console.warn('step2AssignPlan error:', e)
     }
   }
 
-  // Retire le flag [DCA] de toutes les lignes du journal correspondant à ce plan
-  async function unFlagPlanOps(plan) {
+  // Efface le planId (col 8) de toutes les lignes liées à ce plan
+  async function unAssignPlanOps(planId) {
     try {
       const snap = await loadSnapshot()
       if (!snap?.rows) return
       const rows = snap.rows.map(r => [...r])
       let changed = false
       for (let ri = 1; ri < rows.length; ri++) {
-        const r = rows[ri]
-        if (!r[1]) continue
-        if (normPair(String(r[1]||'').trim()) !== plan.pair) continue
-        const notes  = String(r[11] || '')
-        const hasDca = notes.includes('[DCA]')
-        if (hasDca) {
-          rows[ri][11] = notes.replace(/\[DCA\]/g, '').trim()
+        while (rows[ri].length <= 8) rows[ri].push('')
+        if (String(rows[ri][8] || '') === planId) {
+          rows[ri][8] = ''
           changed = true
         }
       }
       if (changed) await saveSnapshot(rows, snap.source)
-    } catch(e) { console.warn('unFlagPlanOps error:', e) }
+    } catch(e) { console.warn('unAssignPlanOps error:', e) }
   }
 
   async function step3Save() {
@@ -1034,11 +1023,11 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
       const startDate = wizard.startDate || (firstDate?firstDate.toISOString().split('T')[0]:'')
       const p = wizard.params||{}
       const planData = {
-        id: currentPlan?.id||null, pair, startDate, endDate: wizard.endDate||null,
-        pointedOps: pointed,
-        baseAmount:    p.baseAmount??10,
-        frequency:     p.frequency??'day',
-        zones:         p.zones||DEFAULT_ZONES,
+        id: wizard.planId || newPlanId(pair),  // id stable depuis le début du wizard
+        pair, startDate, endDate: wizard.endDate||null,
+        baseAmount: p.baseAmount??10,
+        frequency:  p.frequency??'day',
+        zones:      p.zones||DEFAULT_ZONES,
       }
       const id   = await saveDcaPlan(planData)
       const saved = {...planData, id}
@@ -1053,7 +1042,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
     <div className="dca-page">
       {screen==='list'      && <DcaList plans={plans} loading={loading} onNew={startNewWizard} onOpen={openPlan} onDelete={deletePlan} templates={templates} onDeleteTpl={deleteTemplate}/>}
       {screen===1           && <Step1 wizard={wizard} setWizard={setWizard} pairList={pairList} rawRows={rawRows} onNext={step1Next} onBack={()=>setScreen('list')} wizardErr={wizardErr}/>}
-      {screen===2           && <Step2 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={()=>setScreen(3)} onBack={()=>setScreen(1)} onFlagOps={step2FlagOps}/>}
+      {screen===2           && <Step2 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={()=>setScreen(3)} onBack={()=>setScreen(1)} onFlagOps={(ops,pointed)=>step2AssignPlan(ops,pointed,wizard.planId)}/>}
       {screen===3           && <Step3 wizard={wizard} setWizard={setWizard} rawRows={rawRows} onNext={step3Save} onBack={()=>setScreen(2)} saving={saving} templates={templates} onSaveTpl={saveTemplate} onLoadTpl={loadTemplate}/>}
       {screen==='dashboard' && currentPlan && <DcaDashboard plan={currentPlan} rawRows={rawRows} prices={prices} onBack={()=>setScreen('list')} onRefresh={onRefresh}/>}
     </div>

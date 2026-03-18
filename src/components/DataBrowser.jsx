@@ -30,7 +30,7 @@ const COLUMNS = [
   { key: 11, label: 'Notes',     type: 'text',           width: '220px' },
   { key: 12, label: 'Dashboard', type: 'select',         width: '100px',
     options: ['true', 'false'] },
-  { key: 'dca', label: 'DCA',   type: 'dca-flag',       width: '60px'  },
+  { key: 8,     label: 'Plan DCA', type: 'text',         width: '90px'  },
 ]
 
 const PAGE_SIZE = 20
@@ -104,17 +104,19 @@ function formatCell(col, value) {
   if (col.key === 12) {
     return <span className={`db-badge ${s === 'false' ? 'badge-annul' : 'badge-exec'}`}>{s}</span>
   }
-  if (col.key === 'dca') {
-    // DCA flag is encoded in notes (col 11)
-    const hasDca = String(value ?? '').includes('[DCA]')
-    return <span className={`db-badge ${hasDca ? 'badge-exec' : ''}`} style={{opacity:hasDca?1:.35}}>{hasDca?'✓ DCA':'—'}</span>
+  if (col.key === 8) {
+    const pid = String(value ?? '').trim()
+    if (!pid) return <span className="db-empty">—</span>
+    // Afficher les 8 derniers chars pour rester compact
+    const short = pid.length > 12 ? '…' + pid.slice(-10) : pid
+    return <span className="db-badge badge-exec" style={{fontSize:'.52rem',letterSpacing:0}}>{short}</span>
   }
   return <span className="db-text">{s}</span>
 }
 
 // ── Ligne en lecture — boutons en DÉBUT de ligne ──────────────────────────────
 
-function ReadRow({ entry, onEdit, onDelete, onToggleDca }) {
+function ReadRow({ entry, onEdit, onDelete }) {
   const { rowIndex, data } = entry
   const isExcluded = String(data[12]).trim().toLowerCase() === 'false'
 
@@ -127,15 +129,7 @@ function ReadRow({ entry, onEdit, onDelete, onToggleDca }) {
       </td>
       {COLUMNS.map(col => (
         <td key={col.key} className="db-cell">
-          {col.key === 'dca' ? (
-            <button
-              title="Cliquer pour basculer le flag DCA"
-              style={{background:'none',border:'none',cursor:'pointer',padding:'2px 4px'}}
-              onClick={() => onToggleDca(rowIndex, data[11])}
-            >
-              {formatCell(col, data[11])}
-            </button>
-          ) : formatCell(col, data[col.key])}
+          {formatCell(col, data[col.key])}
         </td>
       ))}
     </tr>
@@ -171,22 +165,7 @@ function EditRow({ entry, onSave, onCancel, saving }) {
       </td>
       {COLUMNS.map(col => (
         <td key={col.key} className="db-cell db-cell-input">
-          {col.type === 'dca-flag' ? (
-            (() => {
-              const notes = String(draft[11] ?? '')
-              const hasDca = notes.includes('[DCA]')
-              return (
-                <input type="checkbox" checked={hasDca}
-                  style={{width:16,height:16,accentColor:'var(--green)',cursor:'pointer'}}
-                  onChange={e => {
-                    const newNotes = e.target.checked
-                      ? (notes.includes('[DCA]') ? notes : (notes.trim() ? notes.trim()+' [DCA]' : '[DCA]'))
-                      : notes.replace('[DCA]','').trim()
-                    set(11, newNotes)
-                  }}/>
-              )
-            })()
-          ) : col.type === 'select' ? (
+          {col.type === 'select' ? (
             <select className="db-input" value={draft[col.key]} onChange={e => set(col.key, e.target.value)}>
               {col.options.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
@@ -254,25 +233,7 @@ export default function DataBrowser({ onClose, onDataChanged }) {
     finally { setSaving(false) }
   }
 
-  async function handleToggleDca(rowIndex, currentNotes) {
-    const notes = String(currentNotes ?? '')
-    const newNotes = notes.includes('[DCA]')
-      ? notes.replace('[DCA]', '').trim()
-      : (notes.trim() ? notes.trim() + ' [DCA]' : '[DCA]')
-    // Build updated row from current allEntries
-    const entry = allEntries.find(e => e.rowIndex === rowIndex)
-    if (!entry) return
-    const newData = [...entry.data]
-    while (newData.length <= 12) newData.push('')
-    newData[11] = newNotes
-    setSaving(true); setError(null)
-    try {
-      await updateRow(rowIndex, newData)
-      await reload()
-      onDataChanged?.()
-    } catch (e) { setError('Erreur bascule DCA : ' + e.message) }
-    finally { setSaving(false) }
-  }
+
 
   async function handleDelete(rowIndex) {
     setSaving(true); setError(null)
@@ -374,7 +335,6 @@ export default function DataBrowser({ onClose, onDataChanged }) {
                         entry={entry}
                         onEdit={ri => { setEditing(ri); setDeleteConfirm(null) }}
                         onDelete={ri => setDeleteConfirm(ri)}
-                        onToggleDca={handleToggleDca}
                       />
                     )
                   )}
