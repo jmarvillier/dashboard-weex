@@ -2,7 +2,7 @@
  * DcaStep1.jsx — Wizard étape 1 : sélection de la paire et de la période
  */
 import { useMemo } from 'react'
-import { filterOpsForPlan, PERIOD_LABEL } from '../../../lib/dcaUtils.js'
+import { filterOpsForPlan, PERIOD_LABEL } from '../../lib/dcaUtils.js'
 import Stepper from './DcaStepper.jsx'
 
 /* ═══ STEP 1 — Paire ══════════════════════════════════════════════════════ */
