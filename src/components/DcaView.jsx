@@ -469,7 +469,7 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
         {profitHasEmpty && <div className="dca-banner dca-banner-danger" style={{marginTop:8}}>Renseignez le % de position vendu pour chaque zone de profit.</div>}
       </div>
 
-      <div className="dca-btm">
+      <div className="dca-btm" style={{position:'sticky',bottom:0,background:'var(--bg2)',zIndex:10,borderTop:'1px solid var(--border)',marginTop:8}}>
         <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button>
         <span className="dca-step-hint">Étape 3 / 3</span>
         <button className="dca-btn dca-btn-success" disabled={!canSubmit||saving} onClick={()=>setShowConfirm(true)}>Créer le plan DCA ✓</button>
@@ -1108,6 +1108,8 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
       const saved = { ...planData, id }
       setCurrentPlan(saved)
       setPlans(prev => { const ex=prev.find(x=>x.id===id); return ex?prev.map(x=>x.id===id?saved:x):[...prev,saved] })
+      // 3. Recharger rawRows pour que le dashboard voie les planIds mis à jour
+      onRefresh?.()
       setScreen('dashboard')
     } catch(e) { console.error('step3Save:', e) }
     finally { setSaving(false) }
