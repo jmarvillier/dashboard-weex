@@ -31,7 +31,6 @@ const MENU_ITEMS = [
     desc: 'Voir, modifier et supprimer les entrées du repository',
     pill: '🔍 gérer',
     pillClass: 'browse-pill',
-    requiresData: true,
   },
   {
     id: 'import',
@@ -48,7 +47,6 @@ const MENU_ITEMS = [
     desc: 'Télécharge tout le repository en fichier Excel',
     pill: '📤 exporter',
     pillClass: 'action-pill',
-    requiresData: true,
   },
 ]
 
@@ -241,7 +239,7 @@ export default function DataMenu({
   const [activeAction, setActiveAction] = useState(null)
 
   function handleItemClick(item) {
-    if (item.requiresData && !repoAvailable) return
+
     setActiveAction(item.id)
   }
 
@@ -302,16 +300,15 @@ export default function DataMenu({
 
       <div className="dm-grid">
         {MENU_ITEMS.map(item => {
-          const locked = item.requiresData && !repoAvailable
           return (
             <div
               key={item.id}
-              className={`choice-card dm-card${locked ? ' disabled' : ''}`}
+              className={`choice-card dm-card`}
               onClick={() => handleItemClick(item)}
-              title={locked ? 'Importez d\'abord des données.' : undefined}
+              
             >
               <div className={item.pillClass}>{item.pill}</div>
-              {locked && <div className="locked-pill">🔒 vide</div>}
+              
               <span className="choice-icon">{item.icon}</span>
               <div className="choice-title">{item.title}</div>
               <div className="choice-desc">{item.desc}</div>

@@ -35,9 +35,9 @@ function nowLocal() {
 
 // ── Données statiques ─────────────────────────────────────────────────────────
 
-const INITIAL = {
+const makeInitial = (paire = '') => ({
   datetime  : nowLocal(),
-  paire     : '',
+  paire,
   sens      : 'Achat',
   statut    : 'Exécuté',
   cours     : '',
@@ -47,7 +47,8 @@ const INITIAL = {
   volume    : '',
   notes     : '',
   dashboard : true,
-}
+})
+const INITIAL = makeInitial()
 
 const SENS_OPTIONS = [
   { label: 'Achat',   icon: '↑', key: 'achat'   },
@@ -151,8 +152,9 @@ function PaireInput({ value, onChange }) {
 
 // ── Composant principal ───────────────────────────────────────────────────────
 
-export default function EntryForm({ onClose, onSaved }) {
-  const [form, setForm]       = useState(INITIAL)
+export default function EntryForm({ onClose, onSaved, defaultPaire = '', activePlanId = null }) {
+  const [form, setForm]       = useState(() => makeInitial(defaultPaire))
+  const [isDca, setIsDca]         = useState(!!activePlanId)
   const [busy, setBusy]       = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError]     = useState(null)
@@ -172,19 +174,19 @@ export default function EntryForm({ onClose, onSaved }) {
 
   function toRow() {
     return [
-      form.datetime,           // [0]  Date + heure
-      form.paire.trim(),       // [1]  Paire
-      form.sens,               // [2]  Sens
-      form.statut,             // [3]  Statut
-      form.cours   || '',      // [4]  Cours
-      form.usdt    || '',      // [5]  Montant USDT
-      form.usdc    || '',      // [6]  Montant USDC
-      form.eur     || '',      // [7]  Montant EUR
-      '',                      // [8]  réservé
-      '',                      // [9]  réservé
-      form.volume  || '',      // [10] Volume
-      form.notes   || '',      // [11] Notes
-      form.dashboard ? 'true' : 'false', // [12] Dashboard
+      form.datetime,
+      form.paire.trim(),
+      form.sens,
+      form.statut,
+      form.cours  || '',
+      form.usdt   || '',
+      form.usdc   || '',
+      form.eur    || '',
+      isDca && activePlanId ? activePlanId : '',  // col 8 = planId si DCA coché
+      '',                                          // col 9 réservé
+      form.volume || '',
+      form.notes.trim() || '',
+      form.dashboard ? 'true' : 'false',
     ]
   }
 
@@ -198,7 +200,7 @@ export default function EntryForm({ onClose, onSaved }) {
       setSuccess(true)
       setTimeout(() => {
         setSuccess(false)
-        setForm({ ...INITIAL, datetime: nowLocal() })
+        setForm(makeInitial(defaultPaire))
         onSaved?.()
       }, 1400)
     } catch (e) {
@@ -356,6 +358,26 @@ export default function EntryForm({ onClose, onSaved }) {
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
             />
+          </div>
+
+          {/* ── DCA flags — même style que le toggle Dashboard ── */}
+          <div className="ef-toggle-row" style={{flexDirection:'column',alignItems:'stretch',gap:8}}>
+            {/* Toggle DCA — visible seulement si un planId actif est fourni */}
+            {activePlanId && (
+              <label className="ef-toggle-label">
+                <div
+                  className={`ef-toggle${isDca ? ' on' : ''}`}
+                  onClick={() => setIsDca(v => !v)}
+                >
+                  <div className="ef-toggle-thumb" />
+                </div>
+                Inclure dans le plan DCA actif de la paire
+                <span className="ef-toggle-hint" style={{marginLeft:'auto'}}>
+                  {isDca ? '✅ Attaché au plan DCA' : '⛔ Non attaché au plan DCA'}
+                </span>
+              </label>
+            )}
+
           </div>
 
           {/* ── Ligne 6 : Dashboard toggle ── */}

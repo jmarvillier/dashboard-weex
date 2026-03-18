@@ -1,0 +1,86 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Scaled Mirror DCA — Styles
+   Charte: bleu nuit crépusculaire · Space Mono · CSS custom properties
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   dca.css — Scaled Mirror DCA — charte bleu nuit v5
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Conteneur principal ────────────────────────────────────────────────── */
+.dca-page { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.dca-scroll { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Stepper ─────────────────────────────────────────────────────────────── */
+/* ── Card générique ──────────────────────────────────────────────────────── */
+.dca-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px 20px;
+}
+.dca-card-title {
+  font-family: 'Space Mono', monospace; font-weight: 700; font-size: .72rem;
+  color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+}
+.dca-tag { font-size: .5rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; }
+.dca-tag-req  { background: rgba(212,90,80,.12); border: 1px solid rgba(212,90,80,.3); color: var(--red); }
+.dca-tag-opt  { background: rgba(110,152,182,.08); border: 1px solid var(--border); color: var(--muted); }
+.dca-tag-min  { background: rgba(200,160,32,.1); border: 1px solid rgba(200,160,32,.25); color: var(--gold); }
+
+/* ── Bannières ───────────────────────────────────────────────────────────── */
+.dca-banner { padding: 10px 14px; border-radius: 8px; font-size: .62rem; line-height: 1.6; border: 1px solid; }
+.dca-banner-info { background: rgba(74,128,168,.08); border-color: rgba(74,128,168,.25); color: var(--text2); }
+.dca-banner-warn { background: rgba(200,160,32,.07); border-color: rgba(200,160,32,.25); color: var(--gold); }
+.dca-banner-danger { background: rgba(212,90,80,.08); border-color: rgba(212,90,80,.28); color: var(--red); }
+.dca-banner-success { background: rgba(61,191,144,.07); border-color: rgba(61,191,144,.22); color: var(--green); }
+
+/* ── Liste des plans ─────────────────────────────────────────────────────── */
+.dca-empty-zone { border: 1px dashed var(--border); border-radius: 12px; padding: 28px; text-align: center; color: var(--muted); font-size: .65rem; cursor: pointer; transition: border-color .2s; }
+.dca-empty-zone:hover { border-color: var(--blue); color: var(--text2); }
+
+/* ── Pair chips ──────────────────────────────────────────────────────────── */
+/* ── Form inputs ─────────────────────────────────────────────────────────── */
+.dca-form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.dca-form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 130px; }
+.dca-form-group label { font-size: .56rem; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.dca-input, .dca-select {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: .7rem; padding: 9px 12px;
+  border-radius: 8px; outline: none; transition: border-color .2s; width: 100%;
+}
+.dca-input:focus, .dca-select:focus { border-color: var(--gold); }
+.dca-input::placeholder { color: var(--muted); }
+.dca-input-group { display: flex; }
+.dca-input-group .dca-input { border-radius: 8px 0 0 8px; border-right: none; }
+.dca-input-sfx { padding: 9px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 0 8px 8px 0; font-size: .65rem; color: var(--muted); white-space: nowrap; }
+
+/* ── Param tables ────────────────────────────────────────────────────────── */
+/* ── Pointage table (read-only DataBrowser style) ────────────────────────── */
+/* ── Dashboard Hero ──────────────────────────────────────────────────────── */
+/* ── Zone bar ────────────────────────────────────────────────────────────── */
+/* ── Signal box ──────────────────────────────────────────────────────────── */
+/* ── KPIs ────────────────────────────────────────────────────────────────── */
+/* ── Palier rows ─────────────────────────────────────────────────────────── */
+/* ── Timeline ────────────────────────────────────────────────────────────── */
+/* ── Navigation bas de page ──────────────────────────────────────────────── */
+.dca-btm { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.dca-step-hint { font-size: .56rem; color: var(--muted); }
+.dca-btn { padding: 9px 18px; border-radius: 8px; font-size: .65rem; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-family: 'Space Mono', monospace; transition: all .15s; }
+.dca-btn:hover { border-color: var(--text2); color: var(--text); }
+.dca-btn-primary { background: rgba(74,128,168,.15); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+.dca-btn-primary:hover { background: rgba(74,128,168,.25); }
+.dca-btn-success { background: rgba(61,191,144,.12); border-color: var(--green); color: var(--green); font-weight: 700; }
+.dca-btn-success:hover { background: rgba(61,191,144,.22); }
+.dca-btn-ghost { background: none; border-color: transparent; color: var(--muted); }
+.dca-btn-ghost:hover { color: var(--text2); background: none; }
+
+/* ── Retour ──────────────────────────────────────────────────────────────── */
+.dca-back-bar { display: flex; align-items: center; gap: 10px; padding: 0 0 12px; flex-shrink: 0; }
+.dca-back-btn { background: none; border: none; color: var(--muted); font-size: .6rem; cursor: pointer; font-family: 'Space Mono', monospace; display: flex; align-items: center; gap: 5px; padding: 4px 0; }
+.dca-back-btn:hover { color: var(--text2); }
+.dca-back-pair { font-size: .6rem; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .dca-two-col { grid-template-columns: 1fr; }
+  .dca-kpi-grid { grid-template-columns: 1fr 1fr; }
+  .dca-hero-sep { display: none; }
+}

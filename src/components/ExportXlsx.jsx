@@ -27,6 +27,7 @@ const HEADERS = [
   'Volume',
   'Notes',
   'Dashboard',
+  'DCA',
 ]
 
 // ── Largeurs colonnes ─────────────────────────────────────────────────────────
@@ -45,18 +46,23 @@ const COL_WIDTHS = [
   { wch: 14 }, // Volume
   { wch: 30 }, // Notes
   { wch: 10 }, // Dashboard
+  { wch: 8  }, // DCA
 ]
 
 // ── Cast types numériques ─────────────────────────────────────────────────────
 
 function castRow(row) {
-  return row.slice(0, 13).map((cell, i) => {
+  const base = row.slice(0, 13).map((cell, i) => {
     if ([4, 5, 6, 7, 10].includes(i)) {
       const n = parseFloat(String(cell).replace(',', '.'))
       return isNaN(n) ? '' : n
     }
     return cell ?? ''
   })
+  // Colonne DCA (14) — dérivée des Notes (11)
+  const notes = String(row[11] ?? '')
+  base.push(notes.includes('[DCA]') ? 'true' : 'false')
+  return base
 }
 
 // ── Composant ─────────────────────────────────────────────────────────────────
@@ -147,7 +153,7 @@ export default function ExportXlsx({ onClose }) {
                   <div className="export-info-desc">
                     Toutes les lignes du repository exportées avec les colonnes
                     du journal : Date, Paire, Sens, Statut, Cours, Montants,
-                    Volume, Notes, Dashboard.
+                    Volume, Notes, Dashboard, DCA.
                     Les valeurs numériques sont correctement typées.
                   </div>
                 </div>

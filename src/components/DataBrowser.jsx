@@ -27,9 +27,10 @@ const COLUMNS = [
   { key: 6,  label: 'USDC',      type: 'number',         width: '100px' },
   { key: 7,  label: 'EUR',       type: 'number',         width: '90px'  },
   { key: 10, label: 'Volume',    type: 'number',         width: '100px' },
-  { key: 11, label: 'Notes',     type: 'text',           width: '160px' },
+  { key: 11, label: 'Notes',     type: 'text',           width: '220px' },
   { key: 12, label: 'Dashboard', type: 'select',         width: '100px',
     options: ['true', 'false'] },
+  { key: 8,     label: 'Plan DCA', type: 'text',         width: '90px'  },
 ]
 
 const PAGE_SIZE = 20
@@ -73,6 +74,7 @@ function initDraft(data) {
   const d = [...data]
   while (d.length <= 12) d.push('')
   COLUMNS.forEach(col => {
+    if (typeof col.key !== 'number') return  // skip virtual columns (e.g. 'dca')
     if (col.type === 'select') {
       const raw = String(d[col.key] ?? '').trim()
       d[col.key] = col.options.includes(raw) ? raw : col.options[0]
@@ -101,6 +103,13 @@ function formatCell(col, value) {
   }
   if (col.key === 12) {
     return <span className={`db-badge ${s === 'false' ? 'badge-annul' : 'badge-exec'}`}>{s}</span>
+  }
+  if (col.key === 8) {
+    const pid = String(value ?? '').trim()
+    if (!pid) return <span className="db-empty">—</span>
+    // Afficher les 8 derniers chars pour rester compact
+    const short = pid.length > 12 ? '…' + pid.slice(-10) : pid
+    return <span className="db-badge badge-exec" style={{fontSize:'.52rem',letterSpacing:0}}>{short}</span>
   }
   return <span className="db-text">{s}</span>
 }
@@ -162,6 +171,8 @@ function EditRow({ entry, onSave, onCancel, saving }) {
             </select>
           ) : col.type === 'datetime-local' ? (
             <input className="db-input" type="datetime-local" value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
+          ) : col.key === 11 ? (
+            <textarea className="db-input" rows={2} style={{resize:'vertical',minHeight:32,fontFamily:'inherit',fontSize:'inherit'}} value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
           ) : (
             <input className="db-input" type={col.type} step="any" value={draft[col.key]} onChange={e => set(col.key, e.target.value)} />
           )}
@@ -221,6 +232,8 @@ export default function DataBrowser({ onClose, onDataChanged }) {
     } catch (e) { setError('Erreur sauvegarde : ' + e.message) }
     finally { setSaving(false) }
   }
+
+
 
   async function handleDelete(rowIndex) {
     setSaving(true); setError(null)
