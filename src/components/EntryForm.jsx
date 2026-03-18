@@ -152,9 +152,9 @@ function PaireInput({ value, onChange }) {
 
 // ── Composant principal ───────────────────────────────────────────────────────
 
-export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca = false }) {
+export default function EntryForm({ onClose, onSaved, defaultPaire = '', activePlanId = null }) {
   const [form, setForm]       = useState(() => makeInitial(defaultPaire))
-  const [isDca, setIsDca]         = useState(flagDca)
+  const [isDca, setIsDca]         = useState(!!activePlanId)
   const [busy, setBusy]       = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError]     = useState(null)
@@ -173,10 +173,6 @@ export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca
   }
 
   function toRow() {
-    // Construit la note : texte libre + flags techniques
-    const flags = []
-    if (isDca) flags.push('[DCA]')
-    const notesValue = [form.notes.trim(), ...flags].filter(Boolean).join(' ')
     return [
       form.datetime,
       form.paire.trim(),
@@ -186,10 +182,10 @@ export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca
       form.usdt   || '',
       form.usdc   || '',
       form.eur    || '',
-      '',
-      '',
+      isDca && activePlanId ? activePlanId : '',  // col 8 = planId si DCA coché
+      '',                                          // col 9 réservé
       form.volume || '',
-      notesValue,
+      form.notes.trim() || '',
       form.dashboard ? 'true' : 'false',
     ]
   }
@@ -366,18 +362,21 @@ export default function EntryForm({ onClose, onSaved, defaultPaire = '', flagDca
 
           {/* ── DCA flags — même style que le toggle Dashboard ── */}
           <div className="ef-toggle-row" style={{flexDirection:'column',alignItems:'stretch',gap:8}}>
-            <label className="ef-toggle-label">
-              <div
-                className={`ef-toggle${isDca ? ' on' : ''}`}
-                onClick={() => setIsDca(v => !v)}
-              >
-                <div className="ef-toggle-thumb" />
-              </div>
-              Inclure dans le plan DCA
-              <span className="ef-toggle-hint" style={{marginLeft:'auto'}}>
-                {isDca ? '✅ Inclus dans le suivi DCA' : '⛔ Ignoré du suivi DCA'}
-              </span>
-            </label>
+            {/* Toggle DCA — visible seulement si un planId actif est fourni */}
+            {activePlanId && (
+              <label className="ef-toggle-label">
+                <div
+                  className={`ef-toggle${isDca ? ' on' : ''}`}
+                  onClick={() => setIsDca(v => !v)}
+                >
+                  <div className="ef-toggle-thumb" />
+                </div>
+                Inclure dans le plan DCA actif de la paire
+                <span className="ef-toggle-hint" style={{marginLeft:'auto'}}>
+                  {isDca ? '✅ Attaché au plan DCA' : '⛔ Non attaché au plan DCA'}
+                </span>
+              </label>
+            )}
 
           </div>
 
