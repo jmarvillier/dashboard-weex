@@ -2,9 +2,9 @@
  * dcaUtils.js — Constantes, helpers et fonctions utilitaires DCA
  */
 
-import { normPair } from '../parser.js'
+import { normPair } from './parser.js'
 export { normPair }
-export { parseDate } from '../process.js'
+export { parseDate } from './process.js'
 
 /* ── Constantes ──────────────────────────────────────────────────────────── */
 
