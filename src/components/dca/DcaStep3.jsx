@@ -2,8 +2,8 @@
  * DcaStep3.jsx — Wizard étape 3 : paramétrage de la stratégie
  */
 import { useState, useMemo } from 'react'
-import { filterOpsForPlan, getOpKey, fmt, DEFAULT_ZONES, TYPE_LABELS, TYPE_COLORS } from '../../../lib/dcaUtils.js'
-import { computeBreakeven } from '../../../hooks/useDcaStrategy.js'
+import { filterOpsForPlan, getOpKey, fmt, DEFAULT_ZONES, TYPE_LABELS, TYPE_COLORS } from '../../lib/dcaUtils.js'
+import { computeBreakeven } from '../../hooks/useDcaStrategy.js'
 import Stepper from './DcaStepper.jsx'
 
 /* ═══ STEP 3 — Paramétrage ════════════════════════════════════════════════ */
