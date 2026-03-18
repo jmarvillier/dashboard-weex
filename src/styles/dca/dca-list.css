@@ -1,0 +1,35 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Scaled Mirror DCA — Styles
+   Charte: bleu nuit crépusculaire · Space Mono · CSS custom properties
+═══════════════════════════════════════════════════════════════════════════ */
+
+.dca-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.dca-list-title { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); }
+.dca-list-sub   { font-size: .58rem; color: var(--muted); margin-top: 3px; }
+
+.dca-plan-item {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  cursor: pointer; transition: all .2s; margin-bottom: 8px;
+}
+.dca-plan-item:hover { border-color: var(--blue); transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+.dca-plan-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: .72rem; flex-shrink: 0; }
+.dca-plan-icon-btc { background: rgba(74,128,168,.18); color: var(--blue); }
+.dca-plan-icon-eth { background: rgba(61,191,144,.14); color: var(--green); }
+.dca-plan-icon-def { background: rgba(200,160,32,.1); color: var(--gold); }
+.dca-plan-info    { flex: 1 }
+.dca-plan-pair    { font-family: 'Space Mono', monospace; font-weight: 700; font-size: .8rem; color: var(--text); }
+.dca-plan-meta    { font-size: .56rem; color: var(--muted); margin-top: 3px; }
+.dca-plan-right   { text-align: right; flex-shrink: 0; }
+.dca-plan-status  { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: .55rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.dca-status-acc   { background: rgba(61,191,144,.12); color: var(--green); border: 1px solid rgba(61,191,144,.25); }
+.dca-status-dist  { background: rgba(212,90,80,.1); color: var(--red); border: 1px solid rgba(212,90,80,.2); }
+.dca-plan-avg     { font-size: .56rem; color: var(--muted); margin-top: 5px; }
+.dca-plan-del-btn { background: none; border: 1px solid rgba(212,90,80,.25); color: rgba(212,90,80,.6); border-radius: 6px; padding: 4px 8px; font-size: .6rem; cursor: pointer; transition: all .2s; }
+.dca-plan-del-btn:hover { background: rgba(212,90,80,.1); color: var(--red); border-color: var(--red); }
+
+.dca-chip-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.dca-chip { padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: .65rem; background: var(--bg3); color: var(--text2); transition: all .15s; user-select: none; }
+.dca-chip:hover { border-color: var(--blue); color: var(--text); }
+.dca-chip.sel { background: rgba(74,128,168,.15); border-color: var(--blue); color: var(--blue); font-weight: 700; }
+.dca-chip.new-pair { border-style: dashed; }
