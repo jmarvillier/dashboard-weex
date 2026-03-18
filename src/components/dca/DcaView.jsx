@@ -13,11 +13,11 @@ import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTempla
 import { saveSnapshot, loadSnapshot }  from '../../lib/repository.js'
 import { filterOpsForPlan, getOpKey, newPlanId, normPair, parseDate, DEFAULT_ZONES } from '../../lib/dcaUtils.js'
 
-import DcaList      from './dca/DcaList.jsx'
-import DcaStep1     from './dca/DcaStep1.jsx'
-import DcaStep2     from './dca/DcaStep2.jsx'
-import DcaStep3     from './dca/DcaStep3.jsx'
-import DcaDashboard from './dca/DcaDashboard.jsx'
+import DcaList      from './DcaList.jsx'
+import DcaStep1     from './DcaStep1.jsx'
+import DcaStep2     from './DcaStep2.jsx'
+import DcaStep3     from './DcaStep3.jsx'
+import DcaDashboard from './DcaDashboard.jsx'
 
 import '../../styles/dca/dca-base.css'
 import '../../styles/dca/dca-list.css'
