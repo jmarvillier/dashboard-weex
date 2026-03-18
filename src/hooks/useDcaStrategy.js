@@ -152,7 +152,7 @@ export function computeSignal(plan, currentPrice, breakeven, rechargement) {
   // ── Lire les zones unifiées (nouveau format) ou l'ancien format ──────────
   const zones = plan.zones || []
   const profitZones  = zones.filter(z => z.type === 'profit').sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0))
-  const accumZones   = zones.filter(z => z.type === 'accum' || z.type === 'ralent').sort((a,b)=>(parseFloat(b.ecart)||0)-(parseFloat(a.ecart)||0))
+  const accumZones   = zones.filter(z => z.type === 'accum' || z.type === 'ralent').sort((a,b)=>(parseFloat(a.ecart)||0)-(parseFloat(b.ecart)||0))  // croissant : find() retourne le seuil le plus bas >= delta
 
   // ── Bull run / Distribution ──────────────────────────────────────────────
   // Seuil bull run = écart de la première zone profit (la plus basse)
