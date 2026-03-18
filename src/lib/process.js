@@ -188,7 +188,8 @@ export function extractRawRows(rows) {
     const usdt   = parseN(r[5]) || parseN(r[6]) || parseN(r[7])
     const vol    = parseN(r[10])
     const date   = parseDate(r[0])
-    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat) })
+    const planId = String(r[8] || '').trim()
+    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat), planId })
   })
 
   return result
