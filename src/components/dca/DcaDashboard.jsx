@@ -349,25 +349,26 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
         // ou la plus basse côté profit atteint)
         let activeIdx = -1
         if (delta != null) {
-          // Zone active = la plus précise correspondant à delta
-          // Pour accum/ralent : la zone dont l'écart est >= delta (zone d'achat courante)
-          // Pour profit : la première zone profit déclenchée
-          const profitIdx = sorted.findIndex(z => z.type==='profit' && delta >= (parseFloat(z.ecart??z.ecartThreshold??0)||0))
-          if (profitIdx >= 0) {
-            // Prendre la dernière zone profit atteinte
-            activeIdx = sorted.reduce((best, z, i) => {
-              if (z.type==='profit' && delta >= (parseFloat(z.ecart??z.ecartThreshold??0)||0)) return i
-              return best
-            }, profitIdx)
+          // Zones profit : prendre la DERNIÈRE déclenchée (delta >= seuil le plus élevé atteint)
+          const triggeredProfits = sorted
+            .map((z, i) => ({ z, i }))
+            .filter(({ z }) => z.type === 'profit' && delta >= (parseFloat(z.ecart ?? z.ecartThreshold ?? 0) || 0))
+          if (triggeredProfits.length > 0) {
+            activeIdx = triggeredProfits[triggeredProfits.length - 1].i
           } else {
-            // Zone d'achat : la plus haute dont ecart >= delta
-            activeIdx = sorted.reduce((best, z, i) => {
-              const e = parseFloat(z.ecart??z.ecartThreshold??z.ecartMin??0)||0
-              if (z.type!=='profit' && delta <= e) return i
-              return best
-            }, -1)
-            // Si aucune trouvée côté achat, prendre la plus basse
-            if (activeIdx < 0) activeIdx = sorted.findIndex(z=>z.type!=='profit')
+            // Zone accum/ralent : prendre la PREMIÈRE dont le seuil >= delta
+            // (zone la plus précise/proche au-dessus du cours)
+            const above = sorted
+              .map((z, i) => ({ z, i }))
+              .filter(({ z }) => z.type !== 'profit')
+              .filter(({ z }) => (parseFloat(z.ecart ?? z.ecartThreshold ?? z.ecartMin ?? 0) || 0) >= delta)
+            if (above.length > 0) {
+              activeIdx = above[0].i  // premier = seuil le plus bas >= delta = zone la plus précise
+            } else {
+              // delta dépasse toutes les zones accum/ralent → prendre la dernière
+              const nonProfit = sorted.map((z, i) => ({ z, i })).filter(({ z }) => z.type !== 'profit')
+              activeIdx = nonProfit.length > 0 ? nonProfit[nonProfit.length - 1].i : 0
+            }
           }
         }
         // Afficher : zone active + voisines immédiates (idx-1, idx, idx+1)
