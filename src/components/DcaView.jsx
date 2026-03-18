@@ -500,13 +500,30 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
   const ops = useMemo(() => filterOpsForPlan(rawRows, effectivePair, plan.startDate, plan.endDate), [rawRows, effectivePair, plan.startDate, plan.endDate])
 
-  // Ops du plan : planId en col 8, avec fallback sur plan.pointedOps pour les anciens plans
+  // Ops du plan : planId en col 8 (source de vérité)
+  // Fallback pour plans antérieurs à la migration : matcher par date+paire+montant
+  // sur les rawRows correspondant aux clés plan.pointedOps
   const pointedOps = useMemo(() => {
     const byPlanId = ops.filter(o => o.planId && o.planId === plan.id)
     if (byPlanId.length > 0) return byPlanId
-    // Fallback : plan.pointedOps (clés getOpKey) pour la migration
+
+    // Fallback robuste : reconstruire les ops depuis les clés stockées
+    // Les clés sont `${date.toISOString()}_${idx}` — on extrait la date ISO
     const legacy = plan.pointedOps || []
-    return ops.filter((o, i) => legacy.includes(getOpKey(o, i)))
+    if (legacy.length === 0) return []
+
+    // Extraire les timestamps des clés stockées
+    const legacyDates = legacy.map(key => {
+      const iso = key.split('_')[0]
+      const d = new Date(iso)
+      return isNaN(d.getTime()) ? null : d.getTime()
+    }).filter(Boolean)
+
+    // Matcher chaque op par date (±2min) + paire + montant
+    return ops.filter(o => {
+      if (!o.date) return false
+      return legacyDates.some(ts => Math.abs(o.date.getTime() - ts) < 120000)
+    })
   }, [ops, plan.id, plan.pointedOps])
 
   const breakeven    = useMemo(() => computeBreakeven(pointedOps),          [pointedOps])
