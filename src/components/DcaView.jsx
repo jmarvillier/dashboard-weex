@@ -499,30 +499,45 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
   }, [plan])
 
   const ops = useMemo(() => filterOpsForPlan(rawRows, effectivePair, plan.startDate, plan.endDate), [rawRows, effectivePair, plan.startDate, plan.endDate])
-  // Les ops du plan = celles dont col 8 contient l'id de ce plan
-  const pointedOps = useMemo(() =>
-    ops.filter(o => o.planId === plan.id)
-  , [ops, plan.id])
 
-  const breakeven    = useMemo(() => computeBreakeven(pointedOps),        [pointedOps])
+  // Ops du plan : planId en col 8, avec fallback sur plan.pointedOps pour les anciens plans
+  const pointedOps = useMemo(() => {
+    const byPlanId = ops.filter(o => o.planId && o.planId === plan.id)
+    if (byPlanId.length > 0) return byPlanId
+    // Fallback : plan.pointedOps (clés getOpKey) pour la migration
+    const legacy = plan.pointedOps || []
+    return ops.filter((o, i) => legacy.includes(getOpKey(o, i)))
+  }, [ops, plan.id, plan.pointedOps])
+
+  const breakeven    = useMemo(() => computeBreakeven(pointedOps),          [pointedOps])
   const rechargement = useMemo(() => computeRechargement(plan, pointedOps), [plan, pointedOps])
 
-  const currentPrice = prices[effectivePair] || (manualPrice ? parseFloat(manualPrice) : null)
-  const signal       = useMemo(() => computeSignal(plan, currentPrice, breakeven, rechargement), [plan, currentPrice, breakeven, rechargement])
-  const delta        = currentPrice && breakeven ? (currentPrice-breakeven)/breakeven*100 : null
+  // currentPrice réactif — se met à jour dès que prices ou manualPrice change
+  const currentPrice = useMemo(() =>
+    prices[effectivePair] || (manualPrice ? parseFloat(manualPrice) : null)
+  , [prices, effectivePair, manualPrice])
 
-  const buys          = useMemo(() => pointedOps.filter(o=>o.sens==='Achat' && o.exec), [pointedOps])
-  const sells         = useMemo(() => pointedOps.filter(o=>o.sens==='Vente' && o.exec), [pointedOps])
+  const signal  = useMemo(() => computeSignal(plan, currentPrice, breakeven, rechargement), [plan, currentPrice, breakeven, rechargement])
+  const delta   = useMemo(() => currentPrice && breakeven ? (currentPrice - breakeven) / breakeven * 100 : null, [currentPrice, breakeven])
+
+  const buys    = useMemo(() => pointedOps.filter(o => o.sens==='Achat' && o.exec), [pointedOps])
+  const sells   = useMemo(() => pointedOps.filter(o => o.sens==='Vente' && o.exec), [pointedOps])
+
   const totalInvested = useMemo(() => buys.reduce((s,o)=>s+o.usdt,0),  [buys])
   const totalSold     = useMemo(() => sells.reduce((s,o)=>s+o.usdt,0), [sells])
-  const avgBuyPrice   = useMemo(() => computeAvgPrice(pointedOps), [pointedOps])
-  const avgSellPrice  = useMemo(() => {
-    const vol = sells.reduce((s,o)=>s+(o.vol||0),0)
-    return vol > 0 ? totalSold / vol : 0
-  }, [sells, totalSold])
+  const totalVolBuy   = useMemo(() => buys.reduce((s,o)=>s+(o.vol||0),0),  [buys])
   const totalVolSold  = useMemo(() => sells.reduce((s,o)=>s+(o.vol||0),0), [sells])
-  const position      = buys.reduce((s,o)=>s+(o.vol||0),0) - totalVolSold
-  const pnlLatent     = currentPrice && position>0 && breakeven>0 ? position*(currentPrice-breakeven) : 0
+  const avgBuyPrice   = useMemo(() => computeAvgPrice(pointedOps), [pointedOps])
+  const avgSellPrice  = useMemo(() =>
+    totalVolSold > 0 ? totalSold / totalVolSold : 0
+  , [totalSold, totalVolSold])
+
+  const position  = useMemo(() => totalVolBuy - totalVolSold, [totalVolBuy, totalVolSold])
+  const pnlLatent = useMemo(() =>
+    currentPrice && position > 0 && breakeven > 0
+      ? position * (currentPrice - breakeven)
+      : null   // null → afficher '—' plutôt que 0
+  , [currentPrice, position, breakeven])
 
   const cyclePeriod  = getCurrentPeriodOps(plan, pointedOps)
   const timeline     = useMemo(() => generateTimeline(plan, pointedOps, 15), [plan, pointedOps])
@@ -685,12 +700,12 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
 
         {/* 1. PnL latent */}
         <div className="dca-kpi">
-          <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!==0?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
+          <div className="dca-kpi-val" style={{color:pnlLatent>=0?'var(--green)':'var(--red)'}}>{pnlLatent!=null?(pnlLatent>=0?'+':'')+fmt(pnlLatent,2):'—'}</div>
           <div className="dca-kpi-lbl">
             PnL latent
             <KpiTooltip id="dca-pnl" title="PnL latent" description="Gain ou perte non réalisée sur la position ouverte, calculée par rapport au breakeven." formula="Position × (cours actuel − breakeven)" openId={openTip} setOpenId={setOpenTip}/>
           </div>
-          <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':'cours manquant'}</div>
+          <div className="dca-kpi-sub">{delta!=null?pct(delta)+' vs breakeven':currentPrice?'cours chargé':'cours manquant'}</div>
         </div>
 
         {/* 2. Total investi + prix moyen d'achat */}
