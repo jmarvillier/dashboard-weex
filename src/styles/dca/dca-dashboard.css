@@ -1,0 +1,76 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Scaled Mirror DCA — Styles
+   Charte: bleu nuit crépusculaire · Space Mono · CSS custom properties
+═══════════════════════════════════════════════════════════════════════════ */
+
+.dca-hero {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; position: relative;
+}
+.dca-hero-prices { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dca-hero-block  { text-align: center; flex: 1; min-width: 100px; }
+.dca-hero-lbl    { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
+.dca-hero-val    { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.6rem; color: var(--text); line-height: 1; }
+.dca-hero-val-main { font-size: 1.8rem; color: var(--gold); }
+.dca-hero-sub    { font-size: .52rem; color: var(--muted); margin-top: 5px; }
+.dca-hero-sep    { width: 1px; height: 60px; background: var(--border); flex-shrink: 0; }
+.dca-hero-delta  { text-align: center; flex: 1; }
+.dca-hero-delta-arrow { font-size: 1.4rem; line-height: 1; }
+.dca-hero-delta-pct   { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.1rem; line-height: 1; margin-top: 2px; }
+.dca-hero-delta-lbl   { font-size: .5rem; color: var(--muted); margin-top: 4px; }
+.up   { color: var(--red); }
+.down { color: var(--green); }
+
+.dca-zone-bar-wrap { margin-top: 16px; }
+.dca-zone-bar { display: flex; height: 22px; border-radius: 5px; overflow: hidden; position: relative; }
+.dca-zone-seg { flex: 1; display: flex; align-items: center; justify-content: center; font-size: .55rem; font-weight: 700; }
+.dca-zone-seg.z4 { background: rgba(61,191,144,.35); color: #3dbf90; }
+.dca-zone-seg.z3 { background: rgba(61,191,144,.2); color: #3dbf90; }
+.dca-zone-seg.z2 { background: rgba(200,160,32,.2); color: var(--gold); }
+.dca-zone-seg.z1 { background: rgba(200,160,32,.35); color: var(--gold); }
+.dca-zone-seg.z0 { background: rgba(212,90,80,.25); color: var(--red); }
+.dca-zone-needle { position: absolute; width: 2px; top: 0; bottom: 0; background: var(--text); transform: translateX(-50%); border-radius: 1px; transition: left .4s; }
+.dca-zone-needle::before { content: '▼'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: .55rem; color: var(--text); }
+.dca-zone-labels { display: flex; font-size: .48rem; color: var(--muted); margin-top: 3px; }
+.dca-zone-labels span { flex: 1; text-align: center; }
+
+.dca-signal { border-radius: 10px; padding: 14px 16px; border: 1px solid; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dca-signal.buy    { background: rgba(61,191,144,.08); border-color: rgba(61,191,144,.25); }
+.dca-signal.buy50  { background: rgba(200,160,32,.07); border-color: rgba(200,160,32,.22); }
+.dca-signal.debt   { background: rgba(74,128,168,.08); border-color: rgba(74,128,168,.25); }
+.dca-signal.profit { background: rgba(212,90,80,.07); border-color: rgba(212,90,80,.2); }
+.dca-signal.hold   { background: rgba(110,152,182,.05); border-color: var(--border); }
+.dca-signal-title  { font-family: 'Space Mono', monospace; font-weight: 700; font-size: .78rem; color: var(--text); margin-bottom: 5px; }
+.dca-signal-desc   { font-size: .6rem; color: var(--text2); line-height: 1.6; }
+.dca-signal-amount { text-align: right; flex-shrink: 0; }
+.dca-signal-amt    { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.2rem; color: var(--text); }
+.dca-signal-amt-lbl { font-size: .52rem; color: var(--muted); margin-top: 3px; }
+
+.dca-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.dca-kpi { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.dca-kpi-val { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--text); }
+.dca-kpi-lbl { font-size: .5rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-top: 4px; }
+.dca-kpi-sub { font-size: .54rem; color: var(--muted); margin-top: 3px; }
+
+.dca-pal-row { display: flex; align-items: center; gap: 7px; padding: 6px 0; border-bottom: 1px solid rgba(26,48,80,.4); font-size: .6rem; }
+.dca-pal-row:last-child { border-bottom: none; }
+.dca-pal-row.active-debt   { background: rgba(74,128,168,.1); border-radius: 6px; padding: 6px 8px; margin: 2px -8px; border-color: transparent; }
+.dca-pal-row.active-profit { background: rgba(212,90,80,.1); border-radius: 6px; padding: 6px 8px; margin: 2px -8px; border-color: transparent; }
+.dca-pal-lbl   { flex: 1; color: var(--text2); }
+.dca-pal-price { color: var(--muted); font-family: 'Space Mono', monospace; font-size: .58rem; min-width: 70px; text-align: right; }
+.dca-pal-action { font-weight: 700; color: var(--text); min-width: 80px; text-align: right; font-family: 'Space Mono', monospace; font-size: .6rem; }
+
+.dca-tl      { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; margin: 10px 0; }
+.dca-tc      { aspect-ratio: 1; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: .5rem; cursor: default; position: relative; }
+.dca-tc:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; white-space: nowrap; font-size: .55rem; color: var(--text); z-index: 9; pointer-events: none; }
+.tc-100 { background: rgba(61,191,144,.3); color: var(--green); }
+.tc-75  { background: rgba(61,191,144,.18); color: var(--green); }
+.tc-50  { background: rgba(200,160,32,.22); color: var(--gold); }
+.tc-25  { background: rgba(200,160,32,.35); color: var(--gold); }
+.tc-sk  { background: var(--bg3); color: var(--muted); }
+.tc-sl  { background: rgba(212,90,80,.2); color: var(--red); }
+.tc-dt  { background: rgba(74,128,168,.2); color: var(--blue); }
+.tc-today { outline: 2px solid var(--text2); outline-offset: 1px; }
+
+.dca-tl-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: .54rem; color: var(--muted); margin-bottom: 4px; }
+.dca-tl-leg-dot { width: 7px; height: 7px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 3px; }

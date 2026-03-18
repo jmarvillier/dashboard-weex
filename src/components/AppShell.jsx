@@ -9,7 +9,7 @@ import SummaryTable  from './SummaryTable.jsx'
 import PairesView    from './PairesView.jsx'
 import DataPanel     from './DataPanel.jsx'
 import PeriodFilter  from './PeriodFilter.jsx'
-import DcaView       from './DcaView.jsx'
+import DcaView       from './dca/DcaView.jsx'
 import { usePeriodFilter } from '../hooks/usePeriodFilter.js'
 import { auth, signOut }   from '../lib/firebase.js'
 
