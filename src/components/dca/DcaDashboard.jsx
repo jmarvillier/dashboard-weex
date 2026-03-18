@@ -3,12 +3,12 @@
  */
 import { useState, useMemo } from 'react'
 import { fmt, pct, filterOpsForPlan, getOpKey, normPair, parseDate, migratePlanZones,
-         TYPE_LABELS, TYPE_COLORS, PERIOD_LABEL, DEFAULT_ZONES } from '../../../lib/dcaUtils.js'
+         TYPE_LABELS, TYPE_COLORS, PERIOD_LABEL, DEFAULT_ZONES } from '../../lib/dcaUtils.js'
 import {
   computeBreakeven, computeAvgPrice, computeRechargement,
   computeSignal, generateTimeline, getCurrentPeriodOps,
-} from '../../../hooks/useDcaStrategy.js'
-import { saveSnapshot, loadSnapshot } from '../../../lib/repository.js'
+} from '../../hooks/useDcaStrategy.js'
+import { saveSnapshot, loadSnapshot } from '../../lib/repository.js'
 import EntryForm from '../EntryForm.jsx'
 import KpiTooltip from '../KpiTooltip.jsx'
 

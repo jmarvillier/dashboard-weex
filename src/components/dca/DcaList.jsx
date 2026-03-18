@@ -2,7 +2,7 @@
  * DcaList.jsx — Liste des plans DCA et gestion des templates
  */
 import { useState } from 'react'
-import { PERIOD_LABEL } from '../../../lib/dcaUtils.js'
+import { PERIOD_LABEL } from '../../lib/dcaUtils.js'
 
 /* ═══ SCREEN 0 — Liste ════════════════════════════════════════════════════ */
 function DcaList({ onNew, onOpen, plans, loading, onDelete, templates, onDeleteTpl }) {

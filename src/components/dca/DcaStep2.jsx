@@ -2,8 +2,8 @@
  * DcaStep2.jsx — Wizard étape 2 : pointage des opérations
  */
 import { useState, useEffect, useMemo } from 'react'
-import { filterOpsForPlan, getOpKey, fmt } from '../../../lib/dcaUtils.js'
-import { computeBreakeven, computeAvgPrice } from '../../../hooks/useDcaStrategy.js'
+import { filterOpsForPlan, getOpKey, fmt } from '../../lib/dcaUtils.js'
+import { computeBreakeven, computeAvgPrice } from '../../hooks/useDcaStrategy.js'
 import Stepper from './DcaStepper.jsx'
 
 /* ═══ STEP 2 — Pointage ═══════════════════════════════════════════════════ */
