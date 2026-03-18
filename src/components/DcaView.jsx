@@ -255,7 +255,7 @@ function Step2({ wizard, setWizard, rawRows, onNext, onBack, onFlagOps }) {
           <div><span>Lignes : </span><b>{pointed.length} / {ops.length}</b></div>
         </div>
       </div>
-      <div className="dca-btm">
+      <div className="dca-btm" style={{position:'sticky',bottom:0,background:'var(--bg2)',zIndex:10,borderTop:'1px solid var(--border)',marginTop:8}}>
         <button className="dca-btn dca-btn-ghost" onClick={onBack}>← Retour</button>
         <span className="dca-step-hint">Étape 2 / 3</span>
         <button className="dca-btn dca-btn-primary" onClick={async()=>{ await onFlagOps?.(ops, pointed); onNext() }}>Paramétrer →</button>
@@ -480,7 +480,6 @@ function Step3({ wizard, setWizard, rawRows, onNext, onBack, saving, templates, 
 
 /* ═══ DASHBOARD ═══════════════════════════════════════════════════════════ */
 function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
-  const [showCal,     setShowCal]     = useState(false)
   const [showEntry,   setShowEntry]   = useState(false)
   const [savedMsg,    setSavedMsg]    = useState('')
   const [manualPrice, setManualPrice] = useState('')
@@ -561,17 +560,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
   const timeline     = useMemo(() => generateTimeline(plan, pointedOps, 15), [plan, pointedOps])
   const missedCount  = timeline.filter(t=>t.type==='missed').length
 
-  const calDays = useMemo(() => {
-    const now=new Date(), y=now.getFullYear(), m=now.getMonth()
-    const first=new Date(y,m,1), last=new Date(y,m+1,0), days=[]
-    for(let i=0;i<(first.getDay()+6)%7;i++) days.push(null)
-    for(let d=1;d<=last.getDate();d++) {
-      const day=new Date(y,m,d)
-      const slot=timeline.find(t=>t.date&&t.date.toDateString()===day.toDateString())
-      days.push({day:d,slot,isToday:d===now.getDate()})
-    }
-    return days
-  }, [timeline])
+
 
   // Seuil bull run = écart de la 1ère zone profit
   const bull = useMemo(() => {
@@ -924,26 +913,7 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           ))}
         </div>
 
-        <div className="dca-add-row" style={{cursor:'pointer',userSelect:'none'}} onClick={()=>setShowCal(v=>!v)}>
-          <span style={{fontSize:'.75rem'}}>📅</span>
-          <span>{showCal?'Masquer le calendrier':'Afficher le calendrier mensuel'}</span>
-        </div>
 
-        {showCal && (
-          <div style={{marginTop:10}}>
-            <div style={{fontSize:'.58rem',fontWeight:'500',color:'var(--text2)',marginBottom:6}}>{new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
-              {['L','M','M','J','V','S','D'].map((d,i)=><div key={i} style={{textAlign:'center',fontSize:'.48rem',color:'var(--muted)',fontWeight:'500'}}>{d}</div>)}
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
-              {calDays.map((cell,i)=>{
-                if(!cell) return <div key={i}/>
-                const cls=cell.slot?tlClass(cell.slot):'tc-sk'
-                return <div key={i} className={`dca-tc ${cls}${cell.isToday?' tc-today':''}`} style={{aspectRatio:'1',fontSize:'.55rem'}}>{cell.day}</div>
-              })}
-            </div>
-          </div>
-        )}
 
 
       </div>
@@ -1024,7 +994,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
     setScreen(hasOps ? 2 : 3)
   }
 
-  // Affecte/retire le planId (col 8) sur les lignes du journal correspondantes
+  // Affecte/retire le planId (col 8) sur les lignes du journal
   async function step2AssignPlan(ops, pointed, planId) {
     try {
       const snap = await loadSnapshot()
@@ -1032,30 +1002,57 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
       const rows = snap.rows.map(r => [...r])
       let changed = false
 
+      // Pré-construire un index snapshot : date-ms → [rowIdx, ...]
+      const snapIndex = {}
+      for (let ri = 1; ri < rows.length; ri++) {
+        const r = rows[ri]
+        if (!r[1]) continue
+        const d = parseDate(r[0])
+        if (!d) continue
+        const key = d.getTime()
+        if (!snapIndex[key]) snapIndex[key] = []
+        snapIndex[key].push(ri)
+      }
+
+      // Chercher chaque op dans le snapshot
+      const usedRowIdx = new Set()
       for (let i = 0; i < ops.length; i++) {
         const op        = ops[i]
         const isPointed = pointed.includes(getOpKey(op, i))
+        if (!op.date) continue
 
-        const rowIdx = rows.findIndex((r, ri) => {
-          if (ri === 0) return false
-          if (!r[1]) return false
-          if (normPair(String(r[1]||'').trim()) !== op.pair) return false
-          const snapDate = parseDate(r[0])
-          if (!snapDate || !op.date) return false
-          if (Math.abs(snapDate.getTime() - op.date.getTime()) > 86400000 * 1.5) return false
-          const snapAmt = (parseFloat(r[5])||0) || (parseFloat(r[6])||0) || (parseFloat(r[7])||0)
-          return op.usdt > 0 ? Math.abs(snapAmt - op.usdt) < 0.10 : true
-        })
+        // Stratégie 1 : match exact sur date ms + paire
+        let rowIdx = -1
+        const opTs = op.date.getTime()
+        for (const [tsKey, idxList] of Object.entries(snapIndex)) {
+          if (Math.abs(Number(tsKey) - opTs) > 86400000 * 2) continue  // ±2 jours
+          for (const ri of idxList) {
+            if (usedRowIdx.has(ri)) continue
+            const r = rows[ri]
+            if (normPair(String(r[1]||'').trim()) !== op.pair) continue
+            // Sens (achat/vente) doit correspondre
+            const snapSens = String(r[2]||'').trim().toLowerCase()
+            const opSens   = String(op.sens||'').trim().toLowerCase()
+            if (snapSens && opSens && snapSens !== opSens) continue
+            // Montant : tolérance généreuse ±2 USDT
+            const snapAmt = (parseFloat(r[5])||0) || (parseFloat(r[6])||0) || (parseFloat(r[7])||0)
+            if (op.usdt > 0 && Math.abs(snapAmt - op.usdt) > 2) continue
+            rowIdx = ri
+            break
+          }
+          if (rowIdx >= 0) break
+        }
 
         if (rowIdx < 0) continue
+        usedRowIdx.add(rowIdx)
         while (rows[rowIdx].length <= 12) rows[rowIdx].push('')
-        const currentPlanId = String(rows[rowIdx][8] || '')
+        const cur = String(rows[rowIdx][8] || '')
 
-        if (isPointed && currentPlanId !== planId) {
-          rows[rowIdx][8] = planId   // col 8 = planId
+        if (isPointed && cur !== planId) {
+          rows[rowIdx][8] = planId
           changed = true
-        } else if (!isPointed && currentPlanId === planId) {
-          rows[rowIdx][8] = ''       // retirer l'affectation
+        } else if (!isPointed && cur === planId) {
+          rows[rowIdx][8] = ''
           changed = true
         }
       }
