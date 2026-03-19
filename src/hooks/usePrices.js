@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchLivePrices } from '../lib/priceRepository.js'
 
-const REFRESH_INTERVAL = 60_000
+const REFRESH_INTERVAL = 60_000  // 1 minute
 
 export function usePrices(pairList) {
-  const [prices, setPrices]           = useState({})
-  const [pricesLoading, setPricesLoading] = useState(false)
-  const [pricesError, setPricesError] = useState(null)
-  const [priceSource, setPriceSource] = useState(null)
+  const [prices,          setPrices]          = useState({})
+  const [pricesLoading,   setPricesLoading]   = useState(false)
+  const [pricesError,     setPricesError]     = useState(null)
+  const [priceSource,     setPriceSource]     = useState(null)
   const [lastPriceUpdate, setLastPriceUpdate] = useState(null)
-  const timerRef    = useRef(null)
-  const namesRef    = useRef([])  // on compare les noms, pas les objets
+
+  const timerRef   = useRef(null)
+  const namesRef   = useRef([])
 
   const refresh = useCallback(async (names) => {
     if (!names || names.length === 0) return
@@ -33,36 +34,38 @@ export function usePrices(pairList) {
       console.warn('[usePrices] error:', err)
       setPricesError('Erreur de chargement')
       setPriceSource('error')
-      setPrices({})
     } finally {
       setPricesLoading(false)
     }
-  }, []) // aucune dépendance — refresh est stable
+  }, [])
+
+  // ─── Clé stable : seulement les NOMS des paires ────────────────────────────
+  // On utilise une string au lieu de l'objet pairList pour éviter que
+  // enrichWithPrices() (qui crée de nouveaux objets) ne déclenche le cleanup
+  // → suppression de l'intervalle à chaque rafraîchissement des prix.
+  const namesKey = (pairList || []).map(p => p.name).sort().join(',')
 
   useEffect(() => {
-    // Compare uniquement les noms de paires, pas les objets entiers
-    const names = (pairList || []).map(p => p.name)
-    const prev  = namesRef.current
-
-    const changed =
-      names.length !== prev.length ||
-      names.some((n, i) => n !== prev[i])
-
-    if (!changed) return  // pairList enrichie → on ignore
-
+    const names = namesKey ? namesKey.split(',') : []
     namesRef.current = names
+
     clearInterval(timerRef.current)
 
     if (names.length === 0) {
       setPrices({})
+      timerRef.current = null
       return
     }
 
+    // Premier fetch immédiat + intervalle régulier
     refresh(names)
     timerRef.current = setInterval(() => refresh(namesRef.current), REFRESH_INTERVAL)
 
-    return () => clearInterval(timerRef.current)
-  }, [pairList, refresh])
+    return () => {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }, [namesKey, refresh])  // ← dépend de la STRING, pas de l'objet
 
   return {
     prices,
