@@ -1,13 +1,12 @@
 /**
  * priceRepository.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Fetcher de cours temps réel — cascade par type d'actif :
+ * Cours temps réel — cascade par type d'actif :
+ *   Métaux  → Kraken (XAG/XAU) → metals.live → CryptoCompare
  *   Crypto  → Binance → Kraken → CryptoCompare
- *   Métaux  → Metals.live → Kraken (XAG/XAU) → CryptoCompare
  */
 
 const STABLES = new Set(['USDT','USDC','BUSD','DAI','TUSD','FDUSD','USDP'])
-// Paires métaux précieux (ne sont pas sur Binance)
 const METALS  = new Set(['XAG','XAU','XPT','XPD'])
 
 function getBase(pair)   { return pair.split('/')[0].toUpperCase() }
@@ -16,24 +15,57 @@ function isTrading(pair) { return !STABLES.has(getBase(pair)) }
 function isMetal(pair)   { return METALS.has(getBase(pair)) }
 function isCrypto(pair)  { return isTrading(pair) && !isMetal(pair) }
 
-// Timeout compatible Safari / iOS (pas de AbortSignal.timeout)
-function fetchWithTimeout(url, ms = 7000) {
+// Timeout compatible Safari / iOS
+function fetchWithTimeout(url, ms = 8000) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ms)
   return fetch(url, { signal: controller.signal })
     .finally(() => clearTimeout(timer))
 }
 
-// ── Source Métaux : metals.live ──────────────────────────────────────────────
-// API gratuite, sans clé, prix en USD / troy oz
-// https://metals.live
-
-const METALS_LIVE_MAP = {
-  'XAG': 'silver',
-  'XAU': 'gold',
-  'XPT': 'platinum',
-  'XPD': 'palladium',
+// ── Métaux : Kraken (prioritaire — CORS garanti, vraie bourse) ────────────────
+//  Kraken cote les métaux précieux sans préfixe XX
+const KRAKEN_METALS_MAP = {
+  'XAG': 'XAGUSD',  // argent / silver
+  'XAU': 'XAUUSD',  // or / gold
+  'XPT': 'XPTUSD',  // platine
+  'XPD': 'XPDUSD',  // palladium
 }
+
+async function fromKrakenMetals(pairs) {
+  const metalPairs = pairs.filter(isMetal)
+  if (metalPairs.length === 0) return {}
+
+  const entries = metalPairs.map(p => ({
+    pair: p,
+    krakenSym: KRAKEN_METALS_MAP[getBase(p)] ?? `${getBase(p)}USD`,
+  }))
+
+  const paramStr = entries.map(e => e.krakenSym).join(',')
+  const url = `https://api.kraken.com/0/public/Ticker?pair=${paramStr}`
+  const res = await fetchWithTimeout(url)
+  if (!res.ok) throw new Error(`Kraken metals ${res.status}`)
+  const data = await res.json()
+  if (data.error?.length) throw new Error(`Kraken metals: ${data.error[0]}`)
+
+  const prices = {}
+  const keys   = Object.keys(data.result || {})
+  for (const { pair, krakenSym } of entries) {
+    // Kraken peut répondre avec le sym exact ou une variante
+    const key = keys.find(k =>
+      k === krakenSym ||
+      k.startsWith(getBase(pair)) ||
+      k.includes(getBase(pair))
+    )
+    if (key && data.result[key]?.c?.[0]) {
+      prices[pair] = parseFloat(data.result[key].c[0])
+    }
+  }
+  return prices
+}
+
+// ── Métaux : metals.live (fallback) ──────────────────────────────────────────
+const METALS_LIVE_KEY = { XAG: 'silver', XAU: 'gold', XPT: 'platinum', XPD: 'palladium' }
 
 async function fromMetalsLive(pairs) {
   const metalPairs = pairs.filter(isMetal)
@@ -42,28 +74,43 @@ async function fromMetalsLive(pairs) {
   const res = await fetchWithTimeout('https://api.metals.live/v1/spot', 8000)
   if (!res.ok) throw new Error(`metals.live ${res.status}`)
   const data = await res.json()
-  // Réponse : [{ silver: 29.5, gold: 2050, ... }] ou { silver: 29.5, ... }
-  const obj = Array.isArray(data) ? data[0] : data
+  const obj  = Array.isArray(data) ? data[0] : data
 
   const prices = {}
   for (const p of metalPairs) {
-    const key = METALS_LIVE_MAP[getBase(p)]
-    if (key && obj[key] != null) {
-      prices[p] = parseFloat(obj[key])
-    }
+    const key = METALS_LIVE_KEY[getBase(p)]
+    if (key && obj[key] != null) prices[p] = parseFloat(obj[key])
   }
   return prices
 }
 
-// ── Source 1 : Binance ───────────────────────────────────────────────────────
+// ── Métaux : CryptoCompare (dernier recours) ─────────────────────────────────
+async function fromCryptoCompareMetals(pairs) {
+  const metalPairs = pairs.filter(isMetal)
+  if (metalPairs.length === 0) return {}
 
+  const fsyms = [...new Set(metalPairs.map(getBase))].join(',')
+  const url   = `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=USD`
+  const res   = await fetchWithTimeout(url)
+  if (!res.ok) throw new Error(`CryptoCompare metals ${res.status}`)
+  const data  = await res.json()
+  if (data.Response === 'Error') throw new Error(`CC: ${data.Message}`)
+
+  const prices = {}
+  for (const p of metalPairs) {
+    const entry = data[getBase(p)]
+    if (entry?.USD != null) prices[p] = entry.USD
+  }
+  return prices
+}
+
+// ── Crypto : Binance ─────────────────────────────────────────────────────────
 async function fromBinance(pairs) {
   const cryptoPairs = pairs.filter(isCrypto)
   if (cryptoPairs.length === 0) return {}
 
   const symbols = cryptoPairs.map(p => `"${getBase(p)}${getQuote(p)}"`)
   const url = `https://api.binance.com/api/v3/ticker/price?symbols=[${symbols.join(',')}]`
-
   const res = await fetchWithTimeout(url)
   if (!res.ok) throw new Error(`Binance ${res.status}`)
   const data = await res.json()
@@ -77,40 +124,37 @@ async function fromBinance(pairs) {
   return prices
 }
 
-// ── Source 2 : Kraken ────────────────────────────────────────────────────────
-
-const KRAKEN_MAP = {
-  // Crypto
-  'BTC/USDT':  'XBTUSDT',  'ETH/USDT':  'ETHUSDT',   'SOL/USDT':  'SOLUSDT',
-  'XRP/USDT':  'XRPUSDT',  'ADA/USDT':  'ADAUSDT',   'DOT/USDT':  'DOTUSDT',
-  'DOGE/USDT': 'DOGEUSDT', 'AVAX/USDT': 'AVAXUSDT',  'LINK/USDT': 'LINKUSDT',
-  'LTC/USDT':  'LTCUSDT',  'ATOM/USDT': 'ATOMUSDT',  'UNI/USDT':  'UNIUSDT',
-  'NEAR/USDT': 'NEARUSDT', 'ARB/USDT':  'ARBUSDT',   'OP/USDT':   'OPUSDT',
+// ── Crypto : Kraken ───────────────────────────────────────────────────────────
+const KRAKEN_CRYPTO_MAP = {
+  'BTC/USDT':  'XBTUSDT',  'ETH/USDT':  'ETHUSDT',  'SOL/USDT':  'SOLUSDT',
+  'XRP/USDT':  'XRPUSDT',  'ADA/USDT':  'ADAUSDT',  'DOT/USDT':  'DOTUSDT',
+  'DOGE/USDT': 'DOGEUSDT', 'AVAX/USDT': 'AVAXUSDT', 'LINK/USDT': 'LINKUSDT',
+  'LTC/USDT':  'LTCUSDT',  'ATOM/USDT': 'ATOMUSDT', 'UNI/USDT':  'UNIUSDT',
+  'NEAR/USDT': 'NEARUSDT', 'ARB/USDT':  'ARBUSDT',  'OP/USDT':   'OPUSDT',
   'BTC/USD':   'XBTUSD',   'ETH/USD':   'ETHUSD',
-  // Métaux précieux (Kraken cote XAG et XAU en USD)
-  'XAG/USDT':  'XXAGUSD',  'XAG/USD':   'XXAGUSD',
-  'XAU/USDT':  'XXAUUSD',  'XAU/USD':   'XXAUUSD',
+  'POL/USDT':  'POLUSDT',  'MATIC/USDT':'MATICUSDT',
 }
 
-async function fromKraken(pairs) {
-  const pairsToFetch = pairs.filter(p => isTrading(p))
-  if (pairsToFetch.length === 0) return {}
+async function fromKrakenCrypto(pairs) {
+  const cryptoPairs = pairs.filter(isCrypto)
+  if (cryptoPairs.length === 0) return {}
 
-  const krakenPairs = pairsToFetch
-    .map(p => ({ pair: p, kraken: KRAKEN_MAP[p] ?? `${getBase(p)}USDT` }))
+  const entries = cryptoPairs.map(p => ({
+    pair: p,
+    krakenSym: KRAKEN_CRYPTO_MAP[p] ?? `${getBase(p)}USDT`,
+  }))
 
-  const pairParam = krakenPairs.map(x => x.kraken).join(',')
-  const url = `https://api.kraken.com/0/public/Ticker?pair=${pairParam}`
-
+  const paramStr = entries.map(e => e.krakenSym).join(',')
+  const url = `https://api.kraken.com/0/public/Ticker?pair=${paramStr}`
   const res = await fetchWithTimeout(url)
-  if (!res.ok) throw new Error(`Kraken ${res.status}`)
+  if (!res.ok) throw new Error(`Kraken crypto ${res.status}`)
   const data = await res.json()
-  if (data.error && data.error.length > 0) throw new Error(`Kraken: ${data.error[0]}`)
+  if (data.error?.length) throw new Error(`Kraken: ${data.error[0]}`)
 
   const prices = {}
-  const resultKeys = Object.keys(data.result || {})
-  for (const { pair, kraken } of krakenPairs) {
-    const key = resultKeys.find(k => k === kraken || k.includes(getBase(pair)))
+  const keys   = Object.keys(data.result || {})
+  for (const { pair, krakenSym } of entries) {
+    const key = keys.find(k => k === krakenSym || k.includes(getBase(pair)))
     if (key && data.result[key]?.c?.[0]) {
       prices[pair] = parseFloat(data.result[key].c[0])
     }
@@ -118,110 +162,106 @@ async function fromKraken(pairs) {
   return prices
 }
 
-// ── Source 3 : CryptoCompare ─────────────────────────────────────────────────
-
+// ── Crypto : CryptoCompare ────────────────────────────────────────────────────
 async function fromCryptoCompare(pairs) {
-  const trading = pairs.filter(isTrading)
-  if (trading.length === 0) return {}
+  const cryptoPairs = pairs.filter(isCrypto)
+  if (cryptoPairs.length === 0) return {}
 
-  const fsyms = [...new Set(trading.map(getBase))].join(',')
-  const url = `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=USD,USDT`
-
-  const res = await fetchWithTimeout(url)
+  const fsyms = [...new Set(cryptoPairs.map(getBase))].join(',')
+  const url   = `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${fsyms}&tsyms=USD,USDT`
+  const res   = await fetchWithTimeout(url)
   if (!res.ok) throw new Error(`CryptoCompare ${res.status}`)
-  const data = await res.json()
-  if (data.Response === 'Error') throw new Error(`CryptoCompare: ${data.Message}`)
+  const data  = await res.json()
+  if (data.Response === 'Error') throw new Error(`CC: ${data.Message}`)
 
   const prices = {}
-  for (const p of trading) {
+  for (const p of cryptoPairs) {
     const entry = data[getBase(p)]
-    if (entry?.USDT)     prices[p] = entry.USDT
-    else if (entry?.USD) prices[p] = entry.USD
+    if (entry?.USDT != null)     prices[p] = entry.USDT
+    else if (entry?.USD != null) prices[p] = entry.USD
   }
   return prices
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function tryGet(label, fn) {
+  try {
+    const result = await fn()
+    console.info(`[prices] ✓ ${label}:`, result)
+    return result
+  } catch (e) {
+    console.warn(`[prices] ✗ ${label}:`, e.message)
+    return {}
+  }
+}
+
+function mergeMissing(prices, extra) {
+  for (const [k, v] of Object.entries(extra)) {
+    if (prices[k] === undefined) prices[k] = v
+  }
 }
 
 // ── API publique ──────────────────────────────────────────────────────────────
 
 export async function fetchLivePrices(pairNames) {
-  const trading = pairNames.filter(isTrading)
+  const trading     = pairNames.filter(isTrading)
   if (trading.length === 0) return { prices: {}, source: 'none' }
 
   const metalPairs  = trading.filter(isMetal)
   const cryptoPairs = trading.filter(isCrypto)
   const prices      = {}
-  let   source      = 'none'
+  const sources     = []
 
-  // ── Métaux : metals.live en premier ─────────────────────────────────────
+  // ── 1. Métaux : Kraken (prioritaire) ──────────────────────────────────────
   if (metalPairs.length > 0) {
-    try {
-      const metalPrices = await fromMetalsLive(metalPairs)
-      Object.assign(prices, metalPrices)
-      if (Object.keys(metalPrices).length > 0) source = 'Metals.live'
-    } catch (e) {
-      console.warn('[prices] metals.live failed:', e.message)
+    const krakenM = await tryGet('Kraken-metals', () => fromKrakenMetals(metalPairs))
+    mergeMissing(prices, krakenM)
+    if (Object.keys(krakenM).length > 0) sources.push('Kraken')
+
+    // Fallback metals.live
+    const stillMissingM = metalPairs.filter(p => prices[p] === undefined)
+    if (stillMissingM.length > 0) {
+      const liveM = await tryGet('metals.live', () => fromMetalsLive(stillMissingM))
+      mergeMissing(prices, liveM)
+      if (Object.keys(liveM).length > 0) sources.push('Metals.live')
     }
 
-    // Fallback Kraken pour les métaux non obtenus
-    const missingMetals = metalPairs.filter(p => prices[p] === undefined)
-    if (missingMetals.length > 0) {
-      try {
-        const krakenMetals = await fromKraken(missingMetals)
-        Object.assign(prices, krakenMetals)
-        if (Object.keys(krakenMetals).length > 0 && source === 'none') source = 'Kraken'
-      } catch (e) {
-        console.warn('[prices] Kraken metals failed:', e.message)
-      }
+    // Fallback CryptoCompare pour métaux
+    const stillMissingM2 = metalPairs.filter(p => prices[p] === undefined)
+    if (stillMissingM2.length > 0) {
+      const ccM = await tryGet('CC-metals', () => fromCryptoCompareMetals(stillMissingM2))
+      mergeMissing(prices, ccM)
+      if (Object.keys(ccM).length > 0) sources.push('CryptoCompare')
     }
   }
 
-  // ── Crypto : Binance en premier ──────────────────────────────────────────
+  // ── 2. Crypto : Binance (prioritaire) ─────────────────────────────────────
   if (cryptoPairs.length > 0) {
-    try {
-      const binancePrices = await fromBinance(cryptoPairs)
-      Object.assign(prices, binancePrices)
-      if (Object.keys(binancePrices).length > 0) {
-        source = source === 'none' ? 'Binance' : `${source} + Binance`
-      }
+    const binance = await tryGet('Binance', () => fromBinance(cryptoPairs))
+    mergeMissing(prices, binance)
+    if (Object.keys(binance).length > 0) sources.push('Binance')
 
-      // Paires crypto manquantes → CryptoCompare
-      const missing = cryptoPairs.filter(p => prices[p] === undefined)
-      if (missing.length > 0) {
-        try {
-          const extra = await fromCryptoCompare(missing)
-          Object.assign(prices, extra)
-        } catch { /* silencieux */ }
-      }
-    } catch (e) {
-      console.warn('[prices] Binance failed:', e.message)
+    // Fallback Kraken crypto
+    const missingC = cryptoPairs.filter(p => prices[p] === undefined)
+    if (missingC.length > 0) {
+      const krakenC = await tryGet('Kraken-crypto', () => fromKrakenCrypto(missingC))
+      mergeMissing(prices, krakenC)
+      if (Object.keys(krakenC).length > 0) sources.push('Kraken')
+    }
 
-      // Fallback Kraken crypto
-      try {
-        const krakenPrices = await fromKraken(cryptoPairs)
-        Object.assign(prices, krakenPrices)
-        if (Object.keys(krakenPrices).length > 0) {
-          source = source === 'none' ? 'Kraken' : `${source} + Kraken`
-        }
-      } catch (e2) {
-        console.warn('[prices] Kraken crypto failed:', e2.message)
-      }
-
-      // Fallback CryptoCompare crypto
-      const stillMissing = cryptoPairs.filter(p => prices[p] === undefined)
-      if (stillMissing.length > 0) {
-        try {
-          const ccPrices = await fromCryptoCompare(stillMissing)
-          Object.assign(prices, ccPrices)
-          if (Object.keys(ccPrices).length > 0) {
-            source = source === 'none' ? 'CryptoCompare' : `${source} + CryptoCompare`
-          }
-        } catch (e3) {
-          console.warn('[prices] CryptoCompare failed:', e3.message)
-        }
-      }
+    // Fallback CryptoCompare crypto
+    const missingC2 = cryptoPairs.filter(p => prices[p] === undefined)
+    if (missingC2.length > 0) {
+      const cc = await tryGet('CryptoCompare', () => fromCryptoCompare(missingC2))
+      mergeMissing(prices, cc)
+      if (Object.keys(cc).length > 0) sources.push('CryptoCompare')
     }
   }
 
   if (Object.keys(prices).length === 0) return { prices: {}, source: 'error' }
-  return { prices, source }
+
+  // Déduplique les sources pour l'affichage
+  const uniqueSources = [...new Set(sources)]
+  return { prices, source: uniqueSources.join(' + ') || 'inconnu' }
 }
