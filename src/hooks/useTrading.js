@@ -51,7 +51,7 @@ export function useTrading() {
     priceSource,
     lastPriceUpdate,
     refreshPrices,
-  } = usePrices(view === 'dashboard' || view === 'dca' ? pairList : [])
+  } = usePrices(pairList)
 
   // Quand les prix arrivent, enrichit la pairList avec les PnL live
   useEffect(() => {
