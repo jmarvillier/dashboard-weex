@@ -2,18 +2,37 @@
 export function normPair(p) {
   p = String(p).trim()
   if (p === 'XAGUSDT') return 'XAG/USDT'
+  if (p === 'XAUUSDT') return 'XAU/USDT'
   if (p === 'BTCUSDT') return 'BTC/USDT'
   if (p === 'ETHUSDT') return 'ETH/USDT'
   return p
 }
 
-/** Parse une valeur numérique (gère virgule/point, espaces, guillemets) */
+/**
+ * Parse une valeur numérique.
+ * Règle : le point ET la virgule sont des séparateurs décimaux — jamais de milliers.
+ *   "1.456"    → 1.456   (volume XAG, pas 1456)
+ *   "1,456"    → 1.456
+ *   "1.626,95" → 1626.95 (format européen : point=milliers, virgule=décimal)
+ *   "99.03984" → 99.03984
+ */
 export function parseN(v) {
   if (v === null || v === undefined || v === '') return 0
   if (typeof v === 'number') return v
   let s = String(v).replace(/\s/g, '').replace(/["""]/g, '')
-  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '').replace(',', '.')
-  else s = s.replace(',', '.')
+
+  const hasDot   = s.includes('.')
+  const hasComma = s.includes(',')
+
+  if (hasDot && hasComma) {
+    // Format européen explicite : 1.234,56 → 1234.56
+    s = s.replace(/\./g, '').replace(',', '.')
+  } else if (hasComma) {
+    // Virgule seule = décimal : 1,456 → 1.456
+    s = s.replace(',', '.')
+  }
+  // Point seul = déjà décimal, rien à faire
+
   return parseFloat(s) || 0
 }
 
