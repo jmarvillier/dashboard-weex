@@ -1,7 +1,7 @@
 /**
  * sw.js — Service Worker Ydash
  * ─────────────────────────────────────────────────────────────────────────────
- * 1.1.2.1 et 29d72bf sont remplacés par vite.config.js au build.
+ * 1.1.2.2 et c49a26a sont remplacés par vite.config.js au build.
  *
  * Stratégie :
  *  - Cache nommé par version+sha → purge automatique à chaque déploiement
@@ -11,8 +11,8 @@
  *  - Message  : SKIP_WAITING → activation immédiate sur demande de l'app
  */
 
-const VERSION    = '1.1.2.1'
-const GIT_SHA    = '29d72bf'
+const VERSION    = '1.1.2.2'
+const GIT_SHA    = 'c49a26a'
 const CACHE_NAME = `weex-${VERSION}-${GIT_SHA}-assets`
 
 const PRECACHE_URLS = ['./', './index.html', './manifest.json', './version.json']
