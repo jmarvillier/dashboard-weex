@@ -46,6 +46,7 @@ export function useTrading() {
   // ── Prix live ─────────────────────────────────────────────────────────────
   const {
     prices,
+    priceSources,
     pricesLoading,
     pricesError,
     priceSource,
@@ -56,9 +57,9 @@ export function useTrading() {
   // Quand les prix arrivent, enrichit la pairList avec les PnL live
   useEffect(() => {
     if (!prices || Object.keys(prices).length === 0) return
-    setPairList(prev => enrichWithPrices(prev, prices))
-  }, [prices])
-
+    setPairList(prev => enrichWithPrices(prev, prices, priceSources))
+  }, [prices, priceSources])
+  
   useEffect(() => {
     hasSnapshot().then(setRepoAvailable)
   }, [])
