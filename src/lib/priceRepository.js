@@ -54,6 +54,30 @@ async function fromBitfinexMetals(pairs) {
   return prices
 }
 
+// ── MÉTAUX : Source 2 — GoldPrice.org ────────────────────────────────────────
+// API publique temps réel, CORS ouvert, pas de clé API
+// Retourne XAU et XAG en USD directement
+async function fromGoldPrice(pairs) {
+  const metalPairs = pairs.filter(isMetal)
+  if (!metalPairs.length) return {}
+
+  const res  = await fetchWithTimeout('https://data-asg.goldprice.org/dbXRates/USD', 8000)
+  if (!res.ok) throw new Error(`GoldPrice → HTTP ${res.status}`)
+  const data = await res.json()
+
+  // data.items[0] = { xauPrice, xagPrice, ... }
+  const item   = data?.items?.[0]
+  if (!item) throw new Error('GoldPrice → structure inattendue')
+
+  const MAP = { XAG: 'xagPrice', XAU: 'xauPrice' }
+  const prices = {}
+  for (const p of metalPairs) {
+    const key = MAP[getBase(p)]
+    if (key && item[key] != null) prices[p] = parseFloat(item[key])
+  }
+  return prices
+}
+
 // ── MÉTAUX : Source 2 — OKX ──────────────────────────────────────────────────
 // Perpetual swap XAG-USD-SWAP, temps réel, CORS ouvert
 const OKX_METALS = { XAG: 'XAG-USD-SWAP', XAU: 'XAU-USD-SWAP' }
@@ -284,55 +308,63 @@ export async function fetchLivePrices(pairNames) {
     mergeMissing(prices, priceSources, bf, 'Bitfinex')
     if (Object.keys(bf).length) sources.push('Bitfinex')
 
-    // 2. OKX
+    // 2. GoldPrice.org
     const miss1 = metals.filter(p => prices[p] === undefined)
     if (miss1.length) {
-      const okx = await trySource('OKX-metals', () => fromOkxMetals(miss1))
+      const gp = await trySource('GoldPrice', () => fromGoldPrice(miss1))
+      mergeMissing(prices, priceSources, gp, 'GoldPrice')
+      if (Object.keys(gp).length) sources.push('GoldPrice')
+    }
+
+    // 3. OKX
+    const miss2 = metals.filter(p => prices[p] === undefined)
+    if (miss2.length) {
+      const okx = await trySource('OKX-metals', () => fromOkxMetals(miss2))
       mergeMissing(prices, priceSources, okx, 'OKX')
       if (Object.keys(okx).length) sources.push('OKX')
     }
 
-    // 3. Stooq
-    const miss2 = metals.filter(p => prices[p] === undefined)
-    if (miss2.length) {
-      const stooq = await trySource('Stooq-metals', () => fromStooqMetals(miss2))
+    // 4. Stooq
+    const miss3 = metals.filter(p => prices[p] === undefined)
+    if (miss3.length) {
+      const stooq = await trySource('Stooq-metals', () => fromStooqMetals(miss3))
       mergeMissing(prices, priceSources, stooq, 'Stooq')
       if (Object.keys(stooq).length) sources.push('Stooq')
     }
 
-    // 4. Yahoo Finance
-    const miss3 = metals.filter(p => prices[p] === undefined)
-    if (miss3.length) {
-      const yf = await trySource('Yahoo-metals', () => fromYahooFinanceMetals(miss3))
+    // 5. Yahoo Finance
+    const miss4 = metals.filter(p => prices[p] === undefined)
+    if (miss4.length) {
+      const yf = await trySource('Yahoo-metals', () => fromYahooFinanceMetals(miss4))
       mergeMissing(prices, priceSources, yf, 'Yahoo')
       if (Object.keys(yf).length) sources.push('Yahoo')
     }
 
-    // 5. metals.live
-    const miss4 = metals.filter(p => prices[p] === undefined)
-    if (miss4.length) {
-      const ml = await trySource('metals.live', () => fromMetalsLive(miss4))
+    // 6. metals.live
+    const miss5 = metals.filter(p => prices[p] === undefined)
+    if (miss5.length) {
+      const ml = await trySource('metals.live', () => fromMetalsLive(miss5))
       mergeMissing(prices, priceSources, ml, 'Metals.live')
       if (Object.keys(ml).length) sources.push('Metals.live')
     }
 
-    // 6. Cloudflare Pages
-    const miss5 = metals.filter(p => prices[p] === undefined)
-    if (miss5.length) {
-      const cf = await trySource('CF-Pages', () => fromCloudflareMetals(miss5))
+    // 7. Cloudflare Pages
+    const miss6 = metals.filter(p => prices[p] === undefined)
+    if (miss6.length) {
+      const cf = await trySource('CF-Pages', () => fromCloudflareMetals(miss6))
       mergeMissing(prices, priceSources, cf, 'CF-Pages')
       if (Object.keys(cf).length) sources.push('CF-Pages')
     }
 
-    // 7. jsDelivr — filet ultime
-    const miss6 = metals.filter(p => prices[p] === undefined)
-    if (miss6.length) {
-      const cdn = await trySource('jsDelivr-CDN', () => fromJsDelivrMetals(miss6))
+    // 8. jsDelivr — filet ultime
+    const miss7 = metals.filter(p => prices[p] === undefined)
+    if (miss7.length) {
+      const cdn = await trySource('jsDelivr-CDN', () => fromJsDelivrMetals(miss7))
       mergeMissing(prices, priceSources, cdn, 'jsDelivr')
       if (Object.keys(cdn).length) sources.push('jsDelivr')
     }
   }
-
+  
   // ── Crypto ─────────────────────────────────────────────────────────────────
   if (cryptos.length) {
     // 1. Binance
