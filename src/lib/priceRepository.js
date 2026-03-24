@@ -2,8 +2,8 @@
  * priceRepository.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Cours temps réel par cascade :
- *   Métaux  → Bitfinex → metals.live → jsDelivr CDN (fawazahmed0)
- *   Crypto  → Binance  → Kraken      → CryptoCompare
+ *   Métaux  → Bitfinex → Yahoo Finance → metals.live → CF-Pages (fawazahmed0) → jsDelivr CDN
+ *   Crypto  → Binance  → Kraken        → CryptoCompare
  *
  * ⚠️  Kraken ne cote PLUS XAG/XAU depuis 2019 — retiré définitivement
  */
@@ -67,7 +67,29 @@ async function fromBitfinexMetals(pairs) {
   return prices
 }
 
-// ── MÉTAUX : Source 2 — metals.live ──────────────────────────────────────────
+// ── MÉTAUX : Source 2 — Yahoo Finance ────────────────────────────────────────
+// API non officielle mais CORS ouverte, temps réel (marché spot Forex/Commodities)
+const YAHOO_METALS = { XAG: 'XAGUSD=X', XAU: 'XAUUSD=X', XPT: 'XPTUSD=X', XPD: 'XPDUSD=X' }
+
+async function fromYahooFinanceMetals(pairs) {
+  const metalPairs = pairs.filter(isMetal)
+  if (!metalPairs.length) return {}
+
+  const prices = {}
+  await Promise.all(metalPairs.map(async p => {
+    const sym = YAHOO_METALS[getBase(p)]
+    if (!sym) return
+    const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1m&range=1d&includePrePost=false`
+    const res  = await fetchWithTimeout(url, 8000)
+    if (!res.ok) throw new Error(`Yahoo ${sym} → HTTP ${res.status}`)
+    const data  = await res.json()
+    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice
+    if (price != null) prices[p] = parseFloat(price)
+  }))
+  return prices
+}
+
+// ── MÉTAUX : Source 3 — metals.live ──────────────────────────────────────────
 const METALS_LIVE_KEY = { XAG: 'silver', XAU: 'gold', XPT: 'platinum', XPD: 'palladium' }
 
 async function fromMetalsLive(pairs) {
@@ -87,12 +109,11 @@ async function fromMetalsLive(pairs) {
   return prices
 }
 
-// ── MÉTAUX : Source 3 — jsDelivr CDN (fawazahmed0) ───────────────────────────
-// CDN statique, jamais de CORS, mis à jour quotidiennement
-// https://github.com/fawazahmed0/exchange-api
+// ── MÉTAUX : Source 4 — Cloudflare Pages (fawazahmed0) ───────────────────────
+// Plus fraîche que jsDelivr @latest, mise à jour plusieurs fois par jour
 const FAWAZ_KEY = { XAG: 'xag', XAU: 'xau', XPT: 'xpt', XPD: 'xpd' }
 
-async function fromJsDelivrMetals(pairs) {
+async function fromCloudflareMetals(pairs) {
   const metalPairs = pairs.filter(isMetal)
   if (!metalPairs.length) return {}
 
@@ -100,13 +121,43 @@ async function fromJsDelivrMetals(pairs) {
   await Promise.all(metalPairs.map(async p => {
     const key = FAWAZ_KEY[getBase(p)]
     if (!key) return
-    const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${key}.json`
+    const url = `https://latest.currency-api.pages.dev/v1/currencies/${key}.json`
     const res  = await fetchWithTimeout(url, 8000)
-    if (!res.ok) throw new Error(`jsDelivr ${key} → HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`CF-Pages ${key} → HTTP ${res.status}`)
     const data = await res.json()
-    // data.xag.usd = prix de 1 troy oz d'argent en USD
     const usdPrice = data?.[key]?.usd
     if (usdPrice != null) prices[p] = parseFloat(usdPrice)
+  }))
+  return prices
+}
+
+// ── MÉTAUX : Source 5 — jsDelivr CDN (fawazahmed0) — filet ultime ────────────
+// CDN statique, jamais de CORS, mis à jour quotidiennement (cache agressif)
+async function fromJsDelivrMetals(pairs) {
+  const metalPairs = pairs.filter(isMetal)
+  if (!metalPairs.length) return {}
+
+  // On préfère une URL datée (évite le cache @latest qui peut être figé plusieurs heures)
+  const today = new Date().toISOString().slice(0, 10)
+
+  const prices = {}
+  await Promise.all(metalPairs.map(async p => {
+    const key = FAWAZ_KEY[getBase(p)]
+    if (!key) return
+    // Tenter d'abord la date du jour, sinon @latest
+    const urls = [
+      `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${today}/v1/currencies/${key}.json`,
+      `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${key}.json`,
+    ]
+    for (const url of urls) {
+      try {
+        const res  = await fetchWithTimeout(url, 6000)
+        if (!res.ok) continue
+        const data = await res.json()
+        const usdPrice = data?.[key]?.usd
+        if (usdPrice != null) { prices[p] = parseFloat(usdPrice); break }
+      } catch { /* essai suivant */ }
+    }
   }))
   return prices
 }
@@ -214,18 +265,34 @@ export async function fetchLivePrices(pairNames) {
     mergeMissing(prices, bf)
     if (Object.keys(bf).length) sources.push('Bitfinex')
 
-    // 2. metals.live pour les manquants
+    // 2. Yahoo Finance pour les manquants
     const miss1 = metals.filter(p => prices[p] === undefined)
     if (miss1.length) {
-      const ml = await trySource('metals.live', () => fromMetalsLive(miss1))
+      const yf = await trySource('Yahoo-metals', () => fromYahooFinanceMetals(miss1))
+      mergeMissing(prices, yf)
+      if (Object.keys(yf).length) sources.push('Yahoo')
+    }
+
+    // 3. metals.live pour les manquants
+    const miss2 = metals.filter(p => prices[p] === undefined)
+    if (miss2.length) {
+      const ml = await trySource('metals.live', () => fromMetalsLive(miss2))
       mergeMissing(prices, ml)
       if (Object.keys(ml).length) sources.push('Metals.live')
     }
 
-    // 3. jsDelivr CDN comme filet ultime
-    const miss2 = metals.filter(p => prices[p] === undefined)
-    if (miss2.length) {
-      const cdn = await trySource('jsDelivr-CDN', () => fromJsDelivrMetals(miss2))
+    // 4. Cloudflare Pages (fawazahmed0) — plus fraîche que jsDelivr @latest
+    const miss3 = metals.filter(p => prices[p] === undefined)
+    if (miss3.length) {
+      const cf = await trySource('CF-Pages', () => fromCloudflareMetals(miss3))
+      mergeMissing(prices, cf)
+      if (Object.keys(cf).length) sources.push('CF-Pages')
+    }
+
+    // 5. jsDelivr CDN comme filet ultime
+    const miss4 = metals.filter(p => prices[p] === undefined)
+    if (miss4.length) {
+      const cdn = await trySource('jsDelivr-CDN', () => fromJsDelivrMetals(miss4))
       mergeMissing(prices, cdn)
       if (Object.keys(cdn).length) sources.push('jsDelivr')
     }
