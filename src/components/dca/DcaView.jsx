@@ -247,6 +247,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, pric
           plan={currentPlan}
           rawRows={rawRows}
           prices={prices}
+          priceSources={priceSources}
           onBack={backToList}
           onRefresh={onRefresh}
         />
