@@ -13,7 +13,7 @@ import EntryForm from '../EntryForm.jsx'
 import KpiTooltip from '../KpiTooltip.jsx'
 
 /* ═══ DASHBOARD ═══════════════════════════════════════════════════════════ */
-function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
+function DcaDashboard({ plan, rawRows, prices, priceSources = {}, onBack, onRefresh }) {
   const [showEntry,   setShowEntry]   = useState(false)
   const [savedMsg,    setSavedMsg]    = useState('')
   const [manualPrice, setManualPrice] = useState('')
@@ -215,7 +215,11 @@ function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
           <div className="dca-hero-block">
             <div className="dca-hero-lbl">Cours actuel</div>
             <div className="dca-hero-val">{currentPrice?fmt(currentPrice):'—'}</div>
-            <div className="dca-hero-sub">{prices[effectivePair]?'live':'saisie manuelle'}</div>
+            <div className="dca-hero-sub">
+            {prices[effectivePair]
+             ? <>live <span style={{opacity:.6}}>· {priceSources?.[effectivePair] ?? '—'}</span></>
+             : 'saisie manuelle'}
+            </div>
           </div>
         </div>
 

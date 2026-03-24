@@ -46,6 +46,7 @@ export function useTrading() {
   // ── Prix live ─────────────────────────────────────────────────────────────
   const {
     prices,
+    priceSources,
     pricesLoading,
     pricesError,
     priceSource,
@@ -56,9 +57,9 @@ export function useTrading() {
   // Quand les prix arrivent, enrichit la pairList avec les PnL live
   useEffect(() => {
     if (!prices || Object.keys(prices).length === 0) return
-    setPairList(prev => enrichWithPrices(prev, prices))
-  }, [prices])
-
+    setPairList(prev => enrichWithPrices(prev, prices, priceSources))
+  }, [prices, priceSources])
+  
   useEffect(() => {
     hasSnapshot().then(setRepoAvailable)
   }, [])
@@ -203,7 +204,7 @@ export function useTrading() {
     fileName, loadedAt, pairList, rawRows, excluded, driveErr,
     repoAvailable,
     // Prix live
-    prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
+    prices, priceSources, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,

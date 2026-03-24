@@ -128,12 +128,15 @@ export default function PairCard({ p, excluded, onToggle, index }) {
           <div className="pc2-head-left">
             <div className="pc2-name">{p.name}</div>
             <div className="pc2-sub">
-              {price > 0 && <span className="pc2-price">{fmtPrice(price)} USDT</span>}
-              {hasLive   && <span className="live-dot" style={{width:6,height:6,flexShrink:0}}></span>}
-              {dBePct != null && (
-                <span className={`pc2-be ${cc(dBePct)}`}>{fmtPct(dBePct)} vs breakeven</span>
-              )}
-            </div>
+                {price > 0 && <span className="pc2-price">{fmtPrice(price)} USDT</span>}
+                {hasLive   && <span className="live-dot" style={{width:6,height:6,flexShrink:0}}></span>}
+                {dBePct != null && (
+                  <span className={`pc2-be ${cc(dBePct)}`}>{fmtPct(dBePct)} vs breakeven</span>
+                )}
+                {hasLive && p.priceSource && (
+                  <span className="pc2-price-src">{p.priceSource}</span>
+                )}
+              </div>
           </div>
           <div className="pc2-head-right">
             <div className={`pc2-badge ${cc(pnlT)}`}>

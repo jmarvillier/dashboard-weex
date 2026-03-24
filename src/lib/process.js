@@ -195,14 +195,17 @@ export function extractRawRows(rows) {
   return result
 }
 
-export function enrichWithPrices(pairList, prices) {
+export function enrichWithPrices(pairList, prices, priceSources = {}) {
   return pairList.map(function(p) {
     const coursLive = prices[p.name]
 
     if (coursLive == null || p.is_depot || p.avgBuyPrice <= 0) {
-      return Object.assign({}, p, { cours_live: coursLive != null ? coursLive : null })
+      return Object.assign({}, p, {
+        cours_live:   coursLive != null ? coursLive : null,
+        priceSource:  coursLive != null ? (priceSources[p.name] ?? null) : null,
+      })
     }
-
+    
     // PnL réalisé ne change pas avec le cours live
     const pnlRealiseLive = p.pnl_realise
 
@@ -246,6 +249,7 @@ export function enrichWithPrices(pairList, prices) {
       deltaVsAvgSellPct,
       deltaVsBreakeven,
       deltaVsBreakevenPct,
+      priceSource: priceSources[p.name] ?? null
     })
   })
 }

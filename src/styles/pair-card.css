@@ -340,6 +340,13 @@
 .pc2-depot-val.gold { color: var(--gold); }
 .pc2-depot-unit { font-size: .5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .pc2-depot-note { font-size: .52rem; color: var(--muted); font-style: italic; margin-top: 8px; }
+.pc2-price-src {
+  font-size: .6rem;
+  color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  opacity: .7;
+  letter-spacing: .02em;
+}
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
