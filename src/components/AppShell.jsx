@@ -182,7 +182,7 @@ function Sidebar({ activePage, setActivePage, isOpen, setIsOpen, backToLanding }
   )
 }
 
-/* ── Pages existantes ────────────────────────────────────────────────────── */
+/* ── Pages ───────────────────────────────────────────────────────────────── */
 function PageDashboard({ pairList, rawRows, prices, pricesLoading, pricesError, lastPriceUpdate, refreshPrices }) {
   const { period, setPeriod, data } = usePeriodFilter(pairList, rawRows, prices)
   return (
@@ -208,7 +208,7 @@ function PagePaires({ pairList, excluded, toggleFlag }) {
 /* ── AppShell ────────────────────────────────────────────────────────────── */
 export default function AppShell({
   activePage, setActivePage,
-  excluded, pairList, rawRows, prices,
+  excluded, pairList, rawRows, prices, priceSources,
   repoAvailable, backToLanding, toggleFlag,
   loadFromFile, loadFromDrive, driveErr, setDriveErr, onRepoUpdated,
   pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
@@ -246,7 +246,11 @@ export default function AppShell({
             />
           )}
           {activePage === 'dca' && (
-            <DcaView pairList={pairList} rawRows={rawRows} prices={prices} priceSources={priceSources} onRefresh={onRefresh} />
+            <DcaView
+              pairList={pairList} rawRows={rawRows}
+              prices={prices} priceSources={priceSources}
+              onRefresh={onRefresh}
+            />
           )}
         </main>
       </div>
