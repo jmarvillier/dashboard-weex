@@ -120,7 +120,7 @@ async function clearPlanIds(planId) {
 
 /* ── Orchestrateur ───────────────────────────────────────────────────────── */
 
-export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRefresh }) {
+export default function DcaView({ pairList = [], rawRows = [], prices = {}, priceSources = {}, onRefresh }) {
   const [screen,      setScreen]      = useState('list')
   const [plans,       setPlans]       = useState([])
   const [templates,   setTemplates]   = useState([])
@@ -247,6 +247,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, onRe
           plan={currentPlan}
           rawRows={rawRows}
           prices={prices}
+          priceSources={priceSources}
           onBack={backToList}
           onRefresh={onRefresh}
         />

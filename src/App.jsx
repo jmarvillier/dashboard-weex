@@ -23,7 +23,7 @@ export default function App() {
     view, zone, loading, loadingTxt,
     fileName, loadedAt, pairList, rawRows, excluded, driveErr,
     repoAvailable,
-    prices, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
+    prices, priceSources, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
@@ -44,18 +44,14 @@ export default function App() {
     if (authUid !== null) backToLanding()
   }, [authUid])
 
-  // Pour DCA on entre dans l'app sans forcément charger le journal
   function handleEnterApp(page = 'dashboard') {
     setActivePage(page)
     openFromRepository()
   }
 
   function handleOpenDca() {
-    // DCA accessible directement, même sans journal chargé
     setActivePage('dca')
-    if (repoAvailable) {
-      openFromRepository()
-    }
+    if (repoAvailable) openFromRepository()
   }
 
   const handleBackToLanding = () => {
@@ -96,6 +92,7 @@ export default function App() {
           pairList={pairList}
           rawRows={rawRows}
           prices={prices}
+          priceSources={priceSources}
           repoAvailable={repoAvailable}
           clearRepository={clearRepository}
           backToLanding={handleBackToLanding}
