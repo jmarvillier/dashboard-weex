@@ -13,7 +13,7 @@ import EntryForm from '../EntryForm.jsx'
 import KpiTooltip from '../KpiTooltip.jsx'
 
 /* ═══ DASHBOARD ═══════════════════════════════════════════════════════════ */
-function DcaDashboard({ plan, rawRows, prices, onBack, onRefresh }) {
+function DcaDashboard({ plan, rawRows, prices, priceSources = {}, onBack, onRefresh }) {
   const [showEntry,   setShowEntry]   = useState(false)
   const [savedMsg,    setSavedMsg]    = useState('')
   const [manualPrice, setManualPrice] = useState('')
