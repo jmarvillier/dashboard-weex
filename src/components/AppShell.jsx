@@ -246,7 +246,7 @@ export default function AppShell({
             />
           )}
           {activePage === 'dca' && (
-            <DcaView pairList={pairList} rawRows={rawRows} prices={prices} onRefresh={onRefresh} />
+            <DcaView pairList={pairList} rawRows={rawRows} prices={prices} priceSources={priceSources} onRefresh={onRefresh} />
           )}
         </main>
       </div>
