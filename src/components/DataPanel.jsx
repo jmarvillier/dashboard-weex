@@ -37,6 +37,14 @@ const ACTIONS = [
     pill: '📥 Importer',
   },
   {
+    id: 'regularize',
+    icon: '⚖️',
+    label: 'Régularisation',
+    desc: 'Ajouter des lignes (OKX / Ledger) sans écraser le journal',
+    color: 'gold',
+    pill: '➕ Ajouter',
+  },
+  {
     id: 'export',
     icon: '📤',
     label: 'Exporter .xlsx',
@@ -191,10 +199,77 @@ function ImportMenu({ loadFromFile, loadFromDrive, driveErr, setDriveErr, onBack
   )
 }
 
+/* ─── Sous-vue Régularisation ─────────────────────────────────────────────── */
+
+function RegularizeZone({ regularizeFromFile, onBack, onRepoUpdated }) {
+  const fileInputRef = useRef()
+  const [dragging, setDragging] = useState(false)
+  const [busy, setBusy]         = useState(false)
+  const [msg, setMsg]           = useState(null)
+
+  async function handleFile(file) {
+    if (!file || busy) return
+    setMsg(null)
+    setBusy(true)
+    try {
+      const { added } = await regularizeFromFile(file)
+      const s = added > 1 ? 's' : ''
+      setMsg({ type: 'ok', text: `✅ ${added} ligne${s} ajoutée${s} au journal. Données existantes conservées.` })
+      onRepoUpdated?.()
+    } catch (err) {
+      setMsg({ type: 'err', text: '❌ ' + err.message })
+    } finally {
+      setBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="dp-sub-view">
+      <button className="dp-back-btn" onClick={onBack}>← Données</button>
+      <div className="dp-sub-header">
+        <div className="dp-sub-icon">⚖️</div>
+        <div className="dp-sub-title">Régularisation</div>
+        <div className="dp-sub-desc">Ajoute des lignes au journal sans écraser l'existant</div>
+      </div>
+
+      <div
+        className={`dp-dropzone${dragging ? ' drag' : ''}`}
+        onClick={() => !busy && fileInputRef.current.click()}
+        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}
+      >
+        <div className="dp-dropzone-icon">📂</div>
+        <div className="dp-dropzone-text">
+          <strong>{busy ? 'Ajout en cours…' : 'Cliquez ou glissez votre fichier ici'}</strong>
+          <span>.xlsx · .xls · .csv</span>
+          <span className="dp-dropzone-hint">Lignes de régularisation OKX / Ledger</span>
+        </div>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        style={{ display: 'none' }}
+        onChange={e => handleFile(e.target.files[0])}
+      />
+
+      {msg && <div className={`dp-msg ${msg.type}`}>{msg.text}</div>}
+
+      <div className="dp-notice">
+        ➕ Les lignes du fichier sont <strong>ajoutées</strong> à ton journal existant
+        (contrairement à l'import, qui remplace tout). Une éventuelle ligne d'en-tête est ignorée.
+      </div>
+    </div>
+  )
+}
+
 /* ─── Composant principal ────────────────────────────────────────────────── */
 export default function DataPanel({
   repoAvailable,
   loadFromFile,
+  regularizeFromFile,
   loadFromDrive,
   driveErr,
   setDriveErr,
@@ -228,6 +303,17 @@ export default function DataPanel({
           driveErr={driveErr}
           setDriveErr={setDriveErr}
           onBack={handleBack}
+        />
+      </div>
+    )
+  }
+  if (activeAction === 'regularize') {
+    return (
+      <div className="page-content">
+        <RegularizeZone
+          regularizeFromFile={regularizeFromFile}
+          onBack={handleBack}
+          onRepoUpdated={onRepoUpdated}
         />
       </div>
     )
