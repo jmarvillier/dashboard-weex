@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { parseCSV, isUsdPair } from '../lib/parser.js'
 import { process, buildPairList, enrichWithPrices, extractRawRows } from '../lib/process.js'
-import { saveSnapshot, loadSnapshot, hasSnapshot, clearSnapshot } from '../lib/repository.js'
+import { saveSnapshot, loadSnapshot, hasSnapshot, clearSnapshot, appendRows } from '../lib/repository.js'
 import { usePrices } from './usePrices.js'
 
 const SHEET_URLS = (id) => [
@@ -132,6 +132,41 @@ export function useTrading() {
     reader.readAsArrayBuffer(file)
   }, [])
 
+  // Ajoute des lignes au journal SANS écraser l'existant (régularisation OKX/Ledger)
+  const regularizeFromFile = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        try {
+          startLoading('Lecture du fichier de régularisation…')
+          let rows
+
+          if (file.name.toLowerCase().endsWith('.csv')) {
+            rows = parseCSV(new TextDecoder('utf-8').decode(e.target.result))
+          } else {
+            const wb = window.XLSX.read(new Uint8Array(e.target.result), { type: 'array' })
+            const ws = wb.Sheets[wb.SheetNames[0]]
+            rows = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+          }
+
+          if (!rows || rows.length < 1) throw new Error('Fichier vide ou format non reconnu.')
+
+          setLoadingTxt('Ajout des lignes au journal…')
+          const { rows: merged, added } = await appendRows(rows, file.name)
+
+          stopLoading()
+          ingest(merged, fileName || file.name)
+          resolve({ added })
+        } catch (err) {
+          stopLoading()
+          reject(err)
+        }
+      }
+      reader.onerror = () => { stopLoading(); reject(new Error('Lecture du fichier impossible.')) }
+      reader.readAsArrayBuffer(file)
+    })
+  }, [fileName])
+
   const loadFromDrive = useCallback(async (rawUrl) => {
     const m  = rawUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/)
     const id = m
@@ -208,6 +243,7 @@ export function useTrading() {
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
+    regularizeFromFile,
     loadFromDrive,
     clearRepository,
     refreshRepoAvailable,
