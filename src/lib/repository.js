@@ -85,6 +85,29 @@ export async function appendRow(row) {
   await saveSnapshot(rows, source)
 }
 
+export async function appendRows(newRows, source = 'Régularisation') {
+  await waitForAuth()
+  if (!Array.isArray(newRows) || newRows.length === 0) {
+    throw new Error('Fichier vide ou format non reconnu.')
+  }
+
+  // Détecte une éventuelle ligne d'en-tête dans le fichier importé et l'ignore
+  const hasHeader = newRows[0]?.some(c => /PAIRE|DATE/i.test(String(c)))
+  const dataRows  = hasHeader ? newRows.slice(1) : newRows
+  if (dataRows.length === 0) throw new Error('Aucune ligne de données à ajouter.')
+
+  const snapshot    = await loadSnapshot()
+  const hasExisting = snapshot && Array.isArray(snapshot.rows) && snapshot.rows.length > 0
+
+  // Ajoute aux lignes existantes — n'écrase rien.
+  // Repo vide : on garde le fichier tel quel (en-tête compris).
+  const merged = hasExisting ? [...snapshot.rows, ...dataRows] : newRows
+
+  await saveSnapshot(merged, hasExisting ? snapshot.source : source)
+
+  return { rows: merged, added: dataRows.length }
+}
+
 export async function listEntries() {
   await waitForAuth()
   const snapshot = await loadSnapshot()

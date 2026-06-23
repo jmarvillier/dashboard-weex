@@ -210,7 +210,7 @@ export default function AppShell({
   activePage, setActivePage,
   excluded, pairList, rawRows, prices, priceSources,
   repoAvailable, backToLanding, toggleFlag,
-  loadFromFile, loadFromDrive, driveErr, setDriveErr, onRepoUpdated,
+  loadFromFile, regularizeFromFile, loadFromDrive, driveErr, setDriveErr, onRepoUpdated,
   pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
   onRefresh,
 }) {
@@ -241,7 +241,7 @@ export default function AppShell({
           {activePage === 'donnees' && (
             <DataPanel
               repoAvailable={repoAvailable}
-              loadFromFile={loadFromFile} loadFromDrive={loadFromDrive}
+              loadFromFile={loadFromFile} regularizeFromFile={regularizeFromFile} loadFromDrive={loadFromDrive}
               driveErr={driveErr} setDriveErr={setDriveErr} onRepoUpdated={onRepoUpdated}
             />
           )}

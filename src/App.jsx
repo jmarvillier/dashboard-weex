@@ -27,6 +27,7 @@ export default function App() {
     setZone, setDriveErr,
     openFromRepository,
     loadFromFile,
+    regularizeFromFile,
     loadFromDrive,
     clearRepository,
     refreshRepoAvailable,
@@ -98,6 +99,7 @@ export default function App() {
           backToLanding={handleBackToLanding}
           toggleFlag={toggleFlag}
           loadFromFile={loadFromFile}
+          regularizeFromFile={regularizeFromFile}
           loadFromDrive={loadFromDrive}
           driveErr={driveErr}
           setDriveErr={setDriveErr}
