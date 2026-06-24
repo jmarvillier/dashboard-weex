@@ -99,13 +99,25 @@ export async function appendRows(newRows, source = 'Régularisation') {
   const snapshot    = await loadSnapshot()
   const hasExisting = snapshot && Array.isArray(snapshot.rows) && snapshot.rows.length > 0
 
+  // Pose le flag technique « régularisation » en col 9 sur chaque ligne importée.
+  // Ce flag sert uniquement à filtrer le pointage de régularisation ; il est
+  // remis à vide dès que la ligne est affiliée à un plan.
+  const flagged = dataRows.map(row => {
+    const r = Array.isArray(row) ? [...row] : [row]
+    while (r.length <= 9) r.push('')
+    r[9] = true
+    return r
+  })
+
   // Ajoute aux lignes existantes — n'écrase rien.
-  // Repo vide : on garde le fichier tel quel (en-tête compris).
-  const merged = hasExisting ? [...snapshot.rows, ...dataRows] : newRows
+  // Repo vide : on garde l'en-tête éventuel + les lignes flaguées.
+  const merged = hasExisting
+    ? [...snapshot.rows, ...flagged]
+    : (hasHeader ? [newRows[0], ...flagged] : flagged)
 
   await saveSnapshot(merged, hasExisting ? snapshot.source : source)
 
-  return { rows: merged, added: dataRows.length }
+  return { rows: merged, added: flagged.length }
 }
 
 export async function listEntries() {

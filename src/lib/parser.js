@@ -66,3 +66,14 @@ export function isAnnul(stat) {
 export function isUsdPair(pair) {
   return /^usd/i.test(pair.trim())
 }
+
+/**
+ * Flag technique « régularisation » (col 9 du journal).
+ * Mis à true par l'import de régularisation, remis à false (vide) une fois
+ * la ligne affiliée à un plan. Tolère booléen, "true", "1" ou "regul".
+ */
+export function isRegulFlag(v) {
+  if (v === true) return true
+  const s = String(v ?? '').trim().toLowerCase()
+  return s === 'true' || s === '1' || s === 'regul'
+}
