@@ -1,4 +1,4 @@
-import { normPair, parseN, isExec, isAnnul, isUsdPair } from './parser.js'
+import { normPair, parseN, isExec, isAnnul, isUsdPair, isRegulFlag } from './parser.js'
 
 export function parseDate(raw) {
   if (!raw) return null
@@ -189,7 +189,8 @@ export function extractRawRows(rows) {
     const vol    = parseN(r[10])
     const date   = parseDate(r[0])
     const planId = String(r[8] || '').trim()
-    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat), planId })
+    const isRegul = isRegulFlag(r[9])
+    result.push({ date, pair, sens, statut: stat, prix, usdt, vol, exec: isExec(stat), annule: isAnnul(stat), planId, isRegul })
   })
 
   return result
