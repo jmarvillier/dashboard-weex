@@ -13,7 +13,7 @@ import EntryForm from '../EntryForm.jsx'
 import KpiTooltip from '../KpiTooltip.jsx'
 
 /* ═══ DASHBOARD ═══════════════════════════════════════════════════════════ */
-function DcaDashboard({ plan, rawRows, prices, priceSources = {}, onBack, onRefresh }) {
+function DcaDashboard({ plan, rawRows, prices, priceSources = {}, onBack, onRefresh, onRegularize }) {
   const [showEntry,   setShowEntry]   = useState(false)
   const [savedMsg,    setSavedMsg]    = useState('')
   const [manualPrice, setManualPrice] = useState('')
@@ -33,6 +33,12 @@ function DcaDashboard({ plan, rawRows, prices, priceSources = {}, onBack, onRefr
   }, [plan])
 
   const ops = useMemo(() => filterOpsForPlan(rawRows, effectivePair, plan.startDate, plan.endDate), [rawRows, effectivePair, plan.startDate, plan.endDate])
+
+  // Lignes de régularisation en attente d'affiliation pour cette paire (flag isRegul)
+  const regulCount = useMemo(
+    () => (rawRows || []).filter(r => r.isRegul && r.pair === effectivePair).length,
+    [rawRows, effectivePair]
+  )
 
   // Ops du plan : planId en col 8 (source de vérité)
   // Fallback pour plans antérieurs à la migration : matcher par date+paire+montant
@@ -276,6 +282,15 @@ function DcaDashboard({ plan, rawRows, prices, priceSources = {}, onBack, onRefr
               + Journal
             </button>
           )}
+          {/* Régularisation — affilier des lignes importées (OKX) au plan */}
+          <button
+            className="dca-btn dca-btn-ghost"
+            disabled={!regulCount}
+            title={regulCount ? `${regulCount} ligne(s) de régularisation pour ${effectivePair}` : `Aucune ligne de régularisation pour ${effectivePair}`}
+            style={{fontSize:'.62rem',padding:'7px 14px',whiteSpace:'nowrap',flexShrink:0,borderColor:'var(--gold)',color:regulCount?'var(--gold)':'var(--muted)',opacity:regulCount?1:.45,cursor:regulCount?'pointer':'not-allowed'}}
+            onClick={()=>{ if (regulCount) onRegularize?.() }}>
+            ⚖️ Régularisation{regulCount?` (${regulCount})`:''}
+          </button>
         </div>
       </div>
 

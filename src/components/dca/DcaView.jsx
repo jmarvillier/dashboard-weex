@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { getDcaPlans, saveDcaPlan, deleteDcaPlan, getDcaTemplates, saveDcaTemplate, deleteDcaTemplate } from '../../lib/dcaRepository.js'
 import { saveSnapshot, loadSnapshot }  from '../../lib/repository.js'
 import { filterOpsForPlan, getOpKey, newPlanId, normPair, parseDate, DEFAULT_ZONES } from '../../lib/dcaUtils.js'
+import { isRegulFlag } from '../../lib/parser.js'
 
 import DcaList      from './DcaList.jsx'
 import DcaStep1     from './DcaStep1.jsx'
@@ -118,6 +119,70 @@ async function clearPlanIds(planId) {
   }
 }
 
+/**
+ * Affiliation « régularisation » : écrit le planId (col 8) et remet le flag
+ * isRegul (col 9) à vide sur les SEULES lignes cochées. Purement additif —
+ * ne touche jamais les lignes non cochées ni les lignes non flaguées regul.
+ */
+async function assignRegulToPlan(ops, pointed, planId) {
+  try {
+    const snap = await loadSnapshot()
+    if (!snap?.rows) return
+    const rows = snap.rows.map(r => [...r])
+    let changed = false
+
+    // Index : timestamp → [rowIdx], limité aux lignes flaguées regul
+    const snapIndex = {}
+    for (let ri = 1; ri < rows.length; ri++) {
+      const r = rows[ri]
+      if (!r[1]) continue
+      if (!isRegulFlag(r[9])) continue
+      const d = parseDate(r[0])
+      if (!d) continue
+      const ts = d.getTime()
+      if (!snapIndex[ts]) snapIndex[ts] = []
+      snapIndex[ts].push(ri)
+    }
+
+    const usedRowIdx = new Set()
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i]
+      if (!pointed.includes(getOpKey(op, i))) continue   // additif : uniquement les cochées
+      if (!op.date) continue
+
+      let rowIdx = -1
+      const opTs = op.date.getTime()
+      for (const [tsKey, idxList] of Object.entries(snapIndex)) {
+        if (Math.abs(Number(tsKey) - opTs) > 86400000 * 2) continue
+        for (const ri of idxList) {
+          if (usedRowIdx.has(ri)) continue
+          const r = rows[ri]
+          if (normPair(String(r[1] || '').trim()) !== op.pair) continue
+          const snapSens = String(r[2] || '').trim().toLowerCase()
+          const opSens   = String(op.sens || '').trim().toLowerCase()
+          if (snapSens && opSens && snapSens !== opSens) continue
+          const snapAmt = (parseFloat(r[5]) || 0) || (parseFloat(r[6]) || 0) || (parseFloat(r[7]) || 0)
+          if (op.usdt > 0 && Math.abs(snapAmt - op.usdt) > 2) continue
+          rowIdx = ri
+          break
+        }
+        if (rowIdx >= 0) break
+      }
+
+      if (rowIdx < 0) continue
+      usedRowIdx.add(rowIdx)
+      while (rows[rowIdx].length <= 9) rows[rowIdx].push('')
+      rows[rowIdx][8] = planId   // affiliation au plan
+      rows[rowIdx][9] = ''       // reset du flag regul → disparaît du pointage regul
+      changed = true
+    }
+
+    if (changed) await saveSnapshot(rows, snap.source)
+  } catch (e) {
+    console.warn('assignRegulToPlan error:', e)
+  }
+}
+
 /* ── Orchestrateur ───────────────────────────────────────────────────────── */
 
 export default function DcaView({ pairList = [], rawRows = [], prices = {}, priceSources = {}, onRefresh }) {
@@ -129,6 +194,7 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, pric
   const [wizardErr,   setWizardErr]   = useState('')
   const [currentPlan, setCurrentPlan] = useState(null)
   const [wizard,      setWizard]      = useState(() => makeWizard(pairList[0]?.name))
+  const [regulWizard, setRegulWizard] = useState(null)
 
   useEffect(() => {
     Promise.all([getDcaPlans(), getDcaTemplates()])
@@ -141,6 +207,26 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, pric
   const openPlan      = plan => { setCurrentPlan(plan); setScreen('dashboard') }
   const startWizard   = ()   => { setWizard(makeWizard(pairList[0]?.name)); setCurrentPlan(null); setScreen(1) }
   const backToList    = ()   => setScreen('list')
+
+  /* ── Régularisation : ouvre le pointage filtré sur les lignes regul du plan ── */
+  const openRegul = () => {
+    if (!currentPlan) return
+    setRegulWizard({
+      pair:       currentPlan.pair,
+      customPair: '',
+      startDate:  '',          // pas de filtre de date : on prend toutes les lignes regul de la paire
+      endDate:    '',
+      pointedOps: [],          // rien coché par défaut
+      planId:     currentPlan.id,
+    })
+    setScreen('regul')
+  }
+
+  const affiliateRegul = async (ops, pointed) => {
+    if (!currentPlan) return
+    await assignRegulToPlan(ops, pointed, currentPlan.id)
+    onRefresh?.()
+  }
 
   /* ── Plans ── */
   const deletePlan = async id => {
@@ -250,6 +336,16 @@ export default function DcaView({ pairList = [], rawRows = [], prices = {}, pric
           priceSources={priceSources}
           onBack={backToList}
           onRefresh={onRefresh}
+          onRegularize={openRegul}
+        />
+      )}
+      {screen === 'regul' && currentPlan && regulWizard && (
+        <DcaStep2
+          regul
+          wizard={regulWizard} setWizard={setRegulWizard}
+          rawRows={rawRows}
+          onBack={() => setScreen('dashboard')}
+          onAffiliate={affiliateRegul}
         />
       )}
     </div>
