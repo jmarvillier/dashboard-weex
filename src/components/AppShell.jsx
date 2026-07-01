@@ -10,12 +10,14 @@ import PairesView    from './PairesView.jsx'
 import DataPanel     from './DataPanel.jsx'
 import PeriodFilter  from './PeriodFilter.jsx'
 import DcaView       from './dca/DcaView.jsx'
+import XperpsView    from './xperps/XperpsView.jsx'
 import { usePeriodFilter } from '../hooks/usePeriodFilter.js'
 import { auth, signOut }   from '../lib/firebase.js'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '🚀', label: 'Dashboard',         sublabel: 'Vue globale'            },
   { id: 'paires',    icon: '📊', label: 'Paires',            sublabel: 'Détail par paire'        },
+  { id: 'xperps',    icon: '🎯', label: 'XPERPS',            sublabel: 'Trades perp'             },
   { id: 'donnees',   icon: '🗃️', label: 'Données',           sublabel: 'Gérer le journal'        },
   { id: 'dca',       icon: '📈', label: 'Scaled Mirror DCA', sublabel: 'Accumulation graduée'    },
 ]
@@ -237,6 +239,9 @@ export default function AppShell({
           )}
           {activePage === 'paires' && (
             <PagePaires pairList={pairList} excluded={excluded} toggleFlag={toggleFlag} />
+          )}
+          {activePage === 'xperps' && (
+            <XperpsView />
           )}
           {activePage === 'donnees' && (
             <DataPanel
