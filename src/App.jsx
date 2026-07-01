@@ -21,7 +21,7 @@ export default function App() {
 
   const {
     view, zone, loading, loadingTxt,
-    fileName, loadedAt, pairList, rawRows, excluded, driveErr,
+    fileName, loadedAt, pairList, rawRows, xperpTrades, excluded, driveErr,
     repoAvailable,
     prices, priceSources, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
     setZone, setDriveErr,
@@ -92,6 +92,7 @@ export default function App() {
           excluded={excluded}
           pairList={pairList}
           rawRows={rawRows}
+          xperpTrades={xperpTrades}
           prices={prices}
           priceSources={priceSources}
           repoAvailable={repoAvailable}
