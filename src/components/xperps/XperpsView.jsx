@@ -1,10 +1,9 @@
 /**
  * XperpsView.jsx — Suivi des trades XPERP (futures perpétuels)
  * ─────────────────────────────────────────────────────────────────────────────
- * Composant « fin » : aucune logique de calcul ici. Toutes les stats viennent de
- * useXperps → aggregateXperps (lib/xperps.js). Charte v5 bleu nuit crépusculaire.
- *
- * Unités : PnL USDC (natif) · R (via risque de réf.) · % du notionnel.
+ * Lit la collection Firestore `users/{uid}/xperps` (documents figés par le skill,
+ * R EXACT via le stop). Composant « fin » : aucune logique de calcul ici — tout
+ * vient de useXperps → aggregateXperps. Charte v5 bleu nuit crépusculaire.
  */
 
 import { useState } from 'react'
@@ -82,8 +81,8 @@ function Donut({ wins, losses, be }) {
 }
 
 /* ── Vue principale ────────────────────────────────────────────────────────── */
-export default function XperpsView({ trades = [] }) {
-  const { period, setPeriod, refRisk, setRefRisk, stats, hasData, allCount } = useXperps(trades)
+export default function XperpsView() {
+  const { period, setPeriod, stats, loading, error, reload, hasData, allCount } = useXperps()
   const [eqUnit, setEqUnit] = useState('usd') // 'usd' | 'r'
 
   const s = stats
@@ -102,7 +101,7 @@ export default function XperpsView({ trades = [] }) {
   return (
     <div className="page-content xp-root">
 
-      {/* En-tête : période + risque de réf. */}
+      {/* En-tête : période + qualité du R + actualiser */}
       <div className="xp-head">
         <div className="period-tabs">
           {PERIODS.map(p => (
@@ -111,24 +110,37 @@ export default function XperpsView({ trades = [] }) {
             </button>
           ))}
         </div>
-        <div className="xp-risk">
-          <span className="xp-risk-lbl">Risque de réf.</span>
-          <div className="xp-risk-input">
-            <span>$</span>
-            <input type="number" min="1" step="1" value={refRisk || ''} onChange={e => setRefRisk(e.target.value)} />
-          </div>
-          <span className="xp-risk-hint">sert à convertir le PnL en R</span>
+        <div className="xp-head-right">
+          {hasData && (
+            <span className="xp-rquality">
+              R exact&nbsp;<b className="xp-pos">{s.exactCount}</b>
+              {s.fixedCount > 0 && <> · approx&nbsp;<b className="xp-zer">{s.fixedCount}</b></>}
+            </span>
+          )}
+          <button className="xp-reload" onClick={reload} disabled={loading} aria-label="Actualiser">
+            {loading ? '…' : '↻'}
+          </button>
         </div>
       </div>
 
-      {!hasData ? (
+      {loading && !hasData ? (
+        <div className="xp-empty"><div className="xp-empty-icon">↻</div><div className="xp-empty-title">Chargement des trades XPERP…</div></div>
+      ) : error ? (
+        <div className="xp-empty">
+          <div className="xp-empty-icon">⚠️</div>
+          <div className="xp-empty-title">Impossible de charger la collection</div>
+          <div className="xp-empty-sub">{error}</div>
+          <button className="xp-retry" onClick={reload}>Réessayer</button>
+        </div>
+      ) : !hasData ? (
         <div className="xp-empty">
           <div className="xp-empty-icon">🎯</div>
-          <div className="xp-empty-title">Aucun trade XPERP dans le journal</div>
+          <div className="xp-empty-title">Aucun trade XPERP en base</div>
           <div className="xp-empty-sub">
-            Lance la régularisation OKX (<code>/ydash-regul-okx</code>) pour importer tes shorts / longs
-            clôturés. Chaque trade soldé apparaîtra ici automatiquement.
+            Lance la régularisation OKX (<code>/ydash-regul-okx</code>) pour peupler la collection
+            <code>xperps</code>. Chaque position clôturée apparaîtra ici automatiquement.
           </div>
+          <button className="xp-retry" onClick={reload}>Actualiser</button>
         </div>
       ) : (
         <>
@@ -146,7 +158,7 @@ export default function XperpsView({ trades = [] }) {
             </div>
             <div className="xp-k">
               <div className={`xp-kv ${sgn(s.rNet)}`}>{rfmt(s.rNet)}</div>
-              <div className="xp-kl">R net</div>
+              <div className="xp-kl">R net (exact)</div>
               <div className="xp-ks"><span className="xp-pos">+{s.rWon.toFixed(1)}R</span> · <span className="xp-neg">−{s.rLost.toFixed(1)}R</span></div>
             </div>
             <div className="xp-k">
@@ -190,11 +202,11 @@ export default function XperpsView({ trades = [] }) {
           <div className="xp-ls">
             <div className="xp-lscard">
               <div className="xp-ls-top"><span className="xp-ls-tag xp-ls-long">LONG</span><span className={`xp-ls-pnl ${sgn(lg.pnl)}`}>{money(lg.pnl)}</span></div>
-              <div className="xp-ls-meta">{lg.n} trades · {lgWr != null ? lgWr + '% WR' : '—'} · <span className="xp-pos">{lg.wins}G</span>/<span className="xp-neg">{lg.losses}P</span> · {rfmt(lg.pnl / s.risk)}</div>
+              <div className="xp-ls-meta">{lg.n} trades · {lgWr != null ? lgWr + '% WR' : '—'} · <span className="xp-pos">{lg.wins}G</span>/<span className="xp-neg">{lg.losses}P</span> · {rfmt(lg.rNet)}</div>
             </div>
             <div className="xp-lscard">
               <div className="xp-ls-top"><span className="xp-ls-tag xp-ls-short">SHORT</span><span className={`xp-ls-pnl ${sgn(sh.pnl)}`}>{money(sh.pnl)}</span></div>
-              <div className="xp-ls-meta">{sh.n} trades · {shWr != null ? shWr + '% WR' : '—'} · <span className="xp-pos">{sh.wins}G</span>/<span className="xp-neg">{sh.losses}P</span> · {rfmt(sh.pnl / s.risk)}</div>
+              <div className="xp-ls-meta">{sh.n} trades · {shWr != null ? shWr + '% WR' : '—'} · <span className="xp-pos">{sh.wins}G</span>/<span className="xp-neg">{sh.losses}P</span> · {rfmt(sh.rNet)}</div>
             </div>
           </div>
 
@@ -247,7 +259,7 @@ export default function XperpsView({ trades = [] }) {
                   )
                 })}
               </div>
-              <div className="xp-hours-legend">chiffre = nb de trades · couleur = PnL net du créneau</div>
+              <div className="xp-hours-legend">chiffre = nb de trades · couleur = PnL net du créneau (heure locale)</div>
             </div>
 
             <div className="xp-chips">
@@ -275,7 +287,9 @@ export default function XperpsView({ trades = [] }) {
           </div>
 
           {/* ── Distribution en R ── */}
-          <div className="v5-section-title">Distribution des trades (en R · risque {money(s.risk)})</div>
+          <div className="v5-section-title">
+            Distribution des trades (en R){s.fixedCount > 0 && <span className="xp-approx"> · {s.fixedCount} en R approx.</span>}
+          </div>
           <div className="xp-card">
             <div className="xp-dist">
               {s.dist.map((n, i) => (
@@ -288,7 +302,7 @@ export default function XperpsView({ trades = [] }) {
             </div>
           </div>
 
-          <div className="xp-foot">{s.total} trade(s) sur {allCount} au total · unités : PnL USDC · R (risque {money(s.risk)}) · % du notionnel</div>
+          <div className="xp-foot">{s.total} trade(s) sur {allCount} en base · R exact via le stop, PnL net de frais + funding · heure locale Europe/Paris</div>
         </>
       )}
     </div>

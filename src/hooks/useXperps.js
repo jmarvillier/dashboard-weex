@@ -1,45 +1,44 @@
 /**
  * useXperps.js
  * ─────────────────────────────────────────────────────────────────────────────
- * État du menu XPERPS : période sélectionnée + risque de référence (persisté en
- * localStorage, compatible Safari iPad) + agrégation mémoïsée des trades.
- *
- * `trades` est la liste déjà extraite du journal (extractXperpTrades), passée en
- * prop depuis useTrading — référence stable jusqu'au prochain chargement.
+ * Charge les trades XPERP depuis la collection Firestore `users/{uid}/xperps`
+ * (via xperpsRepository), gère la période et l'agrégation mémoïsée. Le R est
+ * EXACT (figé dans chaque document) : plus de risque de référence à saisir.
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { listXperps } from '../lib/xperpsRepository.js'
 import { filterByPeriod, aggregateXperps } from '../lib/xperps.js'
 
-const RISK_KEY = 'ydash-xperp-risk'
-const DEFAULT_RISK = 10
+export function useXperps() {
+  const [docs, setDocs]       = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState(null)
+  const [period, setPeriod]   = useState('semaine')
 
-function loadRisk() {
-  try {
-    const v = parseFloat(localStorage.getItem(RISK_KEY))
-    return isNaN(v) || v <= 0 ? DEFAULT_RISK : v
-  } catch { return DEFAULT_RISK }
-}
-
-export function useXperps(trades = []) {
-  const [period, setPeriod]        = useState('semaine')
-  const [refRisk, setRefRiskState] = useState(loadRisk)
-
-  const setRefRisk = useCallback(v => {
-    const n = parseFloat(v)
-    const safe = isNaN(n) || n < 0 ? 0 : n
-    setRefRiskState(safe)
-    try { if (safe > 0) localStorage.setItem(RISK_KEY, String(safe)) } catch { /* Safari privé */ }
+  const reload = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      const d = await listXperps()
+      setDocs(Array.isArray(d) ? d : [])
+    } catch (e) {
+      setError(e?.message || 'Erreur de chargement')
+      setDocs([])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  const filtered = useMemo(() => filterByPeriod(trades, period), [trades, period])
-  const stats    = useMemo(() => aggregateXperps(filtered, refRisk || DEFAULT_RISK), [filtered, refRisk])
+  useEffect(() => { reload() }, [reload])
+
+  const filtered = useMemo(() => filterByPeriod(docs, period), [docs, period])
+  const stats    = useMemo(() => aggregateXperps(filtered), [filtered])
 
   return {
     period, setPeriod,
-    refRisk, setRefRisk,
-    filtered, stats,
-    hasData: trades.length > 0,
-    allCount: trades.length,
+    docs, filtered, stats,
+    loading, error, reload,
+    hasData: docs.length > 0,
+    allCount: docs.length,
   }
 }

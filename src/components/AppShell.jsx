@@ -210,7 +210,7 @@ function PagePaires({ pairList, excluded, toggleFlag }) {
 /* ── AppShell ────────────────────────────────────────────────────────────── */
 export default function AppShell({
   activePage, setActivePage,
-  excluded, pairList, rawRows, xperpTrades, prices, priceSources,
+  excluded, pairList, rawRows, prices, priceSources,
   repoAvailable, backToLanding, toggleFlag,
   loadFromFile, regularizeFromFile, loadFromDrive, driveErr, setDriveErr, onRepoUpdated,
   pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
@@ -241,7 +241,7 @@ export default function AppShell({
             <PagePaires pairList={pairList} excluded={excluded} toggleFlag={toggleFlag} />
           )}
           {activePage === 'xperps' && (
-            <XperpsView trades={xperpTrades} />
+            <XperpsView />
           )}
           {activePage === 'donnees' && (
             <DataPanel

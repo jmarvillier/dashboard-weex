@@ -106,3 +106,22 @@
 @media (max-width: 420px) {
   .xp-ls, .xp-chips { grid-template-columns: 1fr; }
 }
+
+/* ── v1.2 : lecture collection (chargement / actualiser / qualité R) ───────── */
+.xp-head-right { display: flex; align-items: center; gap: 12px; }
+.xp-rquality { font-size: .58rem; color: var(--muted); letter-spacing: .04em; }
+.xp-rquality b { font-weight: 700; }
+.xp-reload {
+  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text2); font-size: .9rem; cursor: pointer;
+  font-family: 'Space Mono', monospace; line-height: 1;
+}
+.xp-reload:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.xp-reload:disabled { opacity: .5; cursor: default; }
+.xp-retry {
+  margin-top: 14px; padding: 8px 18px; border-radius: 9px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text); font-family: 'Space Mono', monospace;
+  font-weight: 700; font-size: .68rem; cursor: pointer;
+}
+.xp-retry:hover { border-color: var(--gold); color: var(--gold); }
+.xp-approx { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
