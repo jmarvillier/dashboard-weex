@@ -5,6 +5,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { parseCSV, isUsdPair } from '../lib/parser.js'
 import { process, buildPairList, enrichWithPrices, extractRawRows } from '../lib/process.js'
+import { extractXperpTrades } from '../lib/xperps.js'
 import { saveSnapshot, loadSnapshot, hasSnapshot, clearSnapshot, appendRows } from '../lib/repository.js'
 import { usePrices } from './usePrices.js'
 
@@ -39,6 +40,7 @@ export function useTrading() {
   const [loadedAt, setLoadedAt]       = useState('')
   const [pairList, setPairList]       = useState([])
   const [rawRows, setRawRows]         = useState([])   // ← lignes brutes avec dates
+  const [xperpTrades, setXperpTrades] = useState([])   // ← trades XPERP extraits du journal
   const [excluded, setExcluded]       = useState(new Set())
   const [driveErr, setDriveErr]       = useState(null)
   const [repoAvailable, setRepoAvailable] = useState(false)
@@ -71,9 +73,11 @@ export function useTrading() {
     const P    = process(rows)
     const list = buildPairList(P)
     const raw  = extractRawRows(rows)          // ← extraction des rawRows avec dates
+    const xper = extractXperpTrades(rows)      // ← trades XPERP (Notes « xperp »)
     const autoExcl = new Set(list.filter(p => isUsdPair(p.name)).map(p => p.name))
     setPairList(list)
     setRawRows(raw)
+    setXperpTrades(xper)
     setExcluded(autoExcl)
     setFileName(name)
     setLoadedAt(
@@ -230,13 +234,14 @@ export function useTrading() {
     setZone(null)
     setPairList([])
     setRawRows([])
+    setXperpTrades([])
     setExcluded(new Set())
     setDriveErr(null)
   }, [])
 
   return {
     view, zone, loading, loadingTxt,
-    fileName, loadedAt, pairList, rawRows, excluded, driveErr,
+    fileName, loadedAt, pairList, rawRows, xperpTrades, excluded, driveErr,
     repoAvailable,
     // Prix live
     prices, priceSources, pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
