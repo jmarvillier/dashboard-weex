@@ -10,12 +10,14 @@ import PairesView    from './PairesView.jsx'
 import DataPanel     from './DataPanel.jsx'
 import PeriodFilter  from './PeriodFilter.jsx'
 import DcaView       from './dca/DcaView.jsx'
+import XperpsView    from './xperps/XperpsView.jsx'
 import { usePeriodFilter } from '../hooks/usePeriodFilter.js'
 import { auth, signOut }   from '../lib/firebase.js'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '🚀', label: 'Dashboard',         sublabel: 'Vue globale'            },
   { id: 'paires',    icon: '📊', label: 'Paires',            sublabel: 'Détail par paire'        },
+  { id: 'xperps',    icon: '🎯', label: 'XPERPS',            sublabel: 'Trades perp'             },
   { id: 'donnees',   icon: '🗃️', label: 'Données',           sublabel: 'Gérer le journal'        },
   { id: 'dca',       icon: '📈', label: 'Scaled Mirror DCA', sublabel: 'Accumulation graduée'    },
 ]
@@ -208,7 +210,7 @@ function PagePaires({ pairList, excluded, toggleFlag }) {
 /* ── AppShell ────────────────────────────────────────────────────────────── */
 export default function AppShell({
   activePage, setActivePage,
-  excluded, pairList, rawRows, prices, priceSources,
+  excluded, pairList, rawRows, xperpTrades, prices, priceSources,
   repoAvailable, backToLanding, toggleFlag,
   loadFromFile, regularizeFromFile, loadFromDrive, driveErr, setDriveErr, onRepoUpdated,
   pricesLoading, pricesError, priceSource, lastPriceUpdate, refreshPrices,
@@ -237,6 +239,9 @@ export default function AppShell({
           )}
           {activePage === 'paires' && (
             <PagePaires pairList={pairList} excluded={excluded} toggleFlag={toggleFlag} />
+          )}
+          {activePage === 'xperps' && (
+            <XperpsView trades={xperpTrades} />
           )}
           {activePage === 'donnees' && (
             <DataPanel
