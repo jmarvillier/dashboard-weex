@@ -9,8 +9,30 @@
 const STABLES = new Set(['USDT','USDC','BUSD','DAI','TUSD','FDUSD','USDP'])
 const METALS  = new Set(['XAG','XAU','XPT','XPD'])
 
-function getBase(pair)   { return pair.split('/')[0].toUpperCase() }
-function getQuote(pair)  { return (pair.split('/')[1] || 'USDT').toUpperCase() }
+const QUOTE_SUFFIXES = ['USDT','USDC','FDUSD','BUSD','TUSD','DAI','EUR','USD']
+
+/**
+ * Découpe une paire en base/quote.
+ * Tolère les libellés SANS slash ("SOLUSDT") en plus de "SOL/USDT".
+ * Sans ce garde-fou, "SOLUSDT" donnait base="SOLUSDT" + quote="USDT"
+ * → symbole "SOLUSDTUSDT" → 400 Binance → TOUTE la batch tombait.
+ */
+function splitPair(pair) {
+  const raw = String(pair).trim().toUpperCase()
+  if (raw.includes('/')) {
+    const [b, q] = raw.split('/')
+    return { base: b, quote: (q || 'USDT') }
+  }
+  for (const q of QUOTE_SUFFIXES) {
+    if (raw.length > q.length && raw.endsWith(q)) {
+      return { base: raw.slice(0, -q.length), quote: q }
+    }
+  }
+  return { base: raw, quote: 'USDT' }
+}
+
+function getBase(pair)   { return splitPair(pair).base }
+function getQuote(pair)  { return splitPair(pair).quote }
 function isTrading(pair) { return !STABLES.has(getBase(pair)) }
 function isMetal(pair)   { return METALS.has(getBase(pair)) }
 function isCrypto(pair)  { return isTrading(pair) && !isMetal(pair) }
@@ -209,22 +231,60 @@ async function fromJsDelivrMetals(pairs) {
   return prices
 }
 
+// ── CRYPTO : Source 0 — OKX (référence, 1 seul appel) ────────────────────────
+// GET /api/v5/market/tickers?instType=SPOT → ~1400 instruments d'un coup.
+// Pas de clé, CORS ouvert, et c'est l'exchange réellement tradé.
+// Avantage clé : un symbole inconnu n'invalide PAS les autres.
+let _okxCache = { at: 0, map: null }
+
+async function okxSpotMap() {
+  if (_okxCache.map && Date.now() - _okxCache.at < 30_000) return _okxCache.map
+  const res = await fetchWithTimeout('https://www.okx.com/api/v5/market/tickers?instType=SPOT', 8000)
+  if (!res.ok) throw new Error(`OKX tickers → HTTP ${res.status}`)
+  const data = await res.json()
+  if (data?.code !== '0' || !Array.isArray(data.data)) throw new Error(`OKX tickers → code ${data?.code}`)
+  const map = new Map()
+  for (const t of data.data) {
+    const last = parseFloat(t.last)
+    if (t.instId && !isNaN(last) && last > 0) map.set(t.instId, last)
+  }
+  _okxCache = { at: Date.now(), map }
+  return map
+}
+
+async function fromOkxCrypto(pairs) {
+  const cp = pairs.filter(isCrypto)
+  if (!cp.length) return {}
+  const map = await okxSpotMap()
+  const prices = {}
+  for (const p of cp) {
+    const { base, quote } = splitPair(p)
+    // quote demandée d'abord, puis équivalents stables
+    for (const q of [quote, 'USDT', 'USDC', 'USD']) {
+      const v = map.get(`${base}-${q}`)
+      if (v != null) { prices[p] = v; break }
+    }
+  }
+  return prices
+}
+
 // ── CRYPTO : Source 1 — Binance ───────────────────────────────────────────────
 async function fromBinance(pairs) {
   const cp = pairs.filter(isCrypto)
   if (!cp.length) return {}
-  const symbols = cp.map(p => `"${getBase(p)}${getQuote(p)}"`)
-  const res  = await fetchWithTimeout(
-    `https://api.binance.com/api/v3/ticker/price?symbols=[${symbols.join(',')}]`
-  )
-  if (!res.ok) throw new Error(`Binance → HTTP ${res.status}`)
-  const data = await res.json()
   const prices = {}
-  for (const p of cp) {
-    const sym   = `${getBase(p)}${getQuote(p)}`
-    const entry = data.find(d => d.symbol === sym)
-    if (entry?.price) prices[p] = parseFloat(entry.price)
-  }
+  // Requêtes UNITAIRES : l'endpoint batch renvoie 400 (-1121 Invalid symbol)
+  // dès qu'UN seul symbole est inconnu → on perdait tous les cours d'un coup.
+  await Promise.allSettled(cp.map(async p => {
+    const sym = `${getBase(p)}${getQuote(p)}`
+    const res = await fetchWithTimeout(
+      `https://api.binance.com/api/v3/ticker/price?symbol=${sym}`, 8000
+    )
+    if (!res.ok) return
+    const data = await res.json()
+    const v = parseFloat(data?.price)
+    if (!isNaN(v) && v > 0) prices[p] = v
+  }))
   return prices
 }
 
@@ -247,7 +307,11 @@ async function fromKrakenCrypto(pairs) {
   )
   if (!res.ok) throw new Error(`Kraken → HTTP ${res.status}`)
   const data = await res.json()
-  if (data.error?.length) throw new Error(`Kraken: ${data.error[0]}`)
+  // Kraken renvoie une erreur par symbole inconnu tout en servant les autres :
+  // on ne jette QUE si rien n'est exploitable.
+  if (data.error?.length && !Object.keys(data.result || {}).length) {
+    throw new Error(`Kraken: ${data.error[0]}`)
+  }
   const prices = {}
   const keys   = Object.keys(data.result || {})
   for (const { pair, sym } of entries) {
@@ -367,8 +431,14 @@ export async function fetchLivePrices(pairNames) {
   
   // ── Crypto ─────────────────────────────────────────────────────────────────
   if (cryptos.length) {
+    // 0. OKX — référence
+    const okxC = await trySource('OKX-crypto', () => fromOkxCrypto(cryptos))
+    mergeMissing(prices, priceSources, okxC, 'OKX')
+    if (Object.keys(okxC).length) sources.push('OKX')
+
     // 1. Binance
-    const bn = await trySource('Binance', () => fromBinance(cryptos))
+    const missB = cryptos.filter(p => prices[p] === undefined)
+    const bn = missB.length ? await trySource('Binance', () => fromBinance(missB)) : {}
     mergeMissing(prices, priceSources, bn, 'Binance')
     if (Object.keys(bn).length) sources.push('Binance')
 
